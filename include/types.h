@@ -10,14 +10,14 @@
 #define MAX_FB_W 1920
 #define MAX_FB_H 1200
 
-#define MAX_WIDGETS 96
+#define MAX_WIDGETS 128
 #define MAX_TEXT 128
 #define MAX_ID 32
 #define MAX_ATTR 64
-#define MAX_CHILDREN 32
+#define MAX_CHILDREN 48
 #define MAX_INPUT_DEVS 16
 #define MAX_PATH 256
-#define MAX_SOFTKEY 16
+#define MAX_SOFTKEY 24
 
 #define UNIT_PX 0
 #define UNIT_PCT 1
@@ -25,21 +25,24 @@
 
 #define RGB565(r, g, b) ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | (((b) & 0xF8) >> 3)))
 
-#define COL_BG       RGB565(12, 18, 28)
-#define COL_PANEL    RGB565(24, 36, 52)
-#define COL_BORDER   RGB565(48, 72, 96)
-#define COL_TEXT     RGB565(220, 228, 236)
-#define COL_DIM      RGB565(120, 136, 152)
-#define COL_ACCENT   RGB565(40, 160, 220)
-#define COL_FOCUS    RGB565(20, 90, 140)
-#define COL_SOFTKEY  RGB565(18, 28, 40)
+#define COL_BG       RGB565(11, 15, 23)
+#define COL_PANEL    RGB565(21, 28, 40)
+#define COL_BORDER   RGB565(40, 52, 72)
+#define COL_TEXT     RGB565(241, 245, 249)
+#define COL_DIM      RGB565(148, 163, 184)
+#define COL_ACCENT   RGB565(37, 99, 235)
+#define COL_FOCUS    RGB565(30, 64, 175)
+#define COL_SOFTKEY  RGB565(15, 20, 30)
 #define COL_WARN     RGB565(220, 160, 40)
-#define COL_OK       RGB565(40, 180, 90)
+#define COL_OK       RGB565(22, 163, 74)
+#define COL_DANGER   RGB565(220, 38, 38)
+#define COL_PILL     RGB565(30, 41, 59)
 
 typedef enum {
     W_SCREEN = 0,
     W_VBOX,
     W_HBOX,
+    W_GRID,
     W_LABEL,
     W_BUTTON,
     W_INPUT,
@@ -70,6 +73,7 @@ struct Widget {
     char id[MAX_ID];
     char text[MAX_TEXT];
     char action[MAX_PATH];
+    char icon[MAX_ID];
     int x, y, w, h;
     int sx, sy, sw, sh;
     unsigned xu : 2;
@@ -86,6 +90,7 @@ struct Widget {
     int children[MAX_CHILDREN];
     int list_sel;
     int scroll;
+    int value;
 };
 
 typedef struct {
@@ -133,6 +138,7 @@ typedef struct {
     int shift;
     int caps;
     int bound_w, bound_h;
+    int last_qwerty;
 } InputState;
 
 typedef struct {

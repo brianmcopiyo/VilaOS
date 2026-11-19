@@ -330,9 +330,32 @@ void input_shutdown(InputMux *m)
     m->tty_fd = -1;
 }
 
+void input_mode_label(const InputMux *m, char *buf, size_t n)
+{
+    if (!buf || n == 0)
+        return;
+    if (!m) {
+        str_copy(buf, n, "[T9: abc]");
+        return;
+    }
+    if (m->dialer_mode) {
+        str_copy(buf, n, "[123]");
+        return;
+    }
+    if (m->state.last_qwerty) {
+        str_copy(buf, n, "[QWERTY]");
+        return;
+    }
+    if (m->t9.upper)
+        str_copy(buf, n, "[T9: ABC]");
+    else
+        str_copy(buf, n, "[T9: abc]");
+}
+
 void input_set_dialer_mode(InputMux *m, int enabled)
 {
     m->dialer_mode = enabled;
+    m->state.last_qwerty = 0;
     t9_reset(&m->t9);
 }
 
@@ -512,6 +535,7 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
     char q = key_to_char(m, code);
     if (q && letter_from_key(code)) {
         t9_reset(&m->t9);
+        m->state.last_qwerty = 1;
         out->kind = IE_CHAR;
         out->ch = q;
         out->x = 0;
@@ -523,6 +547,7 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
               code == KEY_MINUS || code == KEY_EQUAL || code == KEY_LEFTBRACE ||
               code == KEY_RIGHTBRACE || code == KEY_BACKSLASH || code == KEY_GRAVE)) {
         t9_reset(&m->t9);
+        m->state.last_qwerty = 1;
         out->kind = IE_CHAR;
         out->ch = q;
         out->x = 0;
@@ -534,6 +559,7 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
     if (digit >= 0) {
         if (m->dialer_mode) {
             t9_reset(&m->t9);
+            m->state.last_qwerty = 0;
             out->kind = IE_CHAR;
             out->ch = (char)('0' + digit);
             out->x = 0;
@@ -542,12 +568,14 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
         if (m->state.shift && code >= KEY_0 && code <= KEY_9) {
             char c = key_to_char(m, code);
             t9_reset(&m->t9);
+            m->state.last_qwerty = 1;
             out->kind = IE_CHAR;
             out->ch = c;
             out->x = 0;
             m->state.shift = 0;
             return 1;
         }
+        m->state.last_qwerty = 0;
         int replace = 0;
         char c = t9_feed(&m->t9, digit, now_ms(), &replace);
         out->kind = IE_CHAR;

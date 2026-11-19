@@ -36,9 +36,26 @@ src/gfx/      framebuffer, software renderer, bitmap fonts
 src/xml/      zero-allocation streaming XML parser
 src/ui/       widget pool + screen loader/renderer
 src/input/    epoll input mux, T9, QWERTY, mouse cursor
-assets/screens/  declarative XML UIs
+src/sdk/      VSL interpreter + capability bridge + app host
+src/pkg/      package registry install/update/remove
+apps/         installable app packages (manifest + ui + logic)
+sdk/          vilaos-sdk pack/new/validate + templates
+assets/screens/  shell screens (idle/home)
 scripts/      QEMU / VirtualBox packaging
 ```
+
+## App SDK & packages
+
+```bash
+sdk/vilaos-sdk new myapp
+sdk/vilaos-sdk pack apps/dialer -o build/packages/dialer.vpkg
+make pkg
+./vilaos-pkg install build/packages/dialer.vpkg
+./vilaos-pkg list
+./vilaos-pkg remove dialer
+```
+
+Apps install under `/apps/<id>/` with persistent data in `/data/apps/<id>/`. Launcher actions use `app:<id>`. Backend logic is VSL (`logic/*.vsl`) with capability checks.
 
 ## Build (Linux / WSL)
 
@@ -77,14 +94,19 @@ qemu-system-x86_64 -m 32M \
 
 | File | Purpose |
 |------|---------|
-| `home.xml` | Status bar, launcher list, softkeys |
-| `dialer.xml` | Numeric entry + Call/Clear |
-| `messages.xml` / `compose.xml` | SMS list + T9/QWERTY/mouse compose |
-| `sysinfo.xml` | Live `/proc/meminfo`, uptime, self RSS, FB mode |
-| `contacts.xml` / `notes.xml` | Extra MVP apps |
+| `idle.xml` | Lock screen with clock, date, notification pills |
+| `home.xml` | Responsive icon launcher grid |
+| `dialer.xml` / `call_active.xml` | Keypad dialer and live call controls |
+| `messages.xml` / `message_thread.xml` / `compose.xml` | Threads, bubbles, T9/QWERTY compose |
+| `contacts.xml` / `contact_detail.xml` | Contact list and detail actions |
+| `notes.xml` | Notes list and editor |
+| `calculator.xml` | Arithmetic calculator |
+| `clock.xml` | Alarms, stopwatch, countdown timer |
+| `files.xml` | File browser with preview |
+| `settings.xml` | Display, input, sound, about |
 
 ## Memory notes
 
 - RGB565 backbuffer sized to the active framebuffer resolution
-- Widget pool: fixed `MAX_WIDGETS` (96), no per-parse heap DOM
+- Widget pool: fixed `MAX_WIDGETS`, no per-parse heap DOM
 - Dirty-rectangle blit to `/dev/fb0` filling the full display

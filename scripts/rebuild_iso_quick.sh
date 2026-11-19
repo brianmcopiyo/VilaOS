@@ -5,17 +5,22 @@ HOST="/mnt/c/Users/HP/Desktop/OS"
 WORK="/root/vilaos-work/src"
 OLD="/root/phoneos-work/src"
 
-find "${HOST}/src" "${HOST}/include" "${HOST}/assets" "${HOST}/scripts" -type f \( -name "*.c" -o -name "*.h" -o -name "*.xml" -o -name "*.sh" -o -name "Makefile" \) -exec sed -i "s/\r$//" {} +
+find "${HOST}/src" "${HOST}/include" "${HOST}/assets" "${HOST}/apps" "${HOST}/sdk" "${HOST}/scripts" -type f \( -name "*.c" -o -name "*.h" -o -name "*.xml" -o -name "*.sh" -o -name "*.vsl" -o -name "Makefile" -o -name "vilaos-sdk" \) -exec sed -i "s/\r$//" {} + 2>/dev/null || true
 
 mkdir -p "${WORK}/build"
 rsync -a --delete \
   --exclude build \
   --exclude ".git" \
   --exclude "*.png" \
-  --exclude "vilaos" \
-  --exclude "vilaos-*" \
-  --exclude "phoneos" \
-  --exclude "phoneos-*" \
+  --exclude "/vilaos" \
+  --exclude "/vilaos-musl" \
+  --exclude "/vilaos-pkg" \
+  --exclude "/vilaos-pkg-musl" \
+  --exclude "/vilaos-desktop" \
+  --exclude "/vilaos-vfb" \
+  --exclude "/vilaos-static" \
+  --exclude "/phoneos" \
+  --exclude "/phoneos-*" \
   "${HOST}/" "${WORK}/"
 
 if [[ -d "${OLD}/build" ]]; then
@@ -33,7 +38,8 @@ ln -sfn /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm
 cd "${WORK}"
 make clean
 make musl
-strip --strip-unneeded vilaos-musl
+strip --strip-unneeded vilaos-musl vilaos-pkg-musl
+bash scripts/pack_apps.sh
 
 if [[ ! -f build/bzImage ]]; then
   echo "missing build/bzImage; run full build first" >&2
@@ -54,14 +60,17 @@ fi
 
 ROOTFS="${WORK}/build/rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens,apps,data/apps,var/lib/vilaos,packages}
 cp -f "${BB}" "${ROOTFS}/bin/busybox"
-for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg; do
+for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
 done
 cp -f vilaos-musl "${ROOTFS}/bin/vilaos"
-chmod 755 "${ROOTFS}/bin/vilaos"
+cp -f vilaos-pkg-musl "${ROOTFS}/bin/vilaos-pkg"
+chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
 cp -a assets/screens/. "${ROOTFS}/assets/screens/"
+cp -a apps/. "${ROOTFS}/apps/"
+cp -a build/packages/. "${ROOTFS}/packages/" 2>/dev/null || true
 
 cat > "${ROOTFS}/init" << "EOF"
 #!/bin/sh
@@ -73,7 +82,7 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 cd /
@@ -123,6 +132,8 @@ genisoimage -o "${ISO_OUT}" \
   -J -R -V VILAOS \
   "${ISO_ROOT}"
 
+mkdir -p "${HOST}/build/packages"
 cp -f "${ISO_OUT}" "${WORK}/build/bzImage" "${WORK}/build/rootfs.cpio.gz" "${HOST}/build/"
+cp -a "${WORK}/build/packages/." "${HOST}/build/packages/" 2>/dev/null || true
 ls -lh "${HOST}/build/vilaos.iso" "${HOST}/build/bzImage" "${HOST}/build/rootfs.cpio.gz"
 echo "ISO ready: ${HOST}/build/vilaos.iso"

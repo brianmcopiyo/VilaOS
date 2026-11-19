@@ -1,17 +1,21 @@
 <?xml version="1.0"?>
-<screen id="home" bg="#0c121c">
+<screen id="home" bg="#0B0F17">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="VilaOS" fg="#28a0dc" w="100%" h="auto"/>
-    <label id="subtitle" text="Select an app" fg="#789098" w="100%" h="auto"/>
-    <list id="launcher" w="100%" h="auto" bg="#182434">
-      <button id="app_dialer" text="Dialer" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
-      <button id="app_messages" text="Messages" action="nav:assets/screens/messages.xml" bg="#182434" focus_bg="#145a8c"/>
-      <button id="app_contacts" text="Contacts" action="nav:assets/screens/contacts.xml" bg="#182434" focus_bg="#145a8c"/>
-      <button id="app_notes" text="Notes" action="nav:assets/screens/notes.xml" bg="#182434" focus_bg="#145a8c"/>
-      <button id="app_sysinfo" text="System Info" action="nav:assets/screens/sysinfo.xml" bg="#182434" focus_bg="#145a8c"/>
-    </list>
+    <label id="title" text="VilaOS" fg="#F1F5F9" w="100%" h="auto"/>
+    <label id="subtitle" text="Apps" fg="#94A3B8" w="100%" h="auto"/>
+    <grid id="launcher" w="100%" h="auto">
+      <button id="app_dialer" text="Dialer" icon="dialer" action="app:dialer" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_messages" text="Messages" icon="messages" action="app:messages" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_contacts" text="Contacts" icon="contacts" action="app:contacts" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_notes" text="Notes" icon="notes" action="app:notes" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_calc" text="Calculator" icon="calculator" action="app:calculator" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_clock" text="Clock" icon="clock" action="app:clock" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_files" text="Files" icon="files" action="app:files" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_browser" text="Browser" icon="files" action="app:browser" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_settings" text="Settings" icon="settings" action="app:settings" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    </grid>
   </vbox>
-  <softkeys left="Open" center="OK" right="Exit"
-            left_action="ok" center_action="ok" right_action="quit"/>
+  <softkeys left="Open" center="OK" right="Lock"
+            left_action="ok" center_action="ok" right_action="lock"/>
 </screen>

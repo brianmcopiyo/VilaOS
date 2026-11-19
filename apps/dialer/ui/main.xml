@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<screen id="dialer" bg="#0B0F17">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <input id="number" text="" max_len="24" w="100%" h="auto" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    <label id="contact_match" text="Enter a number" fg="#94A3B8" w="100%" h="auto"/>
+    <hbox id="row1" w="100%" h="auto">
+      <button id="d1" text="1" action="digit:1" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d2" text="2" action="digit:2" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d3" text="3" action="digit:3" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="row2" w="100%" h="auto">
+      <button id="d4" text="4" action="digit:4" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d5" text="5" action="digit:5" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d6" text="6" action="digit:6" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="row3" w="100%" h="auto">
+      <button id="d7" text="7" action="digit:7" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d8" text="8" action="digit:8" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d9" text="9" action="digit:9" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="row4" w="100%" h="auto">
+      <button id="dstar" text="*" action="digit:*" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="d0" text="0" action="digit:0" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="dhash" text="#" action="digit:#" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+  </vbox>
+  <softkeys left="Call" center="OK" right="Clear"
+            left_action="call" center_action="call" right_action="clear"/>
+</screen>

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<app id="settings" name="Settings" version="1.0.0" version_code="1" icon="settings">
+  <summary text="Display, input mode, sound and system info"/>
+  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <capability name="display"/>
+  <capability name="storage"/>
+</app>

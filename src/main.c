@@ -5,6 +5,8 @@
 #include "font.h"
 #include "screen.h"
 #include "input.h"
+#include "apprun.h"
+#include "pkg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +17,7 @@
 #endif
 
 static volatile int g_run = 1;
+static AppHost g_host;
 
 static void on_signal(int sig)
 {
@@ -27,8 +30,23 @@ static void activate_focus(Screen *s, char *nav, size_t nav_sz)
     if (s->focus < 0)
         return;
     Widget *w = &s->widgets[s->focus];
+    if (g_host.in_app) {
+        apphost_fire_event(&g_host, "click", w->id);
+        if (vsl_has_nav(&g_host.vsl)) {
+            const char *n = vsl_take_nav(&g_host.vsl);
+            if (str_eq(n, "shell:back")) {
+                str_copy(nav, nav_sz, "assets/screens/home.xml");
+                g_host.in_app = 0;
+                vsl_reset(&g_host.vsl);
+            } else {
+                str_copy(nav, nav_sz, n);
+            }
+            g_host.vsl.nav[0] = 0;
+            return;
+        }
+    }
     if (w->action[0])
-        screen_handle_action(s, w->action, nav, nav_sz);
+        apphost_handle_action(&g_host, s, NULL, w->action, nav, nav_sz);
 }
 
 static Widget *focused_input(Screen *s)
@@ -56,18 +74,19 @@ static void apply_text(Screen *s, InputMux *mux, InputEvent *ev)
     Widget *w = focused_input(s);
     if (!w)
         return;
-
     if (ev->x == 1) {
         size_t n = strlen(w->text);
         if (n > 0)
             w->text[n - 1] = 0;
     }
     input_apply_char(w, ev->ch);
+    if (g_host.in_app)
+        apphost_fire_event(&g_host, "change", w->id);
 }
 
 static int path_is_dialer(const char *path)
 {
-    return path && strstr(path, "dialer.xml") != NULL;
+    return path && (strstr(path, "dialer") != NULL);
 }
 
 static void sync_bounds(InputMux *input, Gfx *gfx)
@@ -78,10 +97,74 @@ static void sync_bounds(InputMux *input, Gfx *gfx)
     input->state.cursor_y = clamp_i(input->state.cursor_y, 0, gfx->h > 0 ? gfx->h - 1 : 0);
 }
 
+static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
+{
+    if (!nav[0])
+        return 0;
+    if (str_eq(nav, "back") || str_eq(nav, "shell:back")) {
+        g_host.in_app = 0;
+        vsl_reset(&g_host.vsl);
+        str_copy(nav, MAX_PATH, "assets/screens/home.xml");
+    }
+    if (str_starts(nav, "app:")) {
+        if (apphost_open_app(&g_host, s, g, nav + 4) == 0) {
+            input_set_dialer_mode(input, path_is_dialer(s->path));
+            nav[0] = 0;
+            return 1;
+        }
+        return -1;
+    }
+    if (str_starts(nav, "/apps/") || (g_host.in_app && !str_starts(nav, "assets/"))) {
+        if (apphost_open_screen(&g_host, s, g, nav) == 0) {
+            input_set_dialer_mode(input, path_is_dialer(s->path));
+            nav[0] = 0;
+            return 1;
+        }
+        return -1;
+    }
+    if (screen_load(s, nav) != 0)
+        return -1;
+    if (strstr(nav, "home.xml")) {
+        g_host.in_app = 0;
+        vsl_reset(&g_host.vsl);
+        apphost_refresh_launcher(&g_host, s);
+    } else if (strstr(nav, "idle.xml")) {
+        g_host.in_app = 0;
+        vsl_reset(&g_host.vsl);
+    }
+    screen_layout(s, g);
+    input_set_dialer_mode(input, path_is_dialer(s->path));
+    nav[0] = 0;
+    return 1;
+}
+
+static int run_soft(Screen *s, Gfx *g, const char *act, char *nav, size_t nav_sz)
+{
+    if (!act || !act[0])
+        return 0;
+    if (g_host.in_app) {
+        if (str_eq(act, s->soft_left_act) || str_eq(act, "ok"))
+            apphost_fire_event(&g_host, "soft", "left");
+        else if (str_eq(act, s->soft_center_act))
+            apphost_fire_event(&g_host, "soft", "center");
+        else if (str_eq(act, s->soft_right_act) || str_eq(act, "back"))
+            apphost_fire_event(&g_host, "soft", "right");
+        if (vsl_has_nav(&g_host.vsl)) {
+            const char *n = vsl_take_nav(&g_host.vsl);
+            str_copy(nav, nav_sz, n);
+            g_host.vsl.nav[0] = 0;
+            if (str_eq(nav, "shell:back"))
+                str_copy(nav, nav_sz, "assets/screens/home.xml");
+            return 1;
+        }
+    }
+    return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
+}
+
 int main(int argc, char **argv)
 {
     int desktop = 0;
-    const char *start = "assets/screens/home.xml";
+    const char *start = "assets/screens/idle.xml";
     const char *env_start = getenv("VILAOS_SCREEN");
     if (env_start && env_start[0])
         start = env_start;
@@ -106,12 +189,16 @@ int main(int argc, char **argv)
         fprintf(stderr, "input_init failed (continuing without epoll)\n");
     sync_bounds(&input, &gfx);
 
+    apphost_init(&g_host);
+
     Screen screen;
     if (screen_load(&screen, start) != 0) {
         fprintf(stderr, "failed to load %s\n", start);
         gfx_shutdown(&gfx);
         return 1;
     }
+    if (strstr(start, "home.xml"))
+        apphost_refresh_launcher(&g_host, &screen);
     screen_layout(&screen, &gfx);
     input_set_dialer_mode(&input, path_is_dialer(screen.path));
 
@@ -127,8 +214,12 @@ int main(int argc, char **argv)
         }
 
         uint64_t t = now_ms();
-        if (t - last_tick > 500) {
+        if (t - last_tick > 200) {
             screen_tick(&screen, &gfx);
+            apphost_on_tick(&g_host);
+            char mode[24];
+            input_mode_label(&input, mode, sizeof(mode));
+            screen_set_mode_badge(&screen, mode);
             last_tick = t;
         }
 
@@ -144,9 +235,13 @@ int main(int argc, char **argv)
                 break;
             case IE_NAV_UP:
                 screen_focus_next(&screen, -1);
+                if (screen.focus >= 0)
+                    apphost_fire_event(&g_host, "focus", screen.widgets[screen.focus].id);
                 break;
             case IE_NAV_DOWN:
                 screen_focus_next(&screen, 1);
+                if (screen.focus >= 0)
+                    apphost_fire_event(&g_host, "focus", screen.widgets[screen.focus].id);
                 break;
             case IE_NAV_LEFT:
                 screen_focus_next(&screen, -1);
@@ -155,67 +250,62 @@ int main(int argc, char **argv)
                 screen_focus_next(&screen, 1);
                 break;
             case IE_OK: {
-                int rc = 0;
                 activate_focus(&screen, nav, sizeof(nav));
                 if (!nav[0] && screen.soft_center_act[0])
-                    rc = screen_handle_action(&screen, screen.soft_center_act, nav, sizeof(nav));
+                    run_soft(&screen, &gfx, screen.soft_center_act, nav, sizeof(nav));
                 else if (!nav[0])
-                    rc = screen_handle_action(&screen, "ok", nav, sizeof(nav));
-                if (rc == 3)
-                    g_run = 0;
+                    run_soft(&screen, &gfx, "ok", nav, sizeof(nav));
                 break;
             }
-            case IE_BACK: {
-                int rc = screen_handle_action(&screen, "back", nav, sizeof(nav));
-                if (str_eq(screen.path, "assets/screens/home.xml") || rc == 3)
+            case IE_BACK:
+                run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
+                if (strstr(screen.path, "idle.xml") && !nav[0])
                     g_run = 0;
                 break;
-            }
-            case IE_SOFT_RIGHT: {
-                int rc;
-                if (screen.soft_right_act[0])
-                    rc = screen_handle_action(&screen, screen.soft_right_act, nav, sizeof(nav));
-                else
-                    rc = screen_handle_action(&screen, "back", nav, sizeof(nav));
-                if (rc == 3)
-                    g_run = 0;
+            case IE_SOFT_RIGHT:
+                run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
                 break;
-            }
-            case IE_SOFT_LEFT: {
-                int rc;
-                if (screen.soft_left_act[0])
-                    rc = screen_handle_action(&screen, screen.soft_left_act, nav, sizeof(nav));
-                else {
-                    activate_focus(&screen, nav, sizeof(nav));
-                    rc = 0;
-                }
-                if (rc == 3)
-                    g_run = 0;
+            case IE_SOFT_LEFT:
+                run_soft(&screen, &gfx, screen.soft_left_act[0] ? screen.soft_left_act : "ok", nav, sizeof(nav));
                 break;
-            }
             case IE_BACKSPACE:
                 if (screen.focus >= 0)
                     input_backspace(&screen.widgets[screen.focus]);
+                else {
+                    Widget *w = focused_input(&screen);
+                    if (w)
+                        input_backspace(w);
+                }
+                if (g_host.in_app && screen.focus >= 0)
+                    apphost_fire_event(&g_host, "key", "backspace");
                 break;
             case IE_CHAR:
                 apply_text(&screen, &input, &ev);
+                if (g_host.in_app)
+                    apphost_fire_event(&g_host, "key", "char");
                 break;
-            case IE_CLICK:
-                if (screen_focus_at(&screen, ev.x, ev.y) >= 0)
+            case IE_CLICK: {
+                int sk = screen_hit_softkey(&screen, &gfx, ev.x, ev.y);
+                if (sk == 1)
+                    run_soft(&screen, &gfx, screen.soft_left_act[0] ? screen.soft_left_act : "ok", nav, sizeof(nav));
+                else if (sk == 2) {
+                    activate_focus(&screen, nav, sizeof(nav));
+                    if (!nav[0])
+                        run_soft(&screen, &gfx, screen.soft_center_act[0] ? screen.soft_center_act : "ok", nav, sizeof(nav));
+                } else if (sk == 3)
+                    run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
+                else if (screen_focus_at(&screen, ev.x, ev.y) >= 0)
                     activate_focus(&screen, nav, sizeof(nav));
                 break;
+            }
             default:
                 break;
             }
         }
 
         if (nav[0]) {
-            if (screen_load(&screen, nav) != 0)
+            if (apply_nav(&screen, &gfx, &input, nav) < 0)
                 fprintf(stderr, "nav failed: %s\n", nav);
-            else {
-                screen_layout(&screen, &gfx);
-                input_set_dialer_mode(&input, path_is_dialer(screen.path));
-            }
         }
 
         screen_render(&screen, &gfx, &input.state);

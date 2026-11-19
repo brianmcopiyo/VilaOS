@@ -9,12 +9,42 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
 typedef struct {
     Screen *s;
     int stack[32];
     int sp;
 } BuildCtx;
+
+typedef struct {
+    uint64_t call_start;
+    int call_muted;
+    int call_speaker;
+    char call_number[MAX_TEXT];
+    char call_name[MAX_TEXT];
+    double calc_acc;
+    char calc_op;
+    int calc_fresh;
+    char calc_buf[MAX_TEXT];
+    uint64_t sw_base;
+    uint64_t sw_acc;
+    int sw_running;
+    uint64_t tm_deadline;
+    int tm_running;
+    int tm_secs;
+    int sound_on;
+    int vibrate_on;
+    int large_text;
+    int profile;
+} AppState;
+
+static AppState g_app = {
+    .sound_on = 1,
+    .vibrate_on = 1,
+    .large_text = 0,
+    .profile = 0,
+    .tm_secs = 60,
+    .calc_fresh = 1
+};
 
 static WidgetType tag_type(const char *tag)
 {
@@ -24,6 +54,8 @@ static WidgetType tag_type(const char *tag)
         return W_VBOX;
     if (str_eq(tag, "hbox"))
         return W_HBOX;
+    if (str_eq(tag, "grid"))
+        return W_GRID;
     if (str_eq(tag, "label"))
         return W_LABEL;
     if (str_eq(tag, "button"))
@@ -110,6 +142,10 @@ static void on_start(const XmlStart *el, void *user)
     if (action)
         str_copy(w->action, sizeof(w->action), action);
 
+    const char *icon = xml_attr(el, "icon");
+    if (icon)
+        str_copy(w->icon, sizeof(w->icon), icon);
+
     {
         int vx = 0, vy = 0, vw = 0, vh = 0;
         unsigned ux = UNIT_AUTO, uy = UNIT_AUTO, uw = UNIT_AUTO, uh = UNIT_AUTO;
@@ -131,6 +167,7 @@ static void on_start(const XmlStart *el, void *user)
     w->fg = attr_color(el, "fg", w->fg);
     w->focus_bg = attr_color(el, "focus_bg", w->focus_bg);
     w->max_len = attr_int(el, "max_len", w->max_len);
+    w->value = attr_int(el, "value", 0);
 
     if (w->type == W_BUTTON || w->type == W_INPUT)
         w->focusable = 1;
@@ -223,6 +260,27 @@ int screen_load(Screen *s, const char *path)
     if (s->root < 0 && s->count > 0)
         s->root = 0;
 
+    if (strstr(path, "call_active.xml")) {
+        if (!g_app.call_start)
+            g_app.call_start = now_ms();
+        Widget *num = screen_find(s, "call_number");
+        if (num && g_app.call_number[0])
+            str_copy(num->text, sizeof(num->text), g_app.call_number);
+        Widget *name = screen_find(s, "call_name");
+        if (name && g_app.call_name[0])
+            str_copy(name->text, sizeof(name->text), g_app.call_name);
+    }
+
+    if (strstr(path, "calculator.xml")) {
+        Widget *disp = screen_find(s, "calc_display");
+        if (disp) {
+            if (g_app.calc_buf[0])
+                str_copy(disp->text, sizeof(disp->text), g_app.calc_buf);
+            else
+                str_copy(disp->text, sizeof(disp->text), "0");
+        }
+    }
+
     screen_focus_first(s);
     return 0;
 }
@@ -245,10 +303,55 @@ Widget *screen_find(Screen *s, const char *id)
     return NULL;
 }
 
+static int grid_cols_for(Gfx *g)
+{
+    if (g->w >= 720)
+        return 5;
+    if (g->w >= 480)
+        return 4;
+    return 3;
+}
+
+static void layout_grid(Screen *s, Gfx *g, Widget *grid)
+{
+    int pad = g->pad;
+    int cols = grid_cols_for(g);
+    int n = 0;
+    for (int i = 0; i < grid->child_count; i++) {
+        Widget *c = &s->widgets[grid->children[i]];
+        if (c->type == W_BUTTON)
+            n++;
+    }
+    if (n <= 0)
+        return;
+    int rows = (n + cols - 1) / cols;
+    int gap = pad;
+    int cell_w = (grid->w - pad * 2 - gap * (cols - 1)) / cols;
+    int cell_h = (grid->h - pad * 2 - gap * (rows - 1)) / rows;
+    if (cell_w < 48)
+        cell_w = 48;
+    if (cell_h < 56)
+        cell_h = 56;
+    int idx = 0;
+    for (int i = 0; i < grid->child_count; i++) {
+        Widget *c = &s->widgets[grid->children[i]];
+        if (c->type != W_BUTTON)
+            continue;
+        int r = idx / cols;
+        int col = idx % cols;
+        c->w = cell_w;
+        c->h = cell_h;
+        c->x = grid->x + pad + col * (cell_w + gap);
+        c->y = grid->y + pad + r * (cell_h + gap);
+        c->focusable = 1;
+        idx++;
+    }
+}
+
 static void layout_box(Screen *s, Gfx *g, Widget *box, int vertical)
 {
     int pad = g->pad;
-    int gap = g->pad;
+    int gap = g->pad / 2 + 2;
     int cx = box->x + pad;
     int cy = box->y + pad;
     int inner_w = box->w - pad * 2;
@@ -292,10 +395,10 @@ static void layout_box(Screen *s, Gfx *g, Widget *box, int vertical)
                 rw = inner_w;
             if (rh <= 0) {
                 if (c->type == W_LABEL)
-                    rh = font_char_h_scaled(g, FONT_8X12) + 4;
+                    rh = font_char_h_scaled(g, FONT_8X12) + 6;
                 else if (c->type == W_BUTTON || c->type == W_INPUT)
                     rh = g->item_h;
-                else if (c->type == W_LIST)
+                else if (c->type == W_LIST || c->type == W_GRID || c->type == W_VBOX || c->type == W_HBOX)
                     rh = flex_each > 0 ? flex_each : inner_h / 2;
                 else
                     rh = flex_each > 0 ? flex_each : g->item_h;
@@ -331,6 +434,8 @@ static void layout_box(Screen *s, Gfx *g, Widget *box, int vertical)
             layout_box(s, g, c, 1);
         else if (c->type == W_HBOX)
             layout_box(s, g, c, 0);
+        else if (c->type == W_GRID)
+            layout_grid(s, g, c);
         else if (c->type == W_LIST) {
             int item_h = g->item_h;
             int iy = c->y + 2;
@@ -406,6 +511,8 @@ void screen_layout(Screen *s, Gfx *g)
             layout_box(s, g, c, 1);
         else if (c->type == W_HBOX)
             layout_box(s, g, c, 0);
+        else if (c->type == W_GRID)
+            layout_grid(s, g, c);
         else if (c->type == W_LIST) {
             int item_h = g->item_h;
             int iy = c->y + 2;
@@ -494,6 +601,19 @@ int screen_focus_at(Screen *s, int x, int y)
     return -1;
 }
 
+int screen_hit_softkey(const Screen *s, const Gfx *g, int x, int y)
+{
+    (void)s;
+    if (!g || y < g->h - g->softkey_h)
+        return 0;
+    int third = g->w / 3;
+    if (x < third)
+        return 1;
+    if (x < third * 2)
+        return 2;
+    return 3;
+}
+
 static void draw_signal(Gfx *g, int x, int y, int bars)
 {
     int unit = clamp_i(g->font_scale, 1, 3);
@@ -517,9 +637,10 @@ static void draw_battery(Gfx *g, int x, int y, int pct)
 static void draw_statusbar(Gfx *g, Widget *w)
 {
     draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
+    draw_hline(g, 0, w->h - 1, g->w, COL_BORDER);
     int s = clamp_i(g->font_scale, 1, 3);
-    draw_signal(g, g->pad, (w->h - 12 * s) / 2, 3);
-    draw_battery(g, g->w - g->pad - 22 * s, (w->h - 10 * s) / 2, 78);
+    draw_signal(g, g->pad, (w->h - 12 * s) / 2, 4);
+    draw_battery(g, g->w - g->pad - 22 * s, (w->h - 10 * s) / 2, 86);
 
     time_t t = time(NULL);
     struct tm tm_buf;
@@ -539,13 +660,62 @@ static void draw_softkeys(Gfx *g, Screen *s, Widget *w)
 {
     draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
     draw_hline(g, 0, w->y, g->w, COL_BORDER);
+    int third = g->w / 3;
     int ty = w->y + (w->h - font_char_h_scaled(g, FONT_8X12)) / 2;
-    int side = g->w / 3;
-    font_draw_text_clip(g, FONT_8X12, g->pad, ty, side - g->pad, s->soft_left, COL_ACCENT, COL_SOFTKEY, 1);
+    font_draw_text_clip(g, FONT_8X12, g->pad, ty, third - g->pad * 2, s->soft_left, COL_ACCENT, COL_SOFTKEY, 1);
     int cw = font_text_w_scaled(g, FONT_8X12, s->soft_center);
     font_draw_text(g, FONT_8X12, (g->w - cw) / 2, ty, s->soft_center, COL_TEXT, COL_SOFTKEY, 1);
     int rw = font_text_w_scaled(g, FONT_8X12, s->soft_right);
     font_draw_text(g, FONT_8X12, g->w - rw - g->pad, ty, s->soft_right, COL_ACCENT, COL_SOFTKEY, 1);
+    (void)third;
+}
+
+static void draw_app_icon(Gfx *g, int cx, int cy, int size, const char *icon, uint16_t fg)
+{
+    int s = size / 8;
+    if (s < 2)
+        s = 2;
+    int x = cx - size / 2;
+    int y = cy - size / 2;
+    if (str_eq(icon, "dialer")) {
+        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
+        draw_fill(g, cx - s, y + 2 * s, 2 * s, size - 4 * s, fg);
+        draw_fill(g, x + 2 * s, cy - s, size - 4 * s, 2 * s, fg);
+    } else if (str_eq(icon, "messages")) {
+        draw_round_rect(g, x + s, y + 2 * s, size - 2 * s, size / 2, s, fg, 0);
+        draw_line(g, x + 2 * s, y + size / 2 + s, cx, y + size - 2 * s, fg);
+        draw_line(g, cx, y + size - 2 * s, x + size - 2 * s, y + size / 2 + s, fg);
+    } else if (str_eq(icon, "contacts")) {
+        draw_round_rect(g, cx - 2 * s, y + 2 * s, 4 * s, 4 * s, 2 * s, fg, 1);
+        draw_round_rect(g, x + 2 * s, cy + s, size - 4 * s, size / 3, s, fg, 1);
+    } else if (str_eq(icon, "notes")) {
+        draw_rect(g, x + 2 * s, y + s, size - 4 * s, size - 2 * s, fg);
+        draw_hline(g, x + 3 * s, y + 3 * s, size - 6 * s, fg);
+        draw_hline(g, x + 3 * s, y + 5 * s, size - 6 * s, fg);
+        draw_hline(g, x + 3 * s, y + 7 * s, size / 2, fg);
+    } else if (str_eq(icon, "calculator")) {
+        draw_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, fg);
+        draw_fill(g, x + 2 * s, y + 2 * s, size - 4 * s, 2 * s, fg);
+        for (int r = 0; r < 2; r++)
+            for (int c = 0; c < 3; c++)
+                draw_fill(g, x + 2 * s + c * 2 * s, y + 5 * s + r * 2 * s, s, s, fg);
+    } else if (str_eq(icon, "clock")) {
+        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, size / 2, fg, 0);
+        draw_line(g, cx, cy, cx, y + 2 * s, fg);
+        draw_line(g, cx, cy, cx + 2 * s, cy + s, fg);
+    } else if (str_eq(icon, "files")) {
+        draw_rect(g, x + 2 * s, y + 2 * s, size - 4 * s, size - 3 * s, fg);
+        draw_fill(g, x + 2 * s, y + s, size / 3, 2 * s, fg);
+    } else if (str_eq(icon, "settings")) {
+        draw_round_rect(g, cx - 2 * s, cy - 2 * s, 4 * s, 4 * s, s, fg, 1);
+        for (int a = 0; a < 4; a++) {
+            int dx = (a == 0) ? 0 : (a == 1) ? 3 * s : (a == 2) ? 0 : -3 * s;
+            int dy = (a == 0) ? -3 * s : (a == 1) ? 0 : (a == 2) ? 3 * s : 0;
+            draw_fill(g, cx + dx - s / 2, cy + dy - s / 2, s, s, fg);
+        }
+    } else {
+        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
+    }
 }
 
 static void draw_widget(Screen *s, Gfx *g, Widget *w)
@@ -563,17 +733,48 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     case W_SOFTKEYS:
         draw_softkeys(g, s, w);
         break;
-    case W_LABEL:
-        font_draw_text_clip(g, FONT_8X12, w->x, w->y + (w->h - fh) / 2, w->w > 0 ? w->w : g->w, w->text, w->fg, COL_BG, 0);
+    case W_LABEL: {
+        FontId fid = (w->value > 0 || strstr(w->id, "clock_big") || strstr(w->id, "idle_clock")) ? FONT_8X16 : FONT_8X12;
+        int lh = font_char_h_scaled(g, fid);
+        int ty = w->y + (w->h - lh) / 2;
+        if (w->h > lh * 2)
+            ty = w->y + g->pad;
+        if (str_starts(w->id, "pill") || w->value == 2) {
+            int tw = font_text_w_scaled(g, FONT_8X12, w->text) + g->pad * 2;
+            if (tw > w->w)
+                tw = w->w;
+            draw_round_rect(g, w->x, w->y + (w->h - fh - 6) / 2, tw, fh + 6, radius, COL_PILL, 1);
+            font_draw_text_clip(g, FONT_8X12, w->x + g->pad, w->y + (w->h - fh) / 2, tw - g->pad, w->text, COL_TEXT, COL_PILL, 1);
+        } else {
+            font_draw_text_clip(g, fid, w->x, ty, w->w > 0 ? w->w : g->w, w->text, w->fg, COL_BG, 0);
+        }
         break;
+    }
     case W_BUTTON: {
         uint16_t bg = w->focused ? w->focus_bg : w->bg;
         draw_round_rect(g, w->x, w->y, w->w, w->h, radius, bg, 1);
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, COL_BORDER, 0);
-        int tw = font_text_w_scaled(g, FONT_8X12, w->text);
-        int tx = w->x + (w->w - tw) / 2;
-        int ty = w->y + (w->h - fh) / 2;
-        font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, w->fg, bg, 1);
+        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, w->focused ? COL_ACCENT : COL_BORDER, 0);
+        if (w->icon[0]) {
+            int icon_size = clamp_i(w->h / 2, 16, 40);
+            draw_app_icon(g, w->x + w->w / 2, w->y + w->h / 3, icon_size, w->icon, w->fg);
+            int tw = font_text_w_scaled(g, FONT_8X12, w->text);
+            int tx = w->x + (w->w - tw) / 2;
+            int ty = w->y + (2 * w->h) / 3;
+            font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, w->fg, bg, 1);
+        } else {
+            int tw = font_text_w_scaled(g, FONT_8X12, w->text);
+            int tx = w->x + (w->w - tw) / 2;
+            int ty = w->y + (w->h - fh) / 2;
+            if (w->value > 0) {
+                char badge[8];
+                snprintf(badge, sizeof(badge), "%c", (char)w->value);
+                draw_round_rect(g, w->x + g->pad, w->y + (w->h - fh - 4) / 2, fh + 8, fh + 4, radius, COL_ACCENT, 1);
+                font_draw_text(g, FONT_8X12, w->x + g->pad + 4, ty, badge, COL_TEXT, COL_ACCENT, 1);
+                font_draw_text_clip(g, FONT_8X12, w->x + g->pad + fh + 14, ty, w->w - fh - 20, w->text, w->fg, bg, 1);
+            } else {
+                font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, w->fg, bg, 1);
+            }
+        }
         break;
     }
     case W_INPUT: {
@@ -591,6 +792,10 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     case W_LIST:
         draw_fill(g, w->x, w->y, w->w, w->h, COL_PANEL);
         draw_rect(g, w->x, w->y, w->w, w->h, COL_BORDER);
+        for (int i = 0; i < w->child_count; i++)
+            draw_widget(s, g, &s->widgets[w->children[i]]);
+        break;
+    case W_GRID:
         for (int i = 0; i < w->child_count; i++)
             draw_widget(s, g, &s->widgets[w->children[i]]);
         break;
@@ -632,46 +837,198 @@ void screen_render(Screen *s, Gfx *g, const InputState *in)
     gfx_dirty_all(g);
 }
 
+void screen_set_mode_badge(Screen *s, const char *mode)
+{
+    Widget *b = screen_find(s, "mode_badge");
+    if (b && mode)
+        str_copy(b->text, sizeof(b->text), mode);
+}
+
+static void match_contact(const char *num, char *name, size_t n)
+{
+    name[0] = 0;
+    if (!num || !num[0])
+        return;
+    if (str_starts(num, "5550101") || str_starts(num, "555-0101"))
+        str_copy(name, n, "Alice Chen");
+    else if (str_starts(num, "5550102") || str_starts(num, "555-0102"))
+        str_copy(name, n, "Bob Okonkwo");
+    else if (str_starts(num, "5550103") || str_starts(num, "555-0103"))
+        str_copy(name, n, "Carol Diaz");
+    else if (str_starts(num, "5550104") || str_starts(num, "555-0104"))
+        str_copy(name, n, "Dave Park");
+}
+
+static void calc_set_display(Screen *s)
+{
+    Widget *d = screen_find(s, "calc_display");
+    if (!d)
+        return;
+    if (g_app.calc_buf[0])
+        str_copy(d->text, sizeof(d->text), g_app.calc_buf);
+    else
+        str_copy(d->text, sizeof(d->text), "0");
+}
+
+static void calc_push_digit(Screen *s, char dig)
+{
+    if (g_app.calc_fresh) {
+        g_app.calc_buf[0] = 0;
+        g_app.calc_fresh = 0;
+    }
+    size_t n = strlen(g_app.calc_buf);
+    if (n + 1 < sizeof(g_app.calc_buf)) {
+        g_app.calc_buf[n] = dig;
+        g_app.calc_buf[n + 1] = 0;
+    }
+    calc_set_display(s);
+}
+
+static void calc_apply_op(Screen *s, char op)
+{
+    double v = atof(g_app.calc_buf[0] ? g_app.calc_buf : "0");
+    if (g_app.calc_op == 0) {
+        g_app.calc_acc = v;
+    } else {
+        if (g_app.calc_op == '+')
+            g_app.calc_acc += v;
+        else if (g_app.calc_op == '-')
+            g_app.calc_acc -= v;
+        else if (g_app.calc_op == '*')
+            g_app.calc_acc *= v;
+        else if (g_app.calc_op == '/' && v != 0.0)
+            g_app.calc_acc /= v;
+    }
+    if (op == '=') {
+        snprintf(g_app.calc_buf, sizeof(g_app.calc_buf), "%g", g_app.calc_acc);
+        g_app.calc_op = 0;
+    } else {
+        g_app.calc_op = op;
+        g_app.calc_buf[0] = 0;
+    }
+    g_app.calc_fresh = 1;
+    calc_set_display(s);
+    Widget *expr = screen_find(s, "calc_expr");
+    if (expr) {
+        if (g_app.calc_op)
+            snprintf(expr->text, sizeof(expr->text), "%g %c", g_app.calc_acc, g_app.calc_op);
+        else
+            str_copy(expr->text, sizeof(expr->text), "");
+    }
+}
+
 void screen_tick(Screen *s, Gfx *g)
 {
+    (void)g;
     if (!s)
         return;
-    Widget *info = screen_find(s, "meminfo");
-    if (info) {
-        long total = 0, freeb = 0, avail = 0;
-        read_meminfo_kb(&total, &freeb, &avail);
-        uint64_t up = read_uptime_ms();
-        unsigned sec = (unsigned)(up / 1000ull);
-        unsigned h = sec / 3600;
-        unsigned m = (sec / 60) % 60;
-        unsigned ss = sec % 60;
-        snprintf(info->text, sizeof(info->text),
-                 "RAM %ld/%ld KB  up %u:%02u:%02u", avail, total, h, m, ss);
+
+    time_t t = time(NULL);
+    struct tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &t);
+#else
+    localtime_r(&t, &tm_buf);
+#endif
+
+    Widget *idle_clock = screen_find(s, "idle_clock");
+    if (idle_clock)
+        snprintf(idle_clock->text, sizeof(idle_clock->text), "%02d:%02d", tm_buf.tm_hour, tm_buf.tm_min);
+
+    Widget *idle_date = screen_find(s, "idle_date");
+    if (idle_date) {
+        static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+        static const char *mons[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        snprintf(idle_date->text, sizeof(idle_date->text), "%s, %s %d",
+                 days[tm_buf.tm_wday], mons[tm_buf.tm_mon], tm_buf.tm_mday);
     }
-    Widget *rss = screen_find(s, "rssinfo");
-    if (rss) {
-        FILE *f = fopen("/proc/self/status", "r");
-        long vmrss = 0;
-        if (f) {
-            char line[128];
-            while (fgets(line, sizeof(line), f)) {
-                if (strncmp(line, "VmRSS:", 6) == 0) {
-                    sscanf(line + 6, "%ld", &vmrss);
-                    break;
-                }
-            }
-            fclose(f);
+
+    Widget *match = screen_find(s, "contact_match");
+    Widget *number = screen_find(s, "number");
+    if (match && number) {
+        char name[MAX_TEXT];
+        match_contact(number->text, name, sizeof(name));
+        if (name[0])
+            snprintf(match->text, sizeof(match->text), "%s", name);
+        else if (number->text[0])
+            str_copy(match->text, sizeof(match->text), "Unknown number");
+        else
+            str_copy(match->text, sizeof(match->text), "Enter a number");
+    }
+
+    Widget *call_timer = screen_find(s, "call_timer");
+    if (call_timer && g_app.call_start) {
+        unsigned sec = (unsigned)((now_ms() - g_app.call_start) / 1000ull);
+        snprintf(call_timer->text, sizeof(call_timer->text), "%02u:%02u", sec / 60, sec % 60);
+    }
+
+    Widget *mute = screen_find(s, "btn_mute");
+    if (mute)
+        str_copy(mute->text, sizeof(mute->text), g_app.call_muted ? "Unmute" : "Mute");
+    Widget *spk = screen_find(s, "btn_speaker");
+    if (spk)
+        str_copy(spk->text, sizeof(spk->text), g_app.call_speaker ? "Earpiece" : "Speaker");
+
+    Widget *sw = screen_find(s, "stopwatch_time");
+    if (sw) {
+        uint64_t ms = g_app.sw_acc;
+        if (g_app.sw_running)
+            ms += now_ms() - g_app.sw_base;
+        unsigned sec = (unsigned)(ms / 1000ull);
+        unsigned cs = (unsigned)((ms / 10ull) % 100ull);
+        snprintf(sw->text, sizeof(sw->text), "%02u:%02u.%02u", sec / 60, sec % 60, cs);
+    }
+
+    Widget *tm = screen_find(s, "timer_time");
+    if (tm) {
+        int left = g_app.tm_secs;
+        if (g_app.tm_running) {
+            int rem = (int)((g_app.tm_deadline - now_ms()) / 1000ll);
+            if (rem < 0)
+                rem = 0;
+            left = rem;
+            if (rem == 0)
+                g_app.tm_running = 0;
         }
-        snprintf(rss->text, sizeof(rss->text), "UI RSS: %ld KB (limit 4096)", vmrss);
+        snprintf(tm->text, sizeof(tm->text), "%02d:%02d", left / 60, left % 60);
     }
-    Widget *fbinfo = screen_find(s, "fbinfo");
-    if (fbinfo && g)
-        gfx_format_label(g, fbinfo->text, sizeof(fbinfo->text));
+
+    Widget *clock_now = screen_find(s, "clock_now");
+    if (clock_now)
+        snprintf(clock_now->text, sizeof(clock_now->text), "%02d:%02d:%02d", tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec);
+
+    Widget *snd = screen_find(s, "toggle_sound");
+    if (snd)
+        snprintf(snd->text, sizeof(snd->text), "Sound: %s", g_app.sound_on ? "On" : "Off");
+    Widget *vib = screen_find(s, "toggle_vibrate");
+    if (vib)
+        snprintf(vib->text, sizeof(vib->text), "Vibrate: %s", g_app.vibrate_on ? "On" : "Off");
+    Widget *txt = screen_find(s, "toggle_text");
+    if (txt)
+        snprintf(txt->text, sizeof(txt->text), "Large text: %s", g_app.large_text ? "On" : "Off");
+    Widget *prof = screen_find(s, "toggle_profile");
+    if (prof) {
+        const char *names[] = {"General", "Silent", "Meeting", "Outdoor"};
+        snprintf(prof->text, sizeof(prof->text), "Profile: %s", names[g_app.profile & 3]);
+    }
+}
+
+static int append_digit(Screen *s, char dig)
+{
+    Widget *num = screen_find(s, "number");
+    if (!num)
+        return 0;
+    size_t n = strlen(num->text);
+    if ((int)n < num->max_len && n + 1 < sizeof(num->text)) {
+        num->text[n] = dig;
+        num->text[n + 1] = 0;
+    }
+    return 2;
 }
 
 int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t out_sz)
 {
-    if (!action || !action[0])
+    if (!action || !action[0] || str_eq(action, "none"))
         return 0;
     if (str_starts(action, "nav:")) {
         if (out_nav)
@@ -679,12 +1036,46 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
         return 1;
     }
     if (str_eq(action, "back")) {
+        if (strstr(s->path, "idle.xml")) {
+            if (out_nav)
+                out_nav[0] = 0;
+            return 0;
+        }
+        if (strstr(s->path, "home.xml")) {
+            if (out_nav)
+                str_copy(out_nav, out_sz, "assets/screens/idle.xml");
+            return 1;
+        }
+        if (strstr(s->path, "message_thread") || strstr(s->path, "compose")) {
+            if (out_nav)
+                str_copy(out_nav, out_sz, "assets/screens/messages.xml");
+            return 1;
+        }
+        if (strstr(s->path, "contact_detail")) {
+            if (out_nav)
+                str_copy(out_nav, out_sz, "assets/screens/contacts.xml");
+            return 1;
+        }
+        if (strstr(s->path, "call_active")) {
+            g_app.call_start = 0;
+            if (out_nav)
+                str_copy(out_nav, out_sz, "assets/screens/dialer.xml");
+            return 1;
+        }
         if (out_nav)
             str_copy(out_nav, out_sz, "assets/screens/home.xml");
         return 1;
     }
-    if (str_eq(action, "quit") || str_eq(action, "exit"))
-        return 3;
+    if (str_eq(action, "quit") || str_eq(action, "exit") || str_eq(action, "lock")) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/idle.xml");
+        return 1;
+    }
+    if (str_eq(action, "unlock") || str_eq(action, "menu")) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/home.xml");
+        return 1;
+    }
     if (str_eq(action, "clear")) {
         if (s && s->focus >= 0) {
             Widget *w = &s->widgets[s->focus];
@@ -694,17 +1085,48 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
         Widget *num = screen_find(s, "number");
         if (num)
             num->text[0] = 0;
+        Widget *match = screen_find(s, "contact_match");
+        if (match)
+            str_copy(match->text, sizeof(match->text), "Enter a number");
+        return 2;
+    }
+    if (str_starts(action, "digit:")) {
+        append_digit(s, action[6]);
         return 2;
     }
     if (str_eq(action, "call")) {
         Widget *num = screen_find(s, "number");
-        if (num && num->text[0]) {
-            Widget *st = screen_find(s, "callstatus");
-            if (!st)
-                st = screen_find(s, "hint");
-            if (st)
-                snprintf(st->text, sizeof(st->text), "Calling %s...", num->text);
+        const char *n = (num && num->text[0]) ? num->text : "";
+        if (!n[0] && s->focus >= 0) {
+            Widget *f = &s->widgets[s->focus];
+            if (f->text[0] && strstr(f->text, "555"))
+                n = f->text;
         }
+        if (!n[0])
+            n = "555-0101";
+        str_copy(g_app.call_number, sizeof(g_app.call_number), n);
+        match_contact(n, g_app.call_name, sizeof(g_app.call_name));
+        if (!g_app.call_name[0])
+            str_copy(g_app.call_name, sizeof(g_app.call_name), "Calling...");
+        g_app.call_start = now_ms();
+        g_app.call_muted = 0;
+        g_app.call_speaker = 0;
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/call_active.xml");
+        return 1;
+    }
+    if (str_eq(action, "end_call")) {
+        g_app.call_start = 0;
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/dialer.xml");
+        return 1;
+    }
+    if (str_eq(action, "mute")) {
+        g_app.call_muted = !g_app.call_muted;
+        return 2;
+    }
+    if (str_eq(action, "speaker")) {
+        g_app.call_speaker = !g_app.call_speaker;
         return 2;
     }
     if (str_eq(action, "send")) {
@@ -713,12 +1135,121 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
             body = screen_find(s, "note");
         Widget *st = screen_find(s, "msgstatus");
         if (!st)
-            st = screen_find(s, "status");
+            st = screen_find(s, "status_line");
         if (st) {
             if (body && body->text[0])
-                str_copy(st->text, sizeof(st->text), "Message sent");
+                str_copy(st->text, sizeof(st->text), "Sent");
             else
-                str_copy(st->text, sizeof(st->text), "Empty message");
+                str_copy(st->text, sizeof(st->text), "Nothing to send");
+        }
+        return 2;
+    }
+    if (str_eq(action, "save_note")) {
+        Widget *st = screen_find(s, "note_status");
+        if (st)
+            str_copy(st->text, sizeof(st->text), "Note saved");
+        return 2;
+    }
+    if (str_starts(action, "calc:")) {
+        const char *p = action + 5;
+        if (str_eq(p, "clear")) {
+            g_app.calc_buf[0] = 0;
+            g_app.calc_acc = 0;
+            g_app.calc_op = 0;
+            g_app.calc_fresh = 1;
+            calc_set_display(s);
+            Widget *expr = screen_find(s, "calc_expr");
+            if (expr)
+                expr->text[0] = 0;
+            return 2;
+        }
+        if (str_eq(p, "eq")) {
+            calc_apply_op(s, '=');
+            return 2;
+        }
+        if (p[0] && !p[1] && (p[0] == '+' || p[0] == '-' || p[0] == '*' || p[0] == '/')) {
+            calc_apply_op(s, p[0]);
+            return 2;
+        }
+        if (p[0] == 'd' && p[1] == ':') {
+            calc_push_digit(s, p[2]);
+            return 2;
+        }
+        if (str_eq(p, "dot")) {
+            if (!strchr(g_app.calc_buf, '.'))
+                calc_push_digit(s, '.');
+            return 2;
+        }
+        return 2;
+    }
+    if (str_eq(action, "sw_start")) {
+        if (!g_app.sw_running) {
+            g_app.sw_base = now_ms();
+            g_app.sw_running = 1;
+        }
+        return 2;
+    }
+    if (str_eq(action, "sw_stop")) {
+        if (g_app.sw_running) {
+            g_app.sw_acc += now_ms() - g_app.sw_base;
+            g_app.sw_running = 0;
+        }
+        return 2;
+    }
+    if (str_eq(action, "sw_reset")) {
+        g_app.sw_running = 0;
+        g_app.sw_acc = 0;
+        return 2;
+    }
+    if (str_eq(action, "tm_start")) {
+        if (!g_app.tm_running) {
+            g_app.tm_deadline = now_ms() + (uint64_t)g_app.tm_secs * 1000ull;
+            g_app.tm_running = 1;
+        }
+        return 2;
+    }
+    if (str_eq(action, "tm_stop")) {
+        if (g_app.tm_running) {
+            int rem = (int)((g_app.tm_deadline - now_ms()) / 1000ll);
+            if (rem < 0)
+                rem = 0;
+            g_app.tm_secs = rem;
+            g_app.tm_running = 0;
+        }
+        return 2;
+    }
+    if (str_eq(action, "tm_reset")) {
+        g_app.tm_running = 0;
+        g_app.tm_secs = 60;
+        return 2;
+    }
+    if (str_eq(action, "tm_plus")) {
+        g_app.tm_secs += 30;
+        return 2;
+    }
+    if (str_eq(action, "toggle_sound")) {
+        g_app.sound_on = !g_app.sound_on;
+        return 2;
+    }
+    if (str_eq(action, "toggle_vibrate")) {
+        g_app.vibrate_on = !g_app.vibrate_on;
+        return 2;
+    }
+    if (str_eq(action, "toggle_text")) {
+        g_app.large_text = !g_app.large_text;
+        return 2;
+    }
+    if (str_eq(action, "cycle_profile")) {
+        g_app.profile = (g_app.profile + 1) & 3;
+        return 2;
+    }
+    if (str_eq(action, "preview")) {
+        Widget *preview = screen_find(s, "file_preview");
+        if (preview && s->focus >= 0) {
+            Widget *f = &s->widgets[s->focus];
+            char tmp[MAX_TEXT];
+            str_copy(tmp, sizeof(tmp), f->text);
+            snprintf(preview->text, sizeof(preview->text), "Preview: %s", tmp);
         }
         return 2;
     }

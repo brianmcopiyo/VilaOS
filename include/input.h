@@ -43,5 +43,6 @@ int input_poll(InputMux *m, InputEvent *out, int timeout_ms);
 void input_set_dialer_mode(InputMux *m, int enabled);
 void input_apply_char(Widget *w, char ch);
 void input_backspace(Widget *w);
+void input_mode_label(const InputMux *m, char *buf, size_t n);
 
 #endif

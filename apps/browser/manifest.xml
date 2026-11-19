@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<app id="browser" name="Browser" version="1.0.0" version_code="1" icon="files">
+  <summary text="Lightweight text and XML reader"/>
+  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <capability name="storage"/>
+  <capability name="network"/>
+</app>

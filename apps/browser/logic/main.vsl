@@ -1,0 +1,18 @@
+on_load
+  require storage
+  set_text page_view "Select a page to read"
+end
+
+on_click p1
+  set_text page_view "Welcome to VilaOS. Apps install as packages under /apps."
+end
+on_click p2
+  set_text page_view "manifest.xml declares id, version, entry UI/script, capabilities."
+end
+on_click p3
+  set_text page_view "VSL: on_click, on_soft, set_text, nav, storage_get/set, require."
+end
+
+on_soft right
+  back
+end

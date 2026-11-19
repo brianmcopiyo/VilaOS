@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<app id="notes" name="Notes" version="1.0.0" version_code="1" icon="notes">
+  <summary text="Offline text memos"/>
+  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <capability name="storage"/>
+</app>

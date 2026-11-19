@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<screen id="files" bg="#0B0F17">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Files" fg="#F1F5F9" w="100%" h="auto"/>
+    <label id="path_lbl" text="/Documents" fg="#94A3B8" w="100%" h="auto"/>
+    <list id="entries" w="100%" h="auto" bg="#151C28">
+      <button id="f1" text="Photos/  dir" action="preview" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="f2" text="Notes/  dir" action="preview" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="f3" text="readme.txt  2 KB" action="preview" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="f4" text="budget.csv  8 KB" action="preview" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="f5" text="voice01.amr  24 KB" action="preview" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    </list>
+    <label id="file_preview" text="Select a file" fg="#94A3B8" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Open" center="OK" right="Back"
+            left_action="preview" center_action="ok" right_action="back"/>
+</screen>

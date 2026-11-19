@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<screen id="messages" bg="#0B0F17">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Messages" fg="#F1F5F9" w="100%" h="auto"/>
+    <list id="inbox" w="100%" h="auto" bg="#151C28">
+      <button id="m1" text="Mom  Call me later" action="nav:ui/thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" value="50"/>
+      <button id="m2" text="Work  Meeting at 3" action="nav:ui/thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" value="50"/>
+      <button id="m3" text="Sam  Lunch tomorrow?" action="nav:ui/thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="m4" text="Ada  Designs look great" action="nav:ui/thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    </list>
+    <button id="newmsg" text="New message" action="nav:ui/compose.xml" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="New" center="Open" right="Back"
+            left_action="nav:ui/compose.xml"
+            center_action="ok"
+            right_action="back"/>
+</screen>

@@ -1,0 +1,27 @@
+on_load
+  require contacts
+end
+
+on_click c1
+  nav ui/detail.xml
+end
+on_click c2
+  nav ui/detail.xml
+end
+on_click c3
+  nav ui/detail.xml
+end
+on_click c4
+  nav ui/detail.xml
+end
+on_click c5
+  nav ui/detail.xml
+end
+
+on_soft left
+  action call
+end
+
+on_soft right
+  back
+end

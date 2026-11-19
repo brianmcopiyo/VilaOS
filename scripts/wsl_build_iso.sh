@@ -12,10 +12,15 @@ rsync -a --delete \
   --exclude build \
   --exclude '.git' \
   --exclude '*.png' \
-  --exclude 'vilaos' \
-  --exclude 'vilaos-*' \
-  --exclude 'phoneos' \
-  --exclude 'phoneos-*' \
+  --exclude '/vilaos' \
+  --exclude '/vilaos-musl' \
+  --exclude '/vilaos-pkg' \
+  --exclude '/vilaos-pkg-musl' \
+  --exclude '/vilaos-desktop' \
+  --exclude '/vilaos-vfb' \
+  --exclude '/vilaos-static' \
+  --exclude '/phoneos' \
+  --exclude '/phoneos-*' \
   "${HOST_ROOT}/" "${SRC}/"
 
 mkdir -p "${SRC}/build"

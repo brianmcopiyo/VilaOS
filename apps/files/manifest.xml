@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<app id="files" name="Files" version="1.0.0" version_code="1" icon="files">
+  <summary text="Local storage browser"/>
+  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <capability name="storage"/>
+</app>

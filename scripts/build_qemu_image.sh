@@ -13,19 +13,24 @@ KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VER}.tar
 
 mkdir -p "${BUILD}" "${ROOTFS}"
 
-echo "==> Building vilaos (static musl if available)"
+echo "==> Building vilaos + vilaos-pkg (static musl if available)"
 cd "${ROOT}"
 if command -v musl-gcc >/dev/null 2>&1; then
   make clean
   make musl
   UI_BIN="${ROOT}/vilaos-musl"
+  PKG_BIN="${ROOT}/vilaos-pkg-musl"
 else
   make clean
-  make CFLAGS="-std=c11 -O2 -Wall -Wextra -static" LDFLAGS="-static" APP=vilaos-static
+  make CFLAGS="-std=c11 -O2 -Wall -Wextra -static" LDFLAGS="-static" APP=vilaos-static PKG_APP=vilaos-pkg-static all
   UI_BIN="${ROOT}/vilaos-static"
+  PKG_BIN="${ROOT}/vilaos-pkg-static"
 fi
 test -x "${UI_BIN}"
+test -x "${PKG_BIN}"
 strip --strip-unneeded "${UI_BIN}" 2>/dev/null || true
+strip --strip-unneeded "${PKG_BIN}" 2>/dev/null || true
+bash "${ROOT}/scripts/pack_apps.sh" || true
 
 fetch() {
   local url="$1" out="$2"
@@ -220,14 +225,19 @@ ls -lh "${BUILD}/bzImage"
 
 echo "==> Assembling rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens,apps,data/apps,var/lib/vilaos,packages}
 cp -f "${BUILD}/busybox" "${ROOTFS}/bin/busybox"
-for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg; do
+for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
 done
 cp -f "${UI_BIN}" "${ROOTFS}/bin/vilaos"
-chmod 755 "${ROOTFS}/bin/vilaos"
+cp -f "${PKG_BIN}" "${ROOTFS}/bin/vilaos-pkg"
+chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
 cp -a "${ROOT}/assets/screens/." "${ROOTFS}/assets/screens/"
+cp -a "${ROOT}/apps/." "${ROOTFS}/apps/"
+if [[ -d "${ROOT}/build/packages" ]]; then
+  cp -a "${ROOT}/build/packages/." "${ROOTFS}/packages/" || true
+fi
 
 cat > "${ROOTFS}/init" << 'EOF'
 #!/bin/sh
@@ -239,7 +249,7 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 cd /

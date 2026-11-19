@@ -1,0 +1,7 @@
+on_load
+  require display
+end
+
+on_soft right
+  back
+end

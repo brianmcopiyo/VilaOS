@@ -1,0 +1,52 @@
+on_load
+  require telephony
+end
+
+on_click d0
+  digit 0
+end
+on_click d1
+  digit 1
+end
+on_click d2
+  digit 2
+end
+on_click d3
+  digit 3
+end
+on_click d4
+  digit 4
+end
+on_click d5
+  digit 5
+end
+on_click d6
+  digit 6
+end
+on_click d7
+  digit 7
+end
+on_click d8
+  digit 8
+end
+on_click d9
+  digit 9
+end
+on_click dstar
+  digit *
+end
+on_click dhash
+  digit #
+end
+
+on_soft left
+  action call
+end
+
+on_soft center
+  action call
+end
+
+on_soft right
+  action clear
+end

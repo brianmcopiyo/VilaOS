@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<app id="messages" name="Messages" version="1.0.0" version_code="1" icon="messages">
+  <summary text="SMS threads and compose"/>
+  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <capability name="messages"/>
+  <capability name="storage"/>
+</app>

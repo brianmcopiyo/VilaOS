@@ -8,3 +8,5 @@ build/
 *.cpio
 *.cpio.gz
 *.tar.*
+*.vpkg
+t.c

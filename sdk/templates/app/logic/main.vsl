@@ -1,0 +1,12 @@
+on_load
+  require storage
+  set_text hint "Ready"
+end
+
+on_click ok_btn
+  set_text hint "Clicked"
+end
+
+on_soft right
+  back
+end

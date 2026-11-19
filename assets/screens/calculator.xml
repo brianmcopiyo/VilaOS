@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<screen id="calculator" bg="#0B0F17">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="calc_expr" text="" fg="#94A3B8" w="100%" h="auto"/>
+    <label id="calc_display" text="0" fg="#F1F5F9" w="100%" h="14%" value="1"/>
+    <hbox id="r1" w="100%" h="auto">
+      <button id="c7" text="7" action="calc:d:7" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c8" text="8" action="calc:d:8" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c9" text="9" action="calc:d:9" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="cdiv" text="/" action="calc:/" bg="#1E293B" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="r2" w="100%" h="auto">
+      <button id="c4" text="4" action="calc:d:4" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c5" text="5" action="calc:d:5" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c6" text="6" action="calc:d:6" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="cmul" text="*" action="calc:*" bg="#1E293B" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="r3" w="100%" h="auto">
+      <button id="c1" text="1" action="calc:d:1" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c2" text="2" action="calc:d:2" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="c3" text="3" action="calc:d:3" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="csub" text="-" action="calc:-" bg="#1E293B" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+    <hbox id="r4" w="100%" h="auto">
+      <button id="c0" text="0" action="calc:d:0" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="cdot" text="." action="calc:dot" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="ceq" text="=" action="calc:eq" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="cadd" text="+" action="calc:+" bg="#1E293B" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+    </hbox>
+  </vbox>
+  <softkeys left="Clear" center="=" right="Back"
+            left_action="calc:clear" center_action="calc:eq" right_action="back"/>
+</screen>
