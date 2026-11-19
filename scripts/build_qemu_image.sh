@@ -198,15 +198,17 @@ configure_kernel_tiny() {
   $cfg --disable CONFIG_MEDIA_SUPPORT || true
   $cfg --disable CONFIG_VIDEO_DEV || true
   $cfg --disable CONFIG_SOUNDWIRE || true
+  $cfg --enable CONFIG_PM || true
+  $cfg --enable CONFIG_PM_SLEEP || true
+  $cfg --enable CONFIG_ACPI || true
+  $cfg --enable CONFIG_ACPI_BUTTON || true
+  $cfg --enable CONFIG_ACPI_FAN || true
+  $cfg --enable CONFIG_ACPI_PROCESSOR || true
+  $cfg --enable CONFIG_ACPI_THERMAL || true
+  $cfg --enable CONFIG_X86_ACPI_CPUFREQ || true
   $cfg --disable CONFIG_ACPI_AC || true
   $cfg --disable CONFIG_ACPI_BATTERY || true
-  $cfg --disable CONFIG_ACPI_BUTTON || true
-  $cfg --disable CONFIG_ACPI_FAN || true
   $cfg --disable CONFIG_ACPI_DOCK || true
-  $cfg --disable CONFIG_ACPI_PROCESSOR || true
-  $cfg --disable CONFIG_ACPI_THERMAL || true
-  $cfg --enable CONFIG_ACPI || true
-  $cfg --enable CONFIG_X86_ACPI_CPUFREQ || true
 }
 
 echo "==> Linux kernel ${KERNEL_VER} (tiny)"
@@ -254,7 +256,10 @@ mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 cd /
 export HOME=/
-exec /bin/vilaos
+while true; do
+  /bin/vilaos
+  sleep 1
+done
 EOF
 chmod 755 "${ROOTFS}/init"
 ln -sf /init "${ROOTFS}/sbin/init"

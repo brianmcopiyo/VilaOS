@@ -13,6 +13,8 @@
     <button id="toggle_profile" text="Profile: General" action="cycle_profile" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
     <label id="sec_time" text="Date and time" fg="#57534E" w="100%" h="auto"/>
     <label id="time_help" text="Uses device clock automatically" fg="#1C1917" w="100%" h="auto"/>
+    <label id="sec_power" text="Power" fg="#57534E" w="100%" h="auto"/>
+    <button id="btn_power" text="Power menu" action="power_menu" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
     <label id="sec_about" text="About VilaOS" fg="#57534E" w="100%" h="auto"/>
     <label id="about1" text="VilaOS Feature Phone" fg="#1C1917" w="100%" h="auto"/>
     <label id="about2" text="Version 1.0" fg="#57534E" w="100%" h="auto"/>

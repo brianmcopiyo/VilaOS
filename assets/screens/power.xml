@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<screen id="power" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Power" fg="#1C1917" w="100%" h="auto"/>
+    <label id="hint" text="Choose an action" fg="#57534E" w="100%" h="auto"/>
+    <button id="pwr_off" text="Power Off" action="power_off" bg="#B91C1C" fg="#FFFFFF" focus_bg="#B91C1C" w="100%" h="auto"/>
+    <button id="pwr_restart" text="Restart" action="power_restart" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+    <button id="pwr_cancel" text="Cancel" action="power_cancel" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Select" center="OK" right="Cancel"
+            left_action="ok" center_action="ok" right_action="power_cancel"/>
+</screen>

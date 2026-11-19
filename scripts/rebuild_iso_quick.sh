@@ -87,7 +87,10 @@ mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 cd /
 export HOME=/
-exec /bin/vilaos
+while true; do
+  /bin/vilaos
+  sleep 1
+done
 EOF
 chmod 755 "${ROOTFS}/init"
 ln -sf /init "${ROOTFS}/sbin/init"

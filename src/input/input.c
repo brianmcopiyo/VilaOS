@@ -32,6 +32,8 @@
 #define KEY_F3 61
 #define KEY_LEFTCTRL 29
 #define KEY_RIGHTCTRL 97
+#define KEY_LEFTALT 56
+#define KEY_RIGHTALT 100
 #define KEY_LEFTSHIFT 42
 #define KEY_RIGHTSHIFT 54
 #define KEY_CAPSLOCK 58
@@ -39,6 +41,8 @@
 #define KEY_LEFTMETA 125
 #define KEY_RIGHTMETA 126
 #define KEY_BACK 158
+#define KEY_DELETE 111
+#define KEY_POWER 116
 #define KEY_SPACE 57
 #define KEY_1 2
 #define KEY_2 3
@@ -470,6 +474,10 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
         m->state.ctrl = (value != 0);
         return 0;
     }
+    if (code == KEY_LEFTALT || code == KEY_RIGHTALT) {
+        m->state.alt = (value != 0);
+        return 0;
+    }
     if (code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT) {
         m->state.shift = (value != 0);
         if (value == 0)
@@ -487,6 +495,10 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
     if (now_ms() - m->state.last_pointer_ms > 100)
         m->state.cursor_visible = 0;
 
+    if (code == KEY_POWER || (code == KEY_DELETE && m->state.ctrl && m->state.alt)) {
+        out->kind = IE_POWER;
+        return 1;
+    }
     if (code == KEY_HOME || code == KEY_LEFTMETA || code == KEY_RIGHTMETA ||
         (code == KEY_H && m->state.ctrl)) {
         out->kind = IE_HOME;
@@ -625,10 +637,16 @@ static int poll_sdl(InputMux *m, InputEvent *out)
             else if (k == SDLK_HOME) code = KEY_HOME;
             else if (k == SDLK_LGUI || k == SDLK_RGUI) code = KEY_LEFTMETA;
             else if (k == SDLK_LCTRL || k == SDLK_RCTRL) code = KEY_LEFTCTRL;
+            else if (k == SDLK_LALT || k == SDLK_RALT) code = KEY_LEFTALT;
+            else if (k == SDLK_DELETE) code = KEY_DELETE;
             else if (k == SDLK_F1) code = KEY_F1;
             else if (k == SDLK_F2) code = KEY_F2;
             else if (k == SDLK_SPACE) code = KEY_SPACE;
             else if (k == SDLK_LSHIFT || k == SDLK_RSHIFT) code = KEY_LEFTSHIFT;
+            if (e.key.keysym.mod & KMOD_CTRL)
+                m->state.ctrl = 1;
+            if (e.key.keysym.mod & KMOD_ALT)
+                m->state.alt = 1;
             else if (k >= SDLK_a && k <= SDLK_z) {
                 static const int letters[] = {
                     KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J,
@@ -651,6 +669,10 @@ static int poll_sdl(InputMux *m, InputEvent *out)
         if (e.type == SDL_KEYUP) {
             if (e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_RSHIFT)
                 m->state.shift = 0;
+            if (e.key.keysym.sym == SDLK_LCTRL || e.key.keysym.sym == SDLK_RCTRL)
+                m->state.ctrl = 0;
+            if (e.key.keysym.sym == SDLK_LALT || e.key.keysym.sym == SDLK_RALT)
+                m->state.alt = 0;
         }
         if (e.type == SDL_MOUSEMOTION) {
             int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;

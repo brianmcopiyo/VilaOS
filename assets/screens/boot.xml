@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<screen id="boot" bg="#F5EFE6">
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="boot_mark" text="VilaOS" fg="#EA580C" w="100%" h="18%" value="1"/>
+    <label id="boot_sub" text="Feature Phone" fg="#57534E" w="100%" h="auto"/>
+    <label id="boot_bar" text="" fg="#1C1917" bg="#EAE0D0" w="100%" h="8%" value="8"/>
+    <label id="boot_status" text="Starting VilaOS..." fg="#1C1917" w="100%" h="auto"/>
+  </vbox>
+</screen>

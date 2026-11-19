@@ -139,6 +139,7 @@ typedef struct {
     int shift;
     int caps;
     int ctrl;
+    int alt;
     int bound_w, bound_h;
     int last_qwerty;
 } InputState;

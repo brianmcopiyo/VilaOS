@@ -16,6 +16,6 @@
       <button id="app_settings" text="Settings" icon="settings" action="app:settings" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
     </grid>
   </vbox>
-  <softkeys left="Open" center="OK" right="Lock"
-            left_action="ok" center_action="ok" right_action="lock"/>
+  <softkeys left="Options" center="OK" right="Lock"
+            left_action="power_menu" center_action="ok" right_action="lock"/>
 </screen>

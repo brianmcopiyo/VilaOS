@@ -9,6 +9,7 @@ LIBS     :=
 SRC := \
 	src/main.c \
 	src/core/util.c \
+	src/core/syspower.c \
 	src/gfx/fb.c \
 	src/gfx/draw.c \
 	src/gfx/font.c \

@@ -746,7 +746,16 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
         int ty = w->y + (w->h - lh) / 2;
         if (w->h > lh * 2)
             ty = w->y + g->pad;
-        if (str_starts(w->id, "pill") || w->value == 2) {
+        if (str_eq(w->id, "boot_bar") || str_eq(w->id, "progress")) {
+            int pct = clamp_i(w->value, 0, 100);
+            int bh = clamp_i(w->h, fh + 8, w->h);
+            int by = w->y + (w->h - bh) / 2;
+            draw_round_rect(g, w->x, by, w->w, bh, radius, COL_PANEL, 1);
+            draw_round_rect(g, w->x, by, w->w, bh, radius, COL_BORDER, 0);
+            int fill = (w->w - 4) * pct / 100;
+            if (fill > 0)
+                draw_round_rect(g, w->x + 2, by + 2, fill, bh - 4, radius > 2 ? radius - 1 : 1, COL_ACCENT, 1);
+        } else if (str_starts(w->id, "pill") || w->value == 2) {
             int tw = font_text_w_scaled(g, FONT_8X12, w->text) + g->pad * 2;
             if (tw > w->w)
                 tw = w->w;
@@ -1091,6 +1100,20 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
             str_copy(out_nav, out_sz, "assets/screens/home.xml");
         return 1;
     }
+    if (str_eq(action, "power") || str_eq(action, "power_menu") || str_eq(action, "options")) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/power.xml");
+        return 1;
+    }
+    if (str_eq(action, "power_cancel") || str_eq(action, "cancel")) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, "assets/screens/home.xml");
+        return 1;
+    }
+    if (str_eq(action, "power_off"))
+        return 30;
+    if (str_eq(action, "power_restart"))
+        return 31;
     if (str_eq(action, "clear")) {
         if (s && s->focus >= 0) {
             Widget *w = &s->widgets[s->focus];

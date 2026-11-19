@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<screen id="shutdown" bg="#F5EFE6">
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="shut_mark" text="VilaOS" fg="#EA580C" w="100%" h="18%" value="1"/>
+    <label id="shut_msg" text="Shutting down VilaOS..." fg="#1C1917" w="100%" h="auto"/>
+  </vbox>
+</screen>

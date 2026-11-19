@@ -202,7 +202,12 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
 {
     if (!h)
         return -1;
-    if (!h->in_app || route_is_root(&h->stack)) {
+    if (!h->in_app) {
+        if (out_nav)
+            out_nav[0] = 0;
+        return 0;
+    }
+    if (route_is_root(&h->stack)) {
         route_reset(&h->stack);
         h->in_app = 0;
         vsl_reset(&h->vsl);
@@ -294,6 +299,10 @@ int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, cha
 {
     if (!h || !action || !action[0])
         return 0;
+    if (str_eq(action, "power_off"))
+        return 30;
+    if (str_eq(action, "power_restart"))
+        return 31;
 
     int rc = handle_route_action(h, s, g, action, out_nav, out_sz);
     if (rc != 0)

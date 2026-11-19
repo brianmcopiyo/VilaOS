@@ -17,6 +17,7 @@ typedef enum {
     IE_CHAR,
     IE_BACKSPACE,
     IE_CLICK,
+    IE_POWER,
     IE_QUIT
 } InputEventKind;
 
