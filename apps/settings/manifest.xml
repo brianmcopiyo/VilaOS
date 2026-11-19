@@ -1,6 +1,6 @@
-﻿<?xml version="1.0"?>
-<app id="settings" name="Settings" version="2.0.0" version_code="2" icon="settings">
- <summary text="Display, input, apps, services, and system controls"/>
+<?xml version="1.0"?>
+<app id="settings" name="Settings" version="3.0.0" version_code="3" icon="settings">
+ <summary text="OS administration for display, input, packages, services, and system"/>
  <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
  <capability name="ui"/>
  <capability name="system.device"/>

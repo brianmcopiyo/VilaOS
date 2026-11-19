@@ -114,6 +114,8 @@ API = {
     ("System", "storage"): ("system.storage.info", "i", 0),
     ("System", "input"): ("system.input.info", "i", 0),
     ("System", "packages"): ("system.packages.list", "i", 0),
+    ("System", "packageDetail"): ("system.packages.detail", "ii", 1),
+    ("System", "runtime"): ("system.runtime.info", "i", 0),
     ("System", "locale"): ("system.locale", "i", 0),
     ("System", "theme"): ("system.theme", "i", 0),
     ("System", "time"): ("system.time", "i", 0),

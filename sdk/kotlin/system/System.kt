@@ -7,6 +7,8 @@ object System {
     fun storage(widgetId: String) {}
     fun input(widgetId: String) {}
     fun packages(widgetId: String) {}
+    fun packageDetail(index: String, widgetId: String = "") {}
+    fun runtime(widgetId: String) {}
     fun time(widgetId: String) {}
     fun locale(widgetId: String) {}
     fun theme(widgetId: String) {}

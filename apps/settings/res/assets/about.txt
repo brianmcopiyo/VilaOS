@@ -1,4 +1,4 @@
 VilaOS Settings
+Display Input Packages Services System
 Sunset Orange #EA580C
 Warm Beige #F5EFE6
-API and package manager for feature-phone shells.

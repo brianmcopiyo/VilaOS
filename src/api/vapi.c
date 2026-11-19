@@ -110,6 +110,7 @@ unsigned vapi_cap_required(const char *method)
     if (str_starts(method, "system.device") || str_starts(method, "system.display") ||
         str_starts(method, "system.memory") || str_starts(method, "system.storage") ||
         str_starts(method, "system.input") || str_starts(method, "system.packages") ||
+        str_starts(method, "system.runtime") || str_starts(method, "system.kernel") ||
         str_starts(method, "system.theme") || str_starts(method, "system.time") ||
         str_starts(method, "system.locale") || str_starts(method, "system.api"))
         return PKG_CAP_SYSTEM_DEVICE | PKG_CAP_DISPLAY;

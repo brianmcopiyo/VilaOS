@@ -16,34 +16,75 @@ static void set_out(VapiCtx *ctx, const char *widget, const char *text, char *ou
         str_copy(out, out_n, text);
 }
 
+static void caps_text(unsigned caps, char *buf, size_t n)
+{
+    buf[0] = 0;
+    if (caps & PKG_CAP_UI)
+        str_cat(buf, n, "ui ");
+    if (caps & PKG_CAP_STORAGE)
+        str_cat(buf, n, "storage.app ");
+    if (caps & PKG_CAP_STORAGE_FILES)
+        str_cat(buf, n, "storage.files ");
+    if (caps & PKG_CAP_TELEPHONY)
+        str_cat(buf, n, "telephony ");
+    if (caps & PKG_CAP_MESSAGES)
+        str_cat(buf, n, "messages ");
+    if (caps & PKG_CAP_CONTACTS)
+        str_cat(buf, n, "contacts ");
+    if (caps & PKG_CAP_AUDIO)
+        str_cat(buf, n, "audio.bg ");
+    if (caps & PKG_CAP_CLOCK)
+        str_cat(buf, n, "system.clock ");
+    if (caps & PKG_CAP_SYSTEM_DEVICE)
+        str_cat(buf, n, "system.device ");
+    if (caps & PKG_CAP_SYSTEM_POWER)
+        str_cat(buf, n, "system.power ");
+    if (caps & PKG_CAP_NETWORK)
+        str_cat(buf, n, "network ");
+    if (caps & PKG_CAP_DISPLAY)
+        str_cat(buf, n, "display ");
+    if (!buf[0])
+        str_copy(buf, n, "none");
+}
+
+static void load_reg(PkgRegistry *reg)
+{
+    pkg_registry_load(reg);
+    if (reg->count == 0)
+        pkg_seed_from_dir("/apps", reg);
+}
+
 int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n)
 {
     (void)a2;
     if (!ctx || !op)
         return VAPI_ERR_INVALID_ARG;
 
-    if (str_eq(op, "display") || str_eq(op, "display.info") || str_eq(op, "device") ||
-        str_eq(op, "device.info")) {
+    if (str_eq(op, "display") || str_eq(op, "display.info")) {
         char buf[MAX_TEXT];
-        int w = 0, h = 0;
+        int w = REF_W, h = REF_H;
         if (ctx->gfx) {
             w = ctx->gfx->w;
             h = ctx->gfx->h;
-        } else if (ctx->screen) {
-            w = REF_W;
-            h = REF_H;
+        }
+        int g = 0;
+        if (h > 0)
+            g = (w * 1000) / h;
+        snprintf(buf, sizeof(buf), "%dx%d 1:1 px ratio %d.%03d", w, h, g / 1000, g % 1000);
+        set_out(ctx, a1, buf, out, out_n);
+        return VAPI_OK;
+    }
+    if (str_eq(op, "device") || str_eq(op, "device.info")) {
+        char buf[MAX_TEXT];
+        int w = REF_W, h = REF_H;
+        if (ctx->gfx) {
+            w = ctx->gfx->w;
+            h = ctx->gfx->h;
         }
         HwProfile hw;
         hwinfo_detect(&hw);
-        int aspect = 0;
-        if (h > 0)
-            aspect = (w * 100) / h;
-        snprintf(buf, sizeof(buf), "%dx%d %d:%02d %s", w, h, aspect / 100, aspect % 100,
-                 hwinfo_tier_name(hw.tier));
-        if (str_eq(op, "device") || str_eq(op, "device.info")) {
-            snprintf(buf, sizeof(buf), "%dx%d %s %ldMB %dc API%d", w, h, hwinfo_tier_name(hw.tier),
-                     hw.ram_mb, hw.cores, VILAOS_API_VERSION);
-        }
+        snprintf(buf, sizeof(buf), "%dx%d %s %ldMB %dc API%d", w, h, hwinfo_tier_name(hw.tier),
+                 hw.ram_mb, hw.cores, VILAOS_API_VERSION);
         set_out(ctx, a1, buf, out, out_n);
         return VAPI_OK;
     }
@@ -62,7 +103,7 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
             total_mb = hw.ram_mb;
         if (avail_mb < 0)
             avail_mb = 0;
-        snprintf(buf, sizeof(buf), "%ld/%ld MB %dc %s", avail_mb, total_mb, hw.cores,
+        snprintf(buf, sizeof(buf), "%ld/%ld MB free  %dc  tier %s", avail_mb, total_mb, hw.cores,
                  hwinfo_tier_name(hw.tier));
         set_out(ctx, a1, buf, out, out_n);
         return VAPI_OK;
@@ -70,35 +111,53 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
     if (str_eq(op, "storage") || str_eq(op, "storage.info")) {
         char buf[MAX_TEXT];
         PkgRegistry reg;
-        pkg_registry_load(&reg);
-        if (reg.count == 0)
-            pkg_seed_from_dir("/apps", &reg);
-        snprintf(buf, sizeof(buf), "%d apps /packages /data/apps", reg.count);
+        load_reg(&reg);
+        snprintf(buf, sizeof(buf), "%d pkgs  /apps  /packages  /data/apps", reg.count);
         set_out(ctx, a1, buf, out, out_n);
         return VAPI_OK;
     }
     if (str_eq(op, "input") || str_eq(op, "input.info")) {
-        const char *info = "Keypad + pointer";
+        char buf[MAX_TEXT];
         if (ctx->gfx && ctx->gfx->desktop)
-            info = "Pointer + keypad";
-        set_out(ctx, a1, info, out, out_n);
+            str_copy(buf, sizeof(buf), "Pointer mouse  Keypad  Softkeys");
+        else
+            str_copy(buf, sizeof(buf), "Keypad  Softkeys  Touch if present");
+        set_out(ctx, a1, buf, out, out_n);
+        return VAPI_OK;
+    }
+    if (str_eq(op, "runtime") || str_eq(op, "runtime.info") || str_eq(op, "kernel")) {
+        char buf[MAX_TEXT];
+        FILE *f = fopen("/proc/version", "r");
+        if (f) {
+            if (!fgets(buf, (int)sizeof(buf), f))
+                buf[0] = 0;
+            fclose(f);
+            size_t L = strlen(buf);
+            while (L > 0 && (buf[L - 1] == '\n' || buf[L - 1] == '\r'))
+                buf[--L] = 0;
+            if (L > 96)
+                buf[96] = 0;
+        } else {
+            snprintf(buf, sizeof(buf), "VilaOS API%d musl", VILAOS_API_VERSION);
+        }
+        set_out(ctx, a1, buf, out, out_n);
         return VAPI_OK;
     }
     if (str_eq(op, "packages") || str_eq(op, "packages.list")) {
         char buf[MAX_TEXT];
         char countbuf[32];
         PkgRegistry reg;
-        pkg_registry_load(&reg);
-        if (reg.count == 0)
-            pkg_seed_from_dir("/apps", &reg);
+        load_reg(&reg);
         if (pkg_list(&reg, buf, sizeof(buf)) < 0)
             str_copy(buf, sizeof(buf), "none");
         if (!buf[0])
             str_copy(buf, sizeof(buf), "none");
         snprintf(countbuf, sizeof(countbuf), "%d", reg.count);
         if (ctx->rt) {
+            bridge_set_text(ctx->rt, "pkg_count", countbuf);
             bridge_set_text(ctx->rt, "apps_count", countbuf);
             snprintf(countbuf, sizeof(countbuf), "%d packages", reg.count);
+            bridge_set_text(ctx->rt, "pkg_summary", countbuf);
             bridge_set_text(ctx->rt, "apps_summary", countbuf);
             for (int i = 0; i < 10; i++) {
                 char wid[8];
@@ -114,6 +173,26 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
             }
         }
         set_out(ctx, a1, buf, out, out_n);
+        return VAPI_OK;
+    }
+    if (str_eq(op, "packages.detail") || str_eq(op, "package.detail")) {
+        PkgRegistry reg;
+        char caps[MAX_TEXT];
+        int idx = a1 && a1[0] ? atoi(a1) : 0;
+        load_reg(&reg);
+        if (idx < 0 || idx >= reg.count)
+            return VAPI_ERR_NOT_FOUND;
+        caps_text(reg.apps[idx].caps, caps, sizeof(caps));
+        if (ctx->rt) {
+            bridge_set_text(ctx->rt, "pkg_name", reg.apps[idx].name);
+            bridge_set_text(ctx->rt, "pkg_id", reg.apps[idx].id);
+            bridge_set_text(ctx->rt, "pkg_ver", reg.apps[idx].version);
+            bridge_set_text(ctx->rt, "pkg_caps", caps);
+            bridge_set_text(ctx->rt, "pkg_entry", reg.apps[idx].entry_screen);
+            bridge_set_text(ctx->rt, "pkg_badge", "Installed .vpkg");
+            bridge_set_text(ctx->rt, "pkg_icon", reg.apps[idx].icon);
+        }
+        set_out(ctx, a2 && a2[0] ? a2 : a1, reg.apps[idx].id, out, out_n);
         return VAPI_OK;
     }
     if (str_eq(op, "time") || str_eq(op, "clock") || str_eq(op, "clock.now")) {

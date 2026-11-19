@@ -5,15 +5,15 @@
     <label id="title" text="Settings" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="18" font-weight="700"/>
     <input id="search" text="" width="100%" height="36" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" font-family="Inter" font-size="12"/>
     <card class="row items-center justify-between p-8">
-      <row id="sum_device" title="VilaOS" subtitle="Loading device" icon="settings" icon-set="tabler"/>
-      <badge id="sum_api" text="API" icon="cpu" icon-set="lucide"/>
+      <row id="device" title="VilaOS" subtitle="Loading" icon="settings" icon-set="tabler"/>
+      <badge id="api" text="API" icon="cpu" icon-set="lucide"/>
     </card>
-    <list id="sections" width="100%" height="fill" grow="1" min-height="120" class="surface" padding="4" gap="4" overflow="scroll">
-      <row id="sec_display" title="Display" subtitle="Theme and typography" icon="monitor" icon-set="lucide" action="route:push:res/layout/display.xml"/>
-      <row id="sec_input" title="Input" subtitle="Touch and keypad" icon="keyboard" icon-set="lucide" action="route:push:res/layout/input.xml"/>
-      <row id="sec_apps" title="Apps" subtitle="Installed packages" icon="package" icon-set="lucide" action="route:push:res/layout/apps.xml"/>
-      <row id="sec_services" title="Services" subtitle="Background tasks" icon="activity" icon-set="lucide" action="route:push:res/layout/services.xml"/>
-      <row id="sec_system" title="System" subtitle="Memory and power" icon="info" icon-set="lucide" action="route:push:res/layout/system.xml"/>
+    <list id="sections" width="100%" height="fill" grow="1" min-height="140" class="surface" padding="4" gap="4" overflow="scroll">
+      <row id="display" title="Display" subtitle="Resolution and theme" icon="monitor" icon-set="lucide" action="route:push:res/layout/display.xml"/>
+      <row id="input" title="Input" subtitle="Devices and feedback" icon="keyboard" icon-set="lucide" action="route:push:res/layout/input.xml"/>
+      <row id="packages" title="Packages" subtitle="Installed .vpkg" icon="package" icon-set="lucide" action="route:push:res/layout/packages.xml"/>
+      <row id="services" title="Services" subtitle="Background tasks" icon="activity" icon-set="lucide" action="route:push:res/layout/services.xml"/>
+      <row id="system" title="System" subtitle="Memory and power" icon="info" icon-set="lucide" action="route:push:res/layout/system.xml"/>
     </list>
   </flex>
   <softkeys left="Search" center="Open" right="Back"
