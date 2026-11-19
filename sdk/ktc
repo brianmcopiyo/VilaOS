@@ -22,8 +22,8 @@ CAP = {
 }
 
 SOFT = {"LEFT": "left", "CENTER": "center", "RIGHT": "right"}
-FORBIDDEN = {"Keypad", "Graphics", "Keyboard", "Font", "Draw"}
-BINDINGS = {"DialKeypad", "TextInput", "ActionButton", "ListRow", "SurfaceCard", "StatusBadge", "AppTile"}
+FORBIDDEN = {"Graphics", "Keyboard", "Font", "Draw"}
+BINDINGS = {"Keypad", "Input", "Button", "Row", "Card", "Badge", "Tile", "Header", "Text", "Icon", "List"}
 ROW_IDS = ("m1", "m2", "m3", "m4", "c1", "c2", "c3", "c4", "c5")
 RESERVED = {"key", "target", "event", "status"}
 MODS = {
@@ -45,7 +45,7 @@ LIST_CTORS = {"mutableListOf", "arrayListOf", "ArrayList", "listOf", "emptyList"
 BLANK = {"isBlank", "isEmpty", "isNotBlank", "isNotEmpty"}
 API_OBJS = {
     "Ui", "Storage", "Service", "Audio", "Telephony", "Messages", "Contacts",
-    "Clock", "System", "Action", "Widget", "SoftkeyBar",
+    "Clock", "System", "Action", "Widget", "Footer",
 }
 CMP = {"==": "eq", "!=": "ne", "<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
 NEG = {
@@ -109,6 +109,11 @@ API = {
     ("Clock", "date"): ("clock.date", "i", 0),
     ("Clock", "tick"): ("clock.tick", "i", 0),
     ("System", "deviceInfo"): ("system.device.info", "i", 0),
+    ("System", "display"): ("system.display.info", "i", 0),
+    ("System", "memory"): ("system.memory.info", "i", 0),
+    ("System", "storage"): ("system.storage.info", "i", 0),
+    ("System", "input"): ("system.input.info", "i", 0),
+    ("System", "packages"): ("system.packages.list", "i", 0),
     ("System", "locale"): ("system.locale", "i", 0),
     ("System", "theme"): ("system.theme", "i", 0),
     ("System", "time"): ("system.time", "i", 0),
@@ -963,7 +968,7 @@ class Compiler:
     def setup(self):
         for f in self.d.funs:
             if f.name in ("onKey", "onDigit"):
-                self.err("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber", f.line)
+                self.err("keyboard/keypad handling belongs in the SDK; use Keypad or onNumber", f.line)
             if f.name in EVENTS:
                 self.handlers.append(f)
                 continue
@@ -1758,9 +1763,9 @@ class Compiler:
                 else:
                     self.err("softkey action requires a literal side", line)
             return UNIT
-        if obj == "SoftkeyBar" and m in ("left", "center", "right"):
+        if obj == "Footer" and m in ("left", "center", "right"):
             if len(args) != 2:
-                self.err("SoftkeyBar.%s(label, action)" % m, line)
+                self.err("Footer.%s(label, action)" % m, line)
             label = self.ex(args[0])
             act = self.ex(args[1])
             self.dom("ui.softkey", [lit_str(m, self.file, line), label])
@@ -1967,7 +1972,7 @@ class Compiler:
 
     def gen_bind(self, bd):
         self.file = bd.file
-        if bd.lam is None or bd.kind not in ("DialKeypad", "ActionButton", "ListRow"):
+        if bd.lam is None or bd.kind not in ("Keypad", "Button", "Row"):
             return []
         self.begin(self.hbase)
         if bd.lam.params:
@@ -1978,9 +1983,9 @@ class Compiler:
         self.hmax = max(self.hmax, mx)
         if not lines:
             return []
-        if bd.kind == "DialKeypad":
+        if bd.kind == "Keypad":
             return [self.block_text("on_number *", lines)]
-        if bd.kind == "ActionButton":
+        if bd.kind == "Button":
             return [self.block_text("on_click %s" % bd.id, lines)]
         return [self.block_text("on_click %s" % r, lines) for r in ROW_IDS]
 

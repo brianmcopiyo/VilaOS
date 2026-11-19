@@ -55,8 +55,10 @@ static int expand_component(BuildCtx *ctx, const char *name, const XmlStart *ove
 
 static int is_primitive_tag(const char *tag)
 {
-    static const char *const tags[] = {"screen", "vbox", "hbox", "column", "flex", "grid",
-                                       "label", "button", "input", "list", "statusbar", "softkeys"};
+    static const char *const tags[] = {
+        "screen", "vbox", "hbox", "column", "flex", "grid", "label", "text", "button",
+        "input", "list", "statusbar", "softkeys"
+    };
     for (size_t i = 0; i < sizeof(tags) / sizeof(tags[0]); i++) {
         if (str_eq(tag, tags[i]))
             return 1;
@@ -99,7 +101,7 @@ static void on_start(const XmlStart *el, void *user)
         return;
     }
 
-    if (ctx->res && !(ctx->in_component > 0 && is_primitive_tag(el->tag)) && component_known(ctx, el->tag)) {
+    if (!is_primitive_tag(el->tag) && ctx->res && component_known(ctx, el->tag)) {
         int idx = expand_component(ctx, el->tag, el);
         if (idx >= 0 && !el->self_close && ctx->sp < 32)
             ctx->stack[ctx->sp++] = idx;
@@ -112,6 +114,12 @@ static void on_start(const XmlStart *el, void *user)
         return;
     Widget *w = &s->widgets[idx];
     xml_ui_apply_attrs(w, el, ctx->res);
+    if (!w->component[0]) {
+        if (str_eq(el->tag, "text") || str_eq(el->tag, "header") || str_eq(el->tag, "badge") ||
+            str_eq(el->tag, "icon") || str_eq(el->tag, "footer") || str_eq(el->tag, "button") ||
+            str_eq(el->tag, "tile") || str_eq(el->tag, "row"))
+            str_copy(w->component, sizeof(w->component), el->tag);
+    }
 
     if (w->type == W_BUTTON || w->type == W_INPUT)
         w->focusable = 1;
@@ -216,6 +224,8 @@ static void transfer_to_leaf(Widget *w, Widget *leaf, const char *name)
         str_copy(leaf->action, sizeof(leaf->action), w->action);
     if (w->icon[0])
         str_copy(leaf->icon, sizeof(leaf->icon), w->icon);
+    if (w->icon_set[0])
+        str_copy(leaf->icon_set, sizeof(leaf->icon_set), w->icon_set);
     if (w->value)
         leaf->value = w->value;
     if (!leaf->component[0])

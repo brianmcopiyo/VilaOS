@@ -1,25 +1,21 @@
 <?xml version="1.0"?>
-<screen id="settings" background="#F5EFE6">
+<screen id="settings" class="page" background="#F5EFE6">
   <statusbar id="status"/>
-  <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
-    <label id="title" text="Settings" color="#1C1917" width="100%" height="wrap"/>
-    <label id="sec_display" text="Display" color="#57534E" width="100%" height="22"/>
-    <button id="toggle_text" text="Large text: Off" action="toggle_text" background="#EAE0D0" color="#1C1917" width="100%" height="36" radius="8" border-width="1" border-color="#D4C5B0"/>
-    <label id="div1" text="" width="100%" height="6" component="divider"/>
-    <label id="sec_input" text="Input and keypad" color="#57534E" width="100%" height="22"/>
-    <label id="input_help" text="T9, 123, and QWERTY supported" color="#1C1917" width="100%" height="wrap"/>
-    <label id="sec_sound" text="Sound and profiles" color="#57534E" width="100%" height="22"/>
-    <button id="toggle_sound" text="Sound: On" action="toggle_sound" background="#EAE0D0" color="#1C1917" width="100%" height="36" radius="8"/>
-    <button id="toggle_vibrate" text="Vibrate: On" action="toggle_vibrate" background="#EAE0D0" color="#1C1917" width="100%" height="36" radius="8"/>
-    <button id="toggle_profile" text="Profile: General" action="cycle_profile" background="#EAE0D0" color="#1C1917" width="100%" height="36" radius="8"/>
-    <label id="sec_time" text="Date and time" color="#57534E" width="100%" height="22"/>
-    <label id="time_help" text="Uses device clock automatically" color="#1C1917" width="100%" height="wrap"/>
-    <label id="sec_power" text="Power" color="#57534E" width="100%" height="22"/>
-    <button id="btn_power" text="Power menu" action="power_menu" background="#EA580C" color="#FFFFFF" width="100%" height="40" radius="10"/>
-    <label id="sec_about" text="About VilaOS" color="#57534E" width="100%" height="22"/>
-    <label id="about1" text="VilaOS Feature Phone" color="#1C1917" width="100%" height="wrap"/>
-    <label id="about2" text="Version 1.0" color="#57534E" width="100%" height="wrap"/>
+  <flex id="body" class="col gap-6 p-8" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <label id="title" text="Settings" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="18" font-weight="700"/>
+    <input id="search" text="" width="100%" height="36" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8"/>
+    <card class="row items-center justify-between p-8">
+      <row id="sum_device" title="VilaOS" subtitle="Device" icon="settings" icon-set="tabler"/>
+      <badge id="sum_api" text="API"/>
+    </card>
+    <list id="sections" width="100%" height="fill" grow="1" min-height="120" class="surface" padding="4" gap="4" overflow="scroll">
+      <row id="sec_display" title="Display" subtitle="Theme and typography" icon="monitor" icon-set="lucide" action="app:settings"/>
+      <row id="sec_input" title="Input" subtitle="Touch and keypad" icon="keyboard" icon-set="lucide" action="app:settings"/>
+      <row id="sec_apps" title="Apps" subtitle="Installed packages" icon="package" icon-set="lucide" action="app:settings"/>
+      <row id="sec_services" title="Services" subtitle="Background tasks" icon="activity" icon-set="lucide" action="app:settings"/>
+      <row id="sec_system" title="System" subtitle="Memory and power" icon="info" icon-set="lucide" action="app:settings"/>
+    </list>
   </flex>
-  <softkeys left="Toggle" center="OK" right="Back"
+  <softkeys left="Open" center="OK" right="Back"
             left-action="ok" center-action="ok" right-action="route:pop"/>
 </screen>

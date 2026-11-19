@@ -21,11 +21,11 @@ object Ui {
     fun home() {}
 }
 
-class DialKeypad(val id: String, val onKey: (String) -> Unit = {}) {
+class Keypad(val id: String, val onKey: (String) -> Unit = {}) {
     fun attach(screen: Screen) {}
 }
 
-class TextInput(val id: String, val placeholder: String = "") {
+class Input(val id: String, val placeholder: String = "") {
     fun attach(screen: Screen) {}
     fun value(screen: Screen): String = "text:$id"
     fun clear(screen: Screen) {
@@ -36,30 +36,75 @@ class TextInput(val id: String, val placeholder: String = "") {
     }
 }
 
-class ActionButton(val id: String, val variant: String = "primary", val onClick: () -> Unit = {}) {
+class Button(
+    val id: String,
+    val variant: String = "primary",
+    val icon: String = "",
+    val iconSet: String = "lucide",
+    val onClick: () -> Unit = {}
+) {
     fun attach(screen: Screen) {}
 }
 
-class ListRow(val id: String, val onSelect: (Int) -> Unit = {}) {
+class Row(
+    val id: String,
+    val icon: String = "",
+    val iconSet: String = "lucide",
+    val onSelect: (Int) -> Unit = {}
+) {
     fun attach(screen: Screen) {}
 }
 
-class SurfaceCard(val id: String = "") {
+class Card(val id: String = "") {
     fun attach(screen: Screen) {}
 }
 
-class StatusBadge(val id: String = "") {
+class Badge(
+    val id: String = "",
+    val icon: String = "",
+    val iconSet: String = "lucide"
+) {
     fun setText(text: String) {
         Ui.setText(id, text)
     }
     fun attach(screen: Screen) {}
 }
 
-class AppTile(val id: String = "") {
+class Tile(
+    val id: String = "",
+    val icon: String = "app",
+    val iconSet: String = "lucide"
+) {
     fun attach(screen: Screen) {}
 }
 
-object SoftkeyBar {
+class Header(val id: String = "") {
+    fun setText(text: String) {
+        Ui.setText(id, text)
+    }
+    fun attach(screen: Screen) {}
+}
+
+class Text(val id: String = "") {
+    fun setText(text: String) {
+        Ui.setText(id, text)
+    }
+    fun attach(screen: Screen) {}
+}
+
+class Icon(
+    val id: String = "",
+    val name: String = "app",
+    val iconSet: String = "lucide"
+) {
+    fun attach(screen: Screen) {}
+}
+
+class List(val id: String = "") {
+    fun attach(screen: Screen) {}
+}
+
+object Footer {
     fun left(label: String, action: String) {
         Ui.softkey(SoftKey.LEFT, label, action)
     }

@@ -2,7 +2,7 @@
 <screen id="dialer" background="#F5EFE6">
   <statusbar id="status"/>
   <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
-    <input_field id="number" text="" width="100%" height="44" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" font-family="JetBrains Mono" font-size="16"/>
+    <input id="number" text="" width="100%" height="44" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" font-family="JetBrains Mono" font-size="16"/>
     <label id="contact_match" text="Enter a number" color="#57534E" width="100%" height="wrap" font-family="Inter" font-size="12"/>
     <keypad id="pad" width="100%" height="auto"/>
     <button id="btn_call" text="Call" action="call" background="#EA580C" color="#FFFFFF" width="100%" height="44" radius="12" font-family="DM Sans" font-weight="700"/>

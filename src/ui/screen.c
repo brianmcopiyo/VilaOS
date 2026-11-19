@@ -8,6 +8,7 @@
 #include "procman.h"
 #include "compose.h"
 #include "contacts.h"
+#include "icon.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -252,56 +253,11 @@ static void draw_softkeys(Gfx *g, Screen *s, Widget *w)
     (void)third;
 }
 
-static void draw_app_icon(Gfx *g, int cx, int cy, int size, const char *icon, uint16_t fg)
+static void draw_app_icon(Gfx *g, Widget *w, int cx, int cy, int size, uint16_t fg)
 {
-    int s = size / 8;
-    if (s < 2)
-        s = 2;
-    int x = cx - size / 2;
-    int y = cy - size / 2;
-    if (str_eq(icon, "dialer")) {
-        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
-        draw_fill(g, cx - s, y + 2 * s, 2 * s, size - 4 * s, fg);
-        draw_fill(g, x + 2 * s, cy - s, size - 4 * s, 2 * s, fg);
-    } else if (str_eq(icon, "messages")) {
-        draw_round_rect(g, x + s, y + 2 * s, size - 2 * s, size / 2, s, fg, 0);
-        draw_line(g, x + 2 * s, y + size / 2 + s, cx, y + size - 2 * s, fg);
-        draw_line(g, cx, y + size - 2 * s, x + size - 2 * s, y + size / 2 + s, fg);
-    } else if (str_eq(icon, "contacts")) {
-        draw_round_rect(g, cx - 2 * s, y + 2 * s, 4 * s, 4 * s, 2 * s, fg, 1);
-        draw_round_rect(g, x + 2 * s, cy + s, size - 4 * s, size / 3, s, fg, 1);
-    } else if (str_eq(icon, "notes")) {
-        draw_rect(g, x + 2 * s, y + s, size - 4 * s, size - 2 * s, fg);
-        draw_hline(g, x + 3 * s, y + 3 * s, size - 6 * s, fg);
-        draw_hline(g, x + 3 * s, y + 5 * s, size - 6 * s, fg);
-        draw_hline(g, x + 3 * s, y + 7 * s, size / 2, fg);
-    } else if (str_eq(icon, "calculator")) {
-        draw_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, fg);
-        draw_fill(g, x + 2 * s, y + 2 * s, size - 4 * s, 2 * s, fg);
-        for (int r = 0; r < 2; r++)
-            for (int c = 0; c < 3; c++)
-                draw_fill(g, x + 2 * s + c * 2 * s, y + 5 * s + r * 2 * s, s, s, fg);
-    } else if (str_eq(icon, "clock")) {
-        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, size / 2, fg, 0);
-        draw_line(g, cx, cy, cx, y + 2 * s, fg);
-        draw_line(g, cx, cy, cx + 2 * s, cy + s, fg);
-    } else if (str_eq(icon, "files")) {
-        draw_rect(g, x + 2 * s, y + 2 * s, size - 4 * s, size - 3 * s, fg);
-        draw_fill(g, x + 2 * s, y + s, size / 3, 2 * s, fg);
-    } else if (str_eq(icon, "settings")) {
-        draw_round_rect(g, cx - 2 * s, cy - 2 * s, 4 * s, 4 * s, s, fg, 1);
-        for (int a = 0; a < 4; a++) {
-            int dx = (a == 0) ? 0 : (a == 1) ? 3 * s : (a == 2) ? 0 : -3 * s;
-            int dy = (a == 0) ? -3 * s : (a == 1) ? 0 : (a == 2) ? 3 * s : 0;
-            draw_fill(g, cx + dx - s / 2, cy + dy - s / 2, s, s, fg);
-        }
-    } else if (str_eq(icon, "music")) {
-        draw_round_rect(g, cx - s, y + 2 * s, 2 * s, size - 4 * s, s / 2, fg, 1);
-        draw_round_rect(g, cx + s, y + 3 * s, size / 3, size / 3, s, fg, 1);
-        draw_hline(g, cx - s, y + 2 * s, size / 2, fg);
-    } else {
-        draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
-    }
+    const char *name = (w && w->icon[0]) ? w->icon : "app";
+    const char *set = (w && w->icon_set[0]) ? w->icon_set : "lucide";
+    icon_draw(g, cx, cy, size, name, set, fg);
 }
 
 static FontStyle widget_font_style(Gfx *g, Widget *w, FontId fallback_id)
@@ -448,7 +404,8 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
         break;
     case W_LABEL: {
         FontId fid = (w->value > 0 || strstr(w->id, "clock_big") || strstr(w->id, "idle_clock")) ? FONT_MONO : FONT_UI;
-        if (str_eq(w->component, "section_header") || str_starts(w->id, "sec_") || str_eq(w->id, "title"))
+        if (str_eq(w->component, "header") || str_eq(w->component, "section_header") ||
+            str_starts(w->id, "sec_") || str_eq(w->id, "title"))
             fid = FONT_DISPLAY;
         FontStyle st = widget_font_style(g, w, fid);
         int lh = font_char_h_style(g, &st);
@@ -464,26 +421,39 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             int fill = (w->w - 4) * pct / 100;
             if (fill > 0)
                 draw_round_rect(g, w->x + 2, by + 2, fill, bh - 4, radius > 2 ? radius - 1 : 1, COL_ACCENT, 1);
-        } else if (str_starts(w->id, "pill") || str_eq(w->component, "notification_pill") || w->value == 2) {
+        } else if (str_starts(w->id, "pill") || str_eq(w->component, "badge") ||
+                   str_eq(w->component, "notification_pill") || str_eq(w->component, "status_badge") ||
+                   w->value == 2) {
             FontStyle pill = widget_font_style(g, w, FONT_UI);
             int ph = clamp_i(font_char_h_style(g, &pill) + 8, 16, w->h > 0 ? w->h : font_char_h_style(g, &pill) + 8);
-            int tw = font_text_w_style(g, &pill, w->text) + g->pad * 2 + 8;
+            int icon_pad = w->icon[0] ? ph - 4 : 0;
+            int tw = font_text_w_style(g, &pill, w->text) + g->pad * 2 + 8 + icon_pad;
             if (tw > w->w && w->w > 0)
                 tw = w->w;
             int py = w->y + (w->h - ph) / 2;
             int pr = ph / 2;
-            draw_round_rect(g, w->x, py, tw, ph, pr, w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT, 1);
-            font_draw_text_style_clip(g, &pill, w->x + g->pad + 2, py + (ph - font_char_h_style(g, &pill)) / 2,
-                                      tw - g->pad * 2 - 4, w->text,
-                                      w->fg ? w->fg : COL_ON_ACCENT,
-                                      w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT, 1);
+            uint16_t pbg = w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT;
+            uint16_t pfg = w->fg ? w->fg : COL_ON_ACCENT;
+            draw_round_rect(g, w->x, py, tw, ph, pr, pbg, 1);
+            int tx = w->x + g->pad + 2;
+            if (w->icon[0]) {
+                int isz = clamp_i(ph - 8, 10, 18);
+                draw_app_icon(g, w, w->x + g->pad + 2 + isz / 2, py + ph / 2, isz, pfg);
+                tx += isz + 4;
+            }
+            font_draw_text_style_clip(g, &pill, tx, py + (ph - font_char_h_style(g, &pill)) / 2,
+                                      tw - (tx - w->x) - g->pad, w->text, pfg, pbg, 1);
         } else if (str_eq(w->component, "divider") || str_starts(w->id, "div")) {
             int mid = w->y + w->h / 2;
             draw_hline(g, w->x, mid, w->w, w->border_c ? w->border_c : COL_BORDER);
-        } else if (str_eq(w->component, "section_header") || str_starts(w->id, "sec_")) {
+        } else if (str_eq(w->component, "header") || str_eq(w->component, "section_header") ||
+                   str_starts(w->id, "sec_")) {
             FontStyle hdr = widget_font_style(g, w, FONT_DISPLAY);
             font_draw_text_style_clip(g, &hdr, w->x, ty, w->w > 0 ? w->w : g->w, w->text,
                                       w->fg ? w->fg : COL_DIM, COL_BG, 0);
+        } else if (str_eq(w->component, "icon")) {
+            int isz = clamp_i(w->w < w->h ? w->w : w->h, 12, 48);
+            draw_app_icon(g, w, w->x + w->w / 2, w->y + w->h / 2, isz, w->fg ? w->fg : COL_TEXT);
         } else {
             int br = w->radius > 0 ? clamp_i(w->radius, 2, 14) : 0;
             int pad_l = w->pad_l > 0 ? w->pad_l : 0;
@@ -521,7 +491,7 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             br = w->h / 2;
         FontStyle btn_st = widget_font_style(g, w, FONT_UI);
         int btn_fh = font_char_h_style(g, &btn_st);
-        if (w->icon[0] || str_eq(w->component, "launcher_tile") || str_eq(w->component, "tile")) {
+        if (w->icon[0] || str_eq(w->component, "tile") || str_eq(w->component, "launcher_tile")) {
             draw_elevated_rect(g, w->x, w->y, w->w, w->h, br, bg, border);
             if (g->composer)
                 compose_set_clip(g->composer, w->x + 2, w->y + 2, w->w - 4, w->h - 4);
@@ -530,7 +500,7 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             if (icon_band < 12)
                 icon_band = w->h / 2;
             int icon_size = clamp_i(icon_band * 2 / 3, 14, 36);
-            draw_app_icon(g, w->x + w->w / 2, w->y + 4 + icon_band / 2, icon_size, w->icon[0] ? w->icon : "app", fg);
+            draw_app_icon(g, w, w->x + w->w / 2, w->y + 4 + icon_band / 2, icon_size, fg);
             int label_y = w->y + w->h - label_h;
             int label_x = w->x + 4;
             int label_w = w->w - 8;
@@ -539,19 +509,26 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             font_draw_text_style_clip(g, &btn_st, label_x, label_y + (label_h - btn_fh) / 2, label_w, w->text, fg, bg, 1);
             if (g->composer)
                 compose_set_clip(g->composer, 0, 0, g->w, g->h);
-        } else if (str_eq(w->component, "message_row") || str_eq(w->component, "list_row") || str_eq(w->component, "row") ||
+        } else if (str_eq(w->component, "row") || str_eq(w->component, "list_row") ||
+                   str_eq(w->component, "message_row") || str_eq(w->component, "file_row") ||
                    (w->value == 50 && w->parent >= 0 && s->widgets[w->parent].type == W_LIST)) {
             draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : 6, bg, 1);
             draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : 6, border, 0);
             int av = clamp_i(btn_fh + 10, 18, w->h - 8);
             int ax = w->x + 6;
             int ay = w->y + (w->h - av) / 2;
-            draw_round_rect(g, ax, ay, av, av, av / 2, w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
-            char initial[2] = {w->text[0] ? w->text[0] : '?', 0};
-            int iw = font_text_w_style(g, &btn_st, initial);
-            font_draw_text_style(g, &btn_st, ax + (av - iw) / 2, ay + (av - btn_fh) / 2, initial,
-                                 w->focused ? COL_ACCENT : COL_ON_ACCENT,
-                                 w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
+            if (w->icon[0]) {
+                uint16_t ic = w->focused ? COL_ON_ACCENT : COL_ACCENT;
+                draw_round_rect(g, ax, ay, av, av, av / 4, w->focused ? COL_ACCENT : COL_PANEL, 1);
+                draw_app_icon(g, w, ax + av / 2, ay + av / 2, clamp_i(av * 2 / 3, 12, 28), ic);
+            } else {
+                draw_round_rect(g, ax, ay, av, av, av / 2, w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
+                char initial[2] = {w->text[0] ? w->text[0] : '?', 0};
+                int iw = font_text_w_style(g, &btn_st, initial);
+                font_draw_text_style(g, &btn_st, ax + (av - iw) / 2, ay + (av - btn_fh) / 2, initial,
+                                     w->focused ? COL_ACCENT : COL_ON_ACCENT,
+                                     w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
+            }
             int tx = ax + av + 8;
             int tw = w->x + w->w - tx - 8;
             if (tw < 0)
@@ -573,7 +550,7 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             }
             FontStyle mono_st = font_style_from_id(g, FONT_MONO);
             int time_w = 0;
-            const char *stamp = str_eq(w->component, "message_row") ? "now" : NULL;
+            const char *stamp = (w->value == 50 || str_eq(w->component, "message_row")) ? "now" : NULL;
             if (stamp) {
                 time_w = font_text_w_style(g, &mono_st, stamp) + 4;
                 if (time_w > tw / 3)
@@ -587,7 +564,7 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
                 font_draw_text_style_clip(g, &mono_st, tx + title_w, w->y + 4, time_w, stamp, COL_DIM, bg, 1);
             if (preview[0])
                 font_draw_text_style_clip(g, &btn_st, tx, w->y + 4 + btn_fh + 2, tw, preview, COL_DIM, bg, 1);
-            if (w->value > 0 && str_eq(w->component, "message_row")) {
+            if (w->value == 50 || str_eq(w->component, "message_row")) {
                 int bx = w->x + w->w - 14;
                 int by = w->y + 8;
                 draw_round_rect(g, bx, by, 8, 8, 4, COL_ACCENT, 1);
@@ -600,12 +577,18 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             if (primary)
                 draw_round_rect(g, w->x, w->y, w->w, w->h, br, border, 0);
             int pad = g->pad > 0 ? g->pad : 4;
-            int tw_avail = w->w - pad * 2;
+            int isz = 0;
+            if (w->icon[0]) {
+                isz = clamp_i(btn_fh + 4, 14, w->h - 8);
+                draw_app_icon(g, w, w->x + pad + isz / 2, w->y + w->h / 2, isz, fg);
+                isz += 6;
+            }
+            int tw_avail = w->w - pad * 2 - isz;
             if (tw_avail < 0)
                 tw_avail = 0;
             int text_w = font_text_w_style(g, &btn_st, w->text);
-            int tx = w->x + pad;
-            if (text_w < tw_avail)
+            int tx = w->x + pad + isz;
+            if (!isz && text_w < tw_avail)
                 tx = w->x + (w->w - text_w) / 2;
             int ty = w->y + (w->h - btn_fh) / 2;
             font_draw_text_style_clip(g, &btn_st, tx, ty, tw_avail, w->text, fg, bg, 1);

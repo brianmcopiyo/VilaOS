@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<component>
- <button id="btn" class="btn-primary" text="Continue" action="ok" width="100%" height="40" radius="12"
-  background="#EA580C" color="#FFFFFF" padding="8"/>
-</component>

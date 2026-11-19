@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<component>
+  <softkeys left="Menu" center="OK" right="Back"
+            left-action="menu" center-action="ok" right-action="route:pop"/>
+</component>

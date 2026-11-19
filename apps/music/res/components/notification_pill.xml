@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<component>
- <label id="pill" text="Status" value="2" width="auto" height="24" padding="4"
-  background="#EA580C" color="#FFFFFF" radius="12"/>
-</component>

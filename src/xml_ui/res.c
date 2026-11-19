@@ -127,12 +127,11 @@ static void scan_components(XmlUiResources *r, const char *dir)
 }
 
 static const char *const k_ui_components[] = {
-    "badge", "card", "input_field", "keypad", "list_view", "softkey_bar", "tile", "row"
+    "badge", "card", "input", "keypad", "list", "footer", "tile", "row", "header", "button", "text", "icon"
 };
 
 static const char *const k_base_components[] = {
-    "action_button", "divider", "input_field", "launcher_tile", "list_row",
-    "message_row", "notification_pill", "secondary_button", "section_header"
+    "button", "divider", "input", "tile", "row", "badge", "header", "text", "icon"
 };
 
 static void register_static_dir(XmlUiResources *r, const char *dir, const char *const *names, size_t count)
@@ -265,9 +264,18 @@ int xml_ui_res_load_package(XmlUiResources *r, const char *layout_path)
     scan_components(r, path);
     snprintf(path, sizeof(path), "%s/components", r->os_root[0] ? r->os_root : "assets");
     scan_components(r, path);
-    register_alias(r, "input", "input_field");
-    register_alias(r, "tile", "launcher_tile");
-    register_alias(r, "row", "list_row");
+    register_alias(r, "input_field", "input");
+    register_alias(r, "launcher_tile", "tile");
+    register_alias(r, "list_row", "row");
+    register_alias(r, "message_row", "row");
+    register_alias(r, "file_row", "row");
+    register_alias(r, "action_button", "button");
+    register_alias(r, "secondary_button", "button");
+    register_alias(r, "notification_pill", "badge");
+    register_alias(r, "status_badge", "badge");
+    register_alias(r, "section_header", "header");
+    register_alias(r, "list_view", "list");
+    register_alias(r, "softkey_bar", "footer");
     load_styles(r);
     return 0;
 }

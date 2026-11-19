@@ -3,13 +3,13 @@ package example
 import app.Cap
 import app.VilaApp
 import app.require
-import ui.ActionButton
+import ui.Button
 import ui.Screen
 import ui.SoftKey
 import ui.Ui
 
 class ExampleApp : VilaApp() {
-    private val okBtn = ActionButton(id = "ok_btn", variant = "primary") {
+    private val okBtn = Button(id = "ok_btn", variant = "primary") {
         Ui.pop()
     }
 

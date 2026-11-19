@@ -20,7 +20,8 @@ WidgetType xml_ui_tag_type(const char *tag)
         return W_FLEX;
     if (str_eq(tag, "grid"))
         return W_GRID;
-    if (str_eq(tag, "label"))
+    if (str_eq(tag, "label") || str_eq(tag, "text") || str_eq(tag, "header") ||
+        str_eq(tag, "badge") || str_eq(tag, "icon"))
         return W_LABEL;
     if (str_eq(tag, "button"))
         return W_BUTTON;
@@ -30,7 +31,7 @@ WidgetType xml_ui_tag_type(const char *tag)
         return W_LIST;
     if (str_eq(tag, "statusbar"))
         return W_STATUSBAR;
-    if (str_eq(tag, "softkeys"))
+    if (str_eq(tag, "softkeys") || str_eq(tag, "footer"))
         return W_SOFTKEYS;
     if (str_eq(tag, "component"))
         return W_COMPONENT;
@@ -172,6 +173,9 @@ void xml_ui_apply_attrs(Widget *w, const XmlStart *el, const XmlUiResources *res
     const char *icon = xml_attr(el, "icon");
     if (icon)
         str_copy(w->icon, sizeof(w->icon), icon);
+    const char *iset = xml_attr(el, "icon-set");
+    if (iset)
+        str_copy(w->icon_set, sizeof(w->icon_set), iset);
     const char *comp = xml_attr(el, "name");
     if (!comp)
         comp = xml_attr(el, "component");

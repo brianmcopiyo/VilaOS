@@ -500,7 +500,13 @@ void xml_ui_style_apply_prop(Widget *w, const char *name, const char *value, con
             w->text_align = 0;
     } else if (str_eq(name, "align-text"))
         w->align = (uint8_t)parse_align_v(value);
-    else if (str_eq(name, "font-family") || str_eq(name, "font")) {
+    else if (str_eq(name, "icon")) {
+        if (value[0])
+            str_copy(w->icon, sizeof(w->icon), value);
+    } else if (str_eq(name, "icon-set")) {
+        if (value[0])
+            str_copy(w->icon_set, sizeof(w->icon_set), value);
+    } else if (str_eq(name, "font-family") || str_eq(name, "font")) {
         if (value[0])
             str_copy(w->font_family, sizeof(w->font_family), value);
     } else if (str_eq(name, "font-size")) {
