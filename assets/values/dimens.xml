@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<resources>
+ <dimen name="pad" value="8"/>
+ <dimen name="gap" value="6"/>
+ <dimen name="radius" value="6"/>
+ <dimen name="preview_h" value="36"/>
+ <dimen name="list_min" value="120"/>
+</resources>

@@ -65,7 +65,7 @@ Remove-VmIfExists -Name $VmName -VBox $VBox
     --boot4 none `
     --graphicscontroller vboxvga `
     --accelerate3d off `
-    --mouse ps2 `
+    --mouse usbtablet `
     --keyboard ps2 `
     --audio-driver none `
     --nic1 none `

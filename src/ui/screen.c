@@ -1,19 +1,19 @@
 #include "screen.h"
 #include "xml.h"
+#include "xml_ui.h"
 #include "draw.h"
 #include "font.h"
 #include "fb.h"
 #include "util.h"
+#include "procman.h"
+#include "compose.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-typedef struct {
-    Screen *s;
-    int stack[32];
-    int sp;
-} BuildCtx;
+
+static XmlUiResources g_ui_res;
 
 typedef struct {
     uint64_t call_start;
@@ -46,188 +46,6 @@ static AppState g_app = {
     .calc_fresh = 1
 };
 
-static WidgetType tag_type(const char *tag)
-{
-    if (str_eq(tag, "screen"))
-        return W_SCREEN;
-    if (str_eq(tag, "vbox"))
-        return W_VBOX;
-    if (str_eq(tag, "hbox"))
-        return W_HBOX;
-    if (str_eq(tag, "grid"))
-        return W_GRID;
-    if (str_eq(tag, "label"))
-        return W_LABEL;
-    if (str_eq(tag, "button"))
-        return W_BUTTON;
-    if (str_eq(tag, "input"))
-        return W_INPUT;
-    if (str_eq(tag, "list"))
-        return W_LIST;
-    if (str_eq(tag, "statusbar"))
-        return W_STATUSBAR;
-    if (str_eq(tag, "softkeys"))
-        return W_SOFTKEYS;
-    return W_LABEL;
-}
-
-static void attr_dim(const XmlStart *el, const char *name, int *val, unsigned *unit)
-{
-    const char *v = xml_attr(el, name);
-    int out = 0;
-    int u = UNIT_AUTO;
-    if (v && v[0] && parse_dim(v, &out, &u) == 0) {
-        *val = out;
-        *unit = (unsigned)u;
-        return;
-    }
-    *val = 0;
-    *unit = UNIT_AUTO;
-}
-
-static int attr_int(const XmlStart *el, const char *name, int def)
-{
-    const char *v = xml_attr(el, name);
-    if (!v || !v[0])
-        return def;
-    return atoi(v);
-}
-
-static uint16_t attr_color(const XmlStart *el, const char *name, uint16_t def)
-{
-    const char *v = xml_attr(el, name);
-    uint16_t c;
-    if (v && parse_hex_color(v, &c) == 0)
-        return c;
-    return def;
-}
-
-static int resolve_dim(int src, unsigned unit, int parent, int screen, int ref)
-{
-    if (unit == UNIT_PCT)
-        return (parent * src) / 100;
-    if (unit == UNIT_AUTO)
-        return 0;
-    return scale_i(src, screen, ref);
-}
-
-static void on_start(const XmlStart *el, void *user)
-{
-    BuildCtx *ctx = (BuildCtx *)user;
-    Screen *s = ctx->s;
-    if (s->count >= MAX_WIDGETS)
-        return;
-
-    int idx = s->count++;
-    Widget *w = &s->widgets[idx];
-    memset(w, 0, sizeof(*w));
-    w->type = tag_type(el->tag);
-    w->parent = ctx->sp > 0 ? ctx->stack[ctx->sp - 1] : -1;
-    w->visible = 1;
-    w->bg = COL_PANEL;
-    w->fg = COL_TEXT;
-    w->focus_bg = COL_FOCUS;
-    w->max_len = MAX_TEXT - 1;
-    w->xu = w->yu = w->wu = w->hu = UNIT_AUTO;
-
-    const char *id = xml_attr(el, "id");
-    if (id)
-        str_copy(w->id, sizeof(w->id), id);
-
-    const char *text = xml_attr(el, "text");
-    if (text)
-        str_copy(w->text, sizeof(w->text), text);
-
-    const char *action = xml_attr(el, "action");
-    if (action)
-        str_copy(w->action, sizeof(w->action), action);
-
-    const char *icon = xml_attr(el, "icon");
-    if (icon)
-        str_copy(w->icon, sizeof(w->icon), icon);
-
-    {
-        int vx = 0, vy = 0, vw = 0, vh = 0;
-        unsigned ux = UNIT_AUTO, uy = UNIT_AUTO, uw = UNIT_AUTO, uh = UNIT_AUTO;
-        attr_dim(el, "x", &vx, &ux);
-        attr_dim(el, "y", &vy, &uy);
-        attr_dim(el, "w", &vw, &uw);
-        attr_dim(el, "h", &vh, &uh);
-        w->sx = vx;
-        w->sy = vy;
-        w->sw = vw;
-        w->sh = vh;
-        w->xu = ux;
-        w->yu = uy;
-        w->wu = uw;
-        w->hu = uh;
-    }
-
-    w->bg = attr_color(el, "bg", w->bg);
-    w->fg = attr_color(el, "fg", w->fg);
-    w->focus_bg = attr_color(el, "focus_bg", w->focus_bg);
-    w->max_len = attr_int(el, "max_len", w->max_len);
-    w->value = attr_int(el, "value", 0);
-
-    if (w->type == W_BUTTON || w->type == W_INPUT)
-        w->focusable = 1;
-
-    if (w->type == W_SOFTKEYS) {
-        const char *l = xml_attr(el, "left");
-        const char *c = xml_attr(el, "center");
-        const char *r = xml_attr(el, "right");
-        const char *la = xml_attr(el, "left_action");
-        const char *ca = xml_attr(el, "center_action");
-        const char *ra = xml_attr(el, "right_action");
-        if (l)
-            str_copy(s->soft_left, sizeof(s->soft_left), l);
-        if (c)
-            str_copy(s->soft_center, sizeof(s->soft_center), c);
-        if (r)
-            str_copy(s->soft_right, sizeof(s->soft_right), r);
-        if (la)
-            str_copy(s->soft_left_act, sizeof(s->soft_left_act), la);
-        if (ca)
-            str_copy(s->soft_center_act, sizeof(s->soft_center_act), ca);
-        if (ra)
-            str_copy(s->soft_right_act, sizeof(s->soft_right_act), ra);
-    }
-
-    if (w->parent >= 0) {
-        Widget *p = &s->widgets[w->parent];
-        if (p->child_count < MAX_CHILDREN)
-            p->children[p->child_count++] = idx;
-    } else if (w->type == W_SCREEN) {
-        s->root = idx;
-    }
-
-    if (!el->self_close && ctx->sp < 32)
-        ctx->stack[ctx->sp++] = idx;
-}
-
-static void on_end(const char *tag, void *user)
-{
-    BuildCtx *ctx = (BuildCtx *)user;
-    if (ctx->sp <= 0)
-        return;
-    Widget *top = &ctx->s->widgets[ctx->stack[ctx->sp - 1]];
-    if (tag && tag[0] && tag_type(tag) != top->type)
-        return;
-    ctx->sp--;
-}
-
-static void on_text(const char *text, void *user)
-{
-    BuildCtx *ctx = (BuildCtx *)user;
-    if (ctx->sp <= 0)
-        return;
-    Widget *w = &ctx->s->widgets[ctx->stack[ctx->sp - 1]];
-    if (w->type == W_LABEL || w->type == W_BUTTON || w->type == W_INPUT) {
-        if (!w->text[0])
-            str_copy(w->text, sizeof(w->text), text);
-    }
-}
-
 int screen_init(Screen *s)
 {
     memset(s, 0, sizeof(*s));
@@ -238,27 +56,8 @@ int screen_init(Screen *s)
 
 int screen_load(Screen *s, const char *path)
 {
-    screen_init(s);
-    str_copy(s->path, sizeof(s->path), path);
-    str_copy(s->soft_left, sizeof(s->soft_left), "Menu");
-    str_copy(s->soft_center, sizeof(s->soft_center), "OK");
-    str_copy(s->soft_right, sizeof(s->soft_right), "Back");
-
-    BuildCtx ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.s = s;
-
-    XmlHandlers h;
-    h.on_start = on_start;
-    h.on_end = on_end;
-    h.on_text = on_text;
-    h.user = &ctx;
-
-    if (xml_parse_file(path, &h) != 0)
+    if (xml_ui_load_screen(s, path, &g_ui_res) != 0)
         return -1;
-
-    if (s->root < 0 && s->count > 0)
-        s->root = 0;
 
     if (strstr(path, "call_active.xml")) {
         if (!g_app.call_start)
@@ -303,230 +102,9 @@ Widget *screen_find(Screen *s, const char *id)
     return NULL;
 }
 
-static int grid_cols_for(Gfx *g)
-{
-    if (g->w >= 720)
-        return 5;
-    if (g->w >= 480)
-        return 4;
-    return 3;
-}
-
-static void layout_grid(Screen *s, Gfx *g, Widget *grid)
-{
-    int pad = g->pad;
-    int cols = grid_cols_for(g);
-    int n = 0;
-    for (int i = 0; i < grid->child_count; i++) {
-        Widget *c = &s->widgets[grid->children[i]];
-        if (c->type == W_BUTTON)
-            n++;
-    }
-    if (n <= 0)
-        return;
-    int rows = (n + cols - 1) / cols;
-    int gap = pad;
-    int cell_w = (grid->w - pad * 2 - gap * (cols - 1)) / cols;
-    int cell_h = (grid->h - pad * 2 - gap * (rows - 1)) / rows;
-    if (cell_w < 48)
-        cell_w = 48;
-    if (cell_h < 56)
-        cell_h = 56;
-    int idx = 0;
-    for (int i = 0; i < grid->child_count; i++) {
-        Widget *c = &s->widgets[grid->children[i]];
-        if (c->type != W_BUTTON)
-            continue;
-        int r = idx / cols;
-        int col = idx % cols;
-        c->w = cell_w;
-        c->h = cell_h;
-        c->x = grid->x + pad + col * (cell_w + gap);
-        c->y = grid->y + pad + r * (cell_h + gap);
-        c->focusable = 1;
-        idx++;
-    }
-}
-
-static void layout_box(Screen *s, Gfx *g, Widget *box, int vertical)
-{
-    int pad = g->pad;
-    int gap = g->pad / 2 + 2;
-    int cx = box->x + pad;
-    int cy = box->y + pad;
-    int inner_w = box->w - pad * 2;
-    int inner_h = box->h - pad * 2;
-    if (inner_w < 8)
-        inner_w = 8;
-    if (inner_h < 8)
-        inner_h = 8;
-
-    int flex_count = 0;
-    int fixed = 0;
-    for (int i = 0; i < box->child_count; i++) {
-        Widget *c = &s->widgets[box->children[i]];
-        if (c->type == W_SOFTKEYS || c->type == W_STATUSBAR)
-            continue;
-        int want = vertical ? resolve_dim(c->sh, c->hu, box->h, g->h, REF_H)
-                            : resolve_dim(c->sw, c->wu, box->w, g->w, REF_W);
-        if (want <= 0)
-            flex_count++;
-        else
-            fixed += want + gap;
-    }
-    int flex_space = vertical ? inner_h : inner_w;
-    flex_space -= fixed;
-    if (flex_space < 0)
-        flex_space = 0;
-    int flex_each = flex_count > 0 ? flex_space / flex_count : 0;
-
-    for (int i = 0; i < box->child_count; i++) {
-        Widget *c = &s->widgets[box->children[i]];
-        if (c->type == W_SOFTKEYS || c->type == W_STATUSBAR)
-            continue;
-
-        int rw = resolve_dim(c->sw, c->wu, box->w, g->w, REF_W);
-        int rh = resolve_dim(c->sh, c->hu, box->h, g->h, REF_H);
-        int rx = resolve_dim(c->sx, c->xu, box->w, g->w, REF_W);
-        int ry = resolve_dim(c->sy, c->yu, box->h, g->h, REF_H);
-
-        if (vertical) {
-            if (rw <= 0)
-                rw = inner_w;
-            if (rh <= 0) {
-                if (c->type == W_LABEL)
-                    rh = font_char_h_scaled(g, FONT_8X12) + 6;
-                else if (c->type == W_BUTTON || c->type == W_INPUT)
-                    rh = g->item_h;
-                else if (c->type == W_LIST || c->type == W_GRID || c->type == W_VBOX || c->type == W_HBOX)
-                    rh = flex_each > 0 ? flex_each : inner_h / 2;
-                else
-                    rh = flex_each > 0 ? flex_each : g->item_h;
-            }
-            if (c->xu == UNIT_AUTO && c->yu == UNIT_AUTO) {
-                c->x = box->x + pad;
-                c->y = cy;
-                cy += rh + gap;
-            } else {
-                c->x = box->x + (c->xu == UNIT_AUTO ? pad : rx);
-                c->y = box->y + (c->yu == UNIT_AUTO ? pad : ry);
-            }
-            c->w = rw;
-            c->h = rh;
-        } else {
-            if (rh <= 0)
-                rh = inner_h;
-            if (rw <= 0)
-                rw = flex_each > 0 ? flex_each : g->item_h * 2;
-            if (c->xu == UNIT_AUTO && c->yu == UNIT_AUTO) {
-                c->x = cx;
-                c->y = box->y + pad;
-                cx += rw + gap;
-            } else {
-                c->x = box->x + (c->xu == UNIT_AUTO ? pad : rx);
-                c->y = box->y + (c->yu == UNIT_AUTO ? pad : ry);
-            }
-            c->w = rw;
-            c->h = rh;
-        }
-
-        if (c->type == W_VBOX)
-            layout_box(s, g, c, 1);
-        else if (c->type == W_HBOX)
-            layout_box(s, g, c, 0);
-        else if (c->type == W_GRID)
-            layout_grid(s, g, c);
-        else if (c->type == W_LIST) {
-            int item_h = g->item_h;
-            int iy = c->y + 2;
-            for (int j = 0; j < c->child_count; j++) {
-                Widget *item = &s->widgets[c->children[j]];
-                item->x = c->x + 2;
-                item->y = iy;
-                item->w = c->w - 4;
-                item->h = item_h;
-                item->focusable = 1;
-                iy += item_h + 2;
-            }
-        }
-    }
-}
-
 void screen_layout(Screen *s, Gfx *g)
 {
-    if (!s || !g || s->root < 0 || g->w <= 0 || g->h <= 0)
-        return;
-
-    Widget *root = &s->widgets[s->root];
-    root->x = 0;
-    root->y = 0;
-    root->w = g->w;
-    root->h = g->h;
-
-    for (int i = 0; i < s->count; i++) {
-        Widget *w = &s->widgets[i];
-        if (w->type == W_STATUSBAR) {
-            w->x = 0;
-            w->y = 0;
-            w->w = g->w;
-            w->h = g->status_h;
-        } else if (w->type == W_SOFTKEYS) {
-            w->x = 0;
-            w->y = g->h - g->softkey_h;
-            w->w = g->w;
-            w->h = g->softkey_h;
-        }
-    }
-
-    for (int i = 0; i < root->child_count; i++) {
-        Widget *c = &s->widgets[root->children[i]];
-        if (c->type == W_STATUSBAR || c->type == W_SOFTKEYS)
-            continue;
-
-        int rw = resolve_dim(c->sw, c->wu, g->w, g->w, REF_W);
-        int rh = resolve_dim(c->sh, c->hu, g->h, g->h, REF_H);
-        int rx = resolve_dim(c->sx, c->xu, g->w, g->w, REF_W);
-        int ry = resolve_dim(c->sy, c->yu, g->h, g->h, REF_H);
-
-        if (c->wu == UNIT_AUTO || rw <= 0)
-            rw = g->w;
-        if (c->hu == UNIT_AUTO || rh <= 0)
-            rh = g->h - g->status_h - g->softkey_h;
-        if (c->xu == UNIT_AUTO)
-            rx = 0;
-        if (c->yu == UNIT_AUTO)
-            ry = g->status_h;
-
-        if (ry < g->status_h)
-            ry = g->status_h;
-        if (ry + rh > g->h - g->softkey_h)
-            rh = g->h - g->softkey_h - ry;
-
-        c->x = rx;
-        c->y = ry;
-        c->w = rw;
-        c->h = rh;
-
-        if (c->type == W_VBOX)
-            layout_box(s, g, c, 1);
-        else if (c->type == W_HBOX)
-            layout_box(s, g, c, 0);
-        else if (c->type == W_GRID)
-            layout_grid(s, g, c);
-        else if (c->type == W_LIST) {
-            int item_h = g->item_h;
-            int iy = c->y + 2;
-            for (int j = 0; j < c->child_count; j++) {
-                Widget *item = &s->widgets[c->children[j]];
-                item->x = c->x + 2;
-                item->y = iy;
-                item->w = c->w - 4;
-                item->h = item_h;
-                item->focusable = 1;
-                iy += item_h + 2;
-            }
-        }
-    }
+    xml_ui_layout(s, g);
 }
 
 void screen_set_focus(Screen *s, int idx)
@@ -585,6 +163,14 @@ int screen_focus_at(Screen *s, int x, int y)
         Widget *w = &s->widgets[i];
         if (!w->focusable || !w->visible)
             continue;
+        if (w->parent >= 0) {
+            Widget *p = &s->widgets[w->parent];
+            if (p->type == W_LIST) {
+                Rect clip = {p->x, p->y, p->w, p->h};
+                if (!rect_contains(&clip, x, y))
+                    continue;
+            }
+        }
         Rect r = {w->x, w->y, w->w, w->h};
         if (rect_contains(&r, x, y)) {
             screen_set_focus(s, i);
@@ -606,7 +192,6 @@ int screen_hit_softkey(const Screen *s, const Gfx *g, int x, int y)
     (void)s;
     if (!g)
         return 0;
-    /* A few pixels of slack so mouse clicks near the bar still register. */
     int top = g->h - g->softkey_h - 4;
     if (top < 0)
         top = 0;
@@ -622,22 +207,20 @@ int screen_hit_softkey(const Screen *s, const Gfx *g, int x, int y)
 
 static void draw_signal(Gfx *g, int x, int y, int bars)
 {
-    int unit = clamp_i(g->font_scale, 1, 3);
     for (int i = 0; i < 4; i++) {
-        int h = (3 + i * 3) * unit;
+        int h = 3 + i * 3;
         uint16_t c = i < bars ? COL_OK : COL_DIM;
-        draw_fill(g, x + i * 5 * unit, y + 12 * unit - h, 3 * unit, h, c);
+        draw_fill(g, x + i * 5, y + 12 - h, 3, h, c);
     }
 }
 
 static void draw_battery(Gfx *g, int x, int y, int pct)
 {
-    int s = clamp_i(g->font_scale, 1, 3);
-    draw_rect(g, x, y, 18 * s, 10 * s, COL_TEXT);
-    draw_fill(g, x + 18 * s, y + 3 * s, 2 * s, 4 * s, COL_TEXT);
-    int fill = clamp_i(pct, 0, 100) * 14 * s / 100;
+    draw_rect(g, x, y, 18, 10, COL_TEXT);
+    draw_fill(g, x + 18, y + 3, 2, 4, COL_TEXT);
+    int fill = clamp_i(pct, 0, 100) * 14 / 100;
     uint16_t c = pct < 20 ? COL_WARN : COL_OK;
-    draw_fill(g, x + 2 * s, y + 2 * s, fill, 6 * s, c);
+    draw_fill(g, x + 2, y + 2, fill, 6, c);
 }
 
 static void draw_statusbar(Gfx *g, Widget *w)
@@ -645,9 +228,8 @@ static void draw_statusbar(Gfx *g, Widget *w)
     draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
     draw_hline(g, 0, w->y + w->h - 1, g->w, COL_BORDER);
     draw_hline(g, 0, w->h - 1, g->w, COL_BORDER);
-    int s = clamp_i(g->font_scale, 1, 3);
-    draw_signal(g, g->pad, (w->h - 12 * s) / 2, 4);
-    draw_battery(g, g->w - g->pad - 22 * s, (w->h - 10 * s) / 2, 86);
+    draw_signal(g, g->pad, (w->h - 12) / 2, 4);
+    draw_battery(g, g->w - g->pad - 22, (w->h - 10) / 2, 86);
 
     time_t t = time(NULL);
     struct tm tm_buf;
@@ -661,6 +243,11 @@ static void draw_statusbar(Gfx *g, Widget *w)
     int tw = font_text_w_scaled(g, FONT_8X12, clock);
     int ty = (w->h - font_char_h_scaled(g, FONT_8X12)) / 2;
     font_draw_text(g, FONT_8X12, (g->w - tw) / 2, ty, clock, COL_TEXT, COL_SOFTKEY, 1);
+    if (g_procman.ready) {
+        ProcService *ms = procman_find(&g_procman, "musicd");
+        if (ms && ms->state == SVC_RUNNING && ms->pid > 0)
+            font_draw_text(g, FONT_8X12, g->pad + 22, ty, "M", COL_ACCENT, COL_SOFTKEY, 1);
+    }
 }
 
 static void draw_softkeys(Gfx *g, Screen *s, Widget *w)
@@ -720,9 +307,139 @@ static void draw_app_icon(Gfx *g, int cx, int cy, int size, const char *icon, ui
             int dy = (a == 0) ? -3 * s : (a == 1) ? 0 : (a == 2) ? 3 * s : 0;
             draw_fill(g, cx + dx - s / 2, cy + dy - s / 2, s, s, fg);
         }
+    } else if (str_eq(icon, "music")) {
+        draw_round_rect(g, cx - s, y + 2 * s, 2 * s, size - 4 * s, s / 2, fg, 1);
+        draw_round_rect(g, cx + s, y + 3 * s, size / 3, size / 3, s, fg, 1);
+        draw_hline(g, cx - s, y + 2 * s, size / 2, fg);
     } else {
         draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
     }
+}
+
+static FontStyle widget_font_style(Gfx *g, Widget *w, FontId fallback_id)
+{
+    FontStyle base = font_style_from_id(g, fallback_id);
+    if (!w)
+        return base;
+    if (!w->font_family[0] && w->font_size <= 0 && w->font_weight <= 0)
+        return base;
+    FontStyle ws = font_style_from_widget(w, base.size_px);
+    if (!w->font_family[0])
+        ws.face = base.face;
+    if (w->font_size <= 0)
+        ws.size_px = base.size_px;
+    if (w->font_weight <= 0)
+        ws.weight = base.weight;
+    return ws;
+}
+
+static int is_surface_component(const Widget *w)
+{
+    return str_eq(w->component, "card") || str_eq(w->component, "surface");
+}
+
+static void draw_box_decor(Gfx *g, Widget *w)
+{
+    if (w->w <= 0 || w->h <= 0)
+        return;
+    int surface = is_surface_component(w);
+    int fill = w->bg_set || surface;
+    if (w->type == W_SCREEN && w->bg == COL_BG)
+        fill = 0;
+    int bw = w->border > 0 ? clamp_i(w->border, 1, 6) : 0;
+    if (!fill && bw == 0)
+        return;
+    int br = w->radius > 0 ? clamp_i(w->radius, 2, 24) : 0;
+    if (br * 2 > w->w)
+        br = w->w / 2;
+    if (br * 2 > w->h)
+        br = w->h / 2;
+    if (fill) {
+        if (br > 0)
+            draw_round_rect(g, w->x, w->y, w->w, w->h, br, w->bg, 1);
+        else
+            draw_fill(g, w->x, w->y, w->w, w->h, w->bg);
+    }
+    uint16_t bc = w->border_c ? w->border_c : COL_BORDER;
+    for (int i = 0; i < bw; i++) {
+        int ix = w->x + i;
+        int iy = w->y + i;
+        int iw = w->w - 2 * i;
+        int ih = w->h - 2 * i;
+        if (iw <= 0 || ih <= 0)
+            break;
+        if (br > 0)
+            draw_round_rect(g, ix, iy, iw, ih, br > i ? br - i : 0, bc, 0);
+        else
+            draw_rect(g, ix, iy, iw, ih, bc);
+    }
+}
+
+static void clip_enter(Gfx *g, const Widget *w, Rect *saved, int *active)
+{
+    *active = 0;
+    if (!g->composer || w->overflow == 0 || w->w <= 0 || w->h <= 0)
+        return;
+    Rect cur = {0, 0, g->w, g->h};
+    if (g->composer->clip_depth > 0 && g->composer->clip[0].w > 0 && g->composer->clip[0].h > 0)
+        cur = g->composer->clip[0];
+    *saved = cur;
+    Rect box = {w->x, w->y, w->w, w->h};
+    rect_intersect(&box, &cur);
+    if (box.w < 0)
+        box.w = 0;
+    if (box.h < 0)
+        box.h = 0;
+    compose_set_clip(g->composer, box.x, box.y, box.w, box.h);
+    *active = 1;
+}
+
+static void clip_leave(Gfx *g, const Rect *saved, int active)
+{
+    if (active && g->composer)
+        compose_set_clip(g->composer, saved->x, saved->y, saved->w, saved->h);
+}
+
+static void draw_container_children(Screen *s, Gfx *g, Widget *w);
+
+static void draw_container(Screen *s, Gfx *g, Widget *w)
+{
+    draw_box_decor(g, w);
+    Rect saved = {0, 0, 0, 0};
+    int active = 0;
+    clip_enter(g, w, &saved, &active);
+    draw_container_children(s, g, w);
+    clip_leave(g, &saved, active);
+}
+
+static int label_text_x(Gfx *g, const FontStyle *st, const Widget *w, const char *text, int x, int avail)
+{
+    if (w->text_align == 0 || avail <= 0)
+        return x;
+    int tw = font_text_w_style(g, st, text);
+    if (tw >= avail)
+        return x;
+    if (w->text_align == 1)
+        return x + (avail - tw) / 2;
+    return x + avail - tw;
+}
+
+static const char *label_text_fit(Gfx *g, const FontStyle *st, const Widget *w, int avail, char *buf, size_t buf_sz)
+{
+    if (w->overflow != 3 || avail <= 0 || font_text_w_style(g, st, w->text) <= avail)
+        return w->text;
+    size_t n = strlen(w->text);
+    if (n >= buf_sz - 4)
+        n = buf_sz - 4;
+    while (n > 0) {
+        memcpy(buf, w->text, n);
+        memcpy(buf + n, "...", 4);
+        if (font_text_w_style(g, st, buf) <= avail)
+            return buf;
+        n--;
+    }
+    str_copy(buf, buf_sz, "...");
+    return buf;
 }
 
 static void draw_widget(Screen *s, Gfx *g, Widget *w)
@@ -730,8 +447,9 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     if (!w->visible)
         return;
 
-    int radius = clamp_i(4 * g->font_scale, 3, 10);
-    int fh = font_char_h_scaled(g, FONT_8X12);
+    int radius = 4;
+    FontStyle ui_style = font_style_from_id(g, FONT_UI);
+    int fh = font_char_h_style(g, &ui_style);
 
     switch (w->type) {
     case W_STATUSBAR:
@@ -741,8 +459,11 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
         draw_softkeys(g, s, w);
         break;
     case W_LABEL: {
-        FontId fid = (w->value > 0 || strstr(w->id, "clock_big") || strstr(w->id, "idle_clock")) ? FONT_8X16 : FONT_8X12;
-        int lh = font_char_h_scaled(g, fid);
+        FontId fid = (w->value > 0 || strstr(w->id, "clock_big") || strstr(w->id, "idle_clock")) ? FONT_MONO : FONT_UI;
+        if (str_eq(w->component, "section_header") || str_starts(w->id, "sec_") || str_eq(w->id, "title"))
+            fid = FONT_DISPLAY;
+        FontStyle st = widget_font_style(g, w, fid);
+        int lh = font_char_h_style(g, &st);
         int ty = w->y + (w->h - lh) / 2;
         if (w->h > lh * 2)
             ty = w->y + g->pad;
@@ -755,79 +476,208 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             int fill = (w->w - 4) * pct / 100;
             if (fill > 0)
                 draw_round_rect(g, w->x + 2, by + 2, fill, bh - 4, radius > 2 ? radius - 1 : 1, COL_ACCENT, 1);
-        } else if (str_starts(w->id, "pill") || w->value == 2) {
-            int tw = font_text_w_scaled(g, FONT_8X12, w->text) + g->pad * 2;
-            if (tw > w->w)
+        } else if (str_starts(w->id, "pill") || str_eq(w->component, "notification_pill") || w->value == 2) {
+            FontStyle pill = widget_font_style(g, w, FONT_UI);
+            int ph = clamp_i(font_char_h_style(g, &pill) + 8, 16, w->h > 0 ? w->h : font_char_h_style(g, &pill) + 8);
+            int tw = font_text_w_style(g, &pill, w->text) + g->pad * 2 + 8;
+            if (tw > w->w && w->w > 0)
                 tw = w->w;
-            int py = w->y + (w->h - fh - 6) / 2;
-            draw_round_rect(g, w->x, py, tw, fh + 6, radius, COL_PILL, 1);
-            draw_round_rect(g, w->x, py, tw, fh + 6, radius, COL_BORDER, 0);
-            font_draw_text_clip(g, FONT_8X12, w->x + g->pad, w->y + (w->h - fh) / 2, tw - g->pad, w->text, COL_TEXT, COL_PILL, 1);
+            int py = w->y + (w->h - ph) / 2;
+            int pr = ph / 2;
+            draw_round_rect(g, w->x, py, tw, ph, pr, w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT, 1);
+            font_draw_text_style_clip(g, &pill, w->x + g->pad + 2, py + (ph - font_char_h_style(g, &pill)) / 2,
+                                      tw - g->pad * 2 - 4, w->text,
+                                      w->fg ? w->fg : COL_ON_ACCENT,
+                                      w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT, 1);
+        } else if (str_eq(w->component, "divider") || str_starts(w->id, "div")) {
+            int mid = w->y + w->h / 2;
+            draw_hline(g, w->x, mid, w->w, w->border_c ? w->border_c : COL_BORDER);
+        } else if (str_eq(w->component, "section_header") || str_starts(w->id, "sec_")) {
+            FontStyle hdr = widget_font_style(g, w, FONT_DISPLAY);
+            font_draw_text_style_clip(g, &hdr, w->x, ty, w->w > 0 ? w->w : g->w, w->text,
+                                      w->fg ? w->fg : COL_DIM, COL_BG, 0);
         } else {
-            font_draw_text_clip(g, fid, w->x, ty, w->w > 0 ? w->w : g->w, w->text, w->fg, COL_BG, 0);
-        }
-        break;
-    }
-    case W_BUTTON: {
-        uint16_t bg = w->focused ? w->focus_bg : w->bg;
-        uint16_t fg = w->focused ? COL_ON_ACCENT : w->fg;
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, bg, 1);
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, w->focused ? COL_ACCENT : COL_BORDER, 0);
-        if (w->icon[0]) {
-            int icon_size = clamp_i(w->h / 2, 16, 40);
-            draw_app_icon(g, w->x + w->w / 2, w->y + w->h / 3, icon_size, w->icon, fg);
-            int tw = font_text_w_scaled(g, FONT_8X12, w->text);
-            int tx = w->x + (w->w - tw) / 2;
-            int ty = w->y + (2 * w->h) / 3;
-            font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, fg, bg, 1);
-        } else {
-            int tw = font_text_w_scaled(g, FONT_8X12, w->text);
-            int tx = w->x + (w->w - tw) / 2;
-            int ty = w->y + (w->h - fh) / 2;
-            if (w->value > 0) {
-                char badge[8];
-                snprintf(badge, sizeof(badge), "%c", (char)w->value);
-                draw_round_rect(g, w->x + g->pad, w->y + (w->h - fh - 4) / 2, fh + 8, fh + 4, radius, COL_ACCENT, 1);
-                font_draw_text(g, FONT_8X12, w->x + g->pad + 4, ty, badge, COL_ON_ACCENT, COL_ACCENT, 1);
-                font_draw_text_clip(g, FONT_8X12, w->x + g->pad + fh + 14, ty, w->w - fh - 20, w->text, fg, bg, 1);
+            int br = w->radius > 0 ? clamp_i(w->radius, 2, 14) : 0;
+            int pad_l = w->pad_l > 0 ? w->pad_l : 0;
+            int pad_r = w->pad_r > 0 ? w->pad_r : 0;
+            if (w->bg != 0 && w->bg != COL_BG && (w->radius > 0 || w->pad_t > 0 || strstr(w->id, "preview"))) {
+                draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : radius, w->bg, 1);
+                if (w->border > 0)
+                    draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : radius, w->border_c ? w->border_c : COL_BORDER, 0);
+                int clip_w = w->w - pad_l - pad_r;
+                if (clip_w < 0)
+                    clip_w = 0;
+                char fit[MAX_TEXT + 4];
+                const char *shown = label_text_fit(g, &st, w, clip_w, fit, sizeof(fit));
+                int tx = label_text_x(g, &st, w, shown, w->x + pad_l, clip_w);
+                font_draw_text_style_clip(g, &st, tx, ty, clip_w, shown, w->fg, w->bg, 0);
             } else {
-                font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, fg, bg, 1);
+                int avail = w->w > 0 ? w->w : g->w;
+                char fit[MAX_TEXT + 4];
+                const char *shown = label_text_fit(g, &st, w, avail, fit, sizeof(fit));
+                int tx = label_text_x(g, &st, w, shown, w->x, avail);
+                font_draw_text_style_clip(g, &st, tx, ty, avail, shown, w->fg, COL_BG, 0);
             }
         }
         break;
     }
-    case W_INPUT: {
-        uint16_t bg = w->focused ? w->focus_bg : w->bg;
-        uint16_t fg = w->focused ? COL_ON_ACCENT : w->fg;
-        int ih = font_char_h_scaled(g, FONT_8X16);
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, bg, 1);
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius, w->focused ? COL_ACCENT : COL_BORDER, 0);
-        font_draw_text_clip(g, FONT_8X16, w->x + g->pad, w->y + (w->h - ih) / 2, w->w - g->pad * 2, w->text, fg, bg, 1);
-        if (w->focused) {
-            int tw = font_text_w_scaled(g, FONT_8X16, w->text);
-            draw_vline(g, w->x + g->pad + tw + 1, w->y + 4, w->h - 8, COL_ON_ACCENT);
+    case W_BUTTON: {
+        int primary = (w->bg == COL_ACCENT) || (w->fg == COL_ON_ACCENT && w->bg != COL_PANEL && w->bg != COL_BG);
+        uint16_t bg = w->focused ? COL_ACCENT : (w->bg ? w->bg : COL_PANEL);
+        uint16_t fg = w->focused ? COL_ON_ACCENT : (primary ? COL_ON_ACCENT : (w->fg ? w->fg : COL_TEXT));
+        uint16_t border = w->focused ? COL_ACCENT : (primary ? COL_ACCENT : (w->border_c ? w->border_c : COL_BORDER));
+        int br = w->radius > 0 ? clamp_i(w->radius, 2, 18) : radius;
+        if (br * 2 > w->w)
+            br = w->w / 2;
+        if (br * 2 > w->h)
+            br = w->h / 2;
+        FontStyle btn_st = widget_font_style(g, w, FONT_UI);
+        int btn_fh = font_char_h_style(g, &btn_st);
+        if (w->icon[0] || str_eq(w->component, "launcher_tile") || str_eq(w->component, "tile")) {
+            draw_elevated_rect(g, w->x, w->y, w->w, w->h, br, bg, border);
+            if (g->composer)
+                compose_set_clip(g->composer, w->x + 2, w->y + 2, w->w - 4, w->h - 4);
+            int label_h = btn_fh + 6;
+            int icon_band = w->h - label_h - 4;
+            if (icon_band < 12)
+                icon_band = w->h / 2;
+            int icon_size = clamp_i(icon_band * 2 / 3, 14, 36);
+            draw_app_icon(g, w->x + w->w / 2, w->y + 4 + icon_band / 2, icon_size, w->icon[0] ? w->icon : "app", fg);
+            int label_y = w->y + w->h - label_h;
+            int label_x = w->x + 4;
+            int label_w = w->w - 8;
+            if (label_w < 0)
+                label_w = 0;
+            font_draw_text_style_clip(g, &btn_st, label_x, label_y + (label_h - btn_fh) / 2, label_w, w->text, fg, bg, 1);
+            if (g->composer)
+                compose_set_clip(g->composer, 0, 0, g->w, g->h);
+        } else if (str_eq(w->component, "message_row") || str_eq(w->component, "list_row") || str_eq(w->component, "row") ||
+                   (w->value == 50 && w->parent >= 0 && s->widgets[w->parent].type == W_LIST)) {
+            draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : 6, bg, 1);
+            draw_round_rect(g, w->x, w->y, w->w, w->h, br > 0 ? br : 6, border, 0);
+            int av = clamp_i(btn_fh + 10, 18, w->h - 8);
+            int ax = w->x + 6;
+            int ay = w->y + (w->h - av) / 2;
+            draw_round_rect(g, ax, ay, av, av, av / 2, w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
+            char initial[2] = {w->text[0] ? w->text[0] : '?', 0};
+            int iw = font_text_w_style(g, &btn_st, initial);
+            font_draw_text_style(g, &btn_st, ax + (av - iw) / 2, ay + (av - btn_fh) / 2, initial,
+                                 w->focused ? COL_ACCENT : COL_ON_ACCENT,
+                                 w->focused ? COL_ON_ACCENT : COL_ACCENT, 1);
+            int tx = ax + av + 8;
+            int tw = w->x + w->w - tx - 8;
+            if (tw < 0)
+                tw = 0;
+            const char *sp = strchr(w->text, ' ');
+            char title[64];
+            char preview[96];
+            title[0] = 0;
+            preview[0] = 0;
+            if (sp) {
+                size_t n = (size_t)(sp - w->text);
+                if (n >= sizeof(title))
+                    n = sizeof(title) - 1;
+                memcpy(title, w->text, n);
+                title[n] = 0;
+                str_copy(preview, sizeof(preview), sp + 1);
+            } else {
+                str_copy(title, sizeof(title), w->text);
+            }
+            FontStyle mono_st = font_style_from_id(g, FONT_MONO);
+            int time_w = 0;
+            const char *stamp = str_eq(w->component, "message_row") ? "now" : NULL;
+            if (stamp) {
+                time_w = font_text_w_style(g, &mono_st, stamp) + 4;
+                if (time_w > tw / 3)
+                    time_w = tw / 3;
+            }
+            int title_w = tw - time_w;
+            if (title_w < 0)
+                title_w = 0;
+            font_draw_text_style_clip(g, &btn_st, tx, w->y + 4, title_w, title, fg, bg, 1);
+            if (stamp && time_w > 0)
+                font_draw_text_style_clip(g, &mono_st, tx + title_w, w->y + 4, time_w, stamp, COL_DIM, bg, 1);
+            if (preview[0])
+                font_draw_text_style_clip(g, &btn_st, tx, w->y + 4 + btn_fh + 2, tw, preview, COL_DIM, bg, 1);
+            if (w->value > 0 && str_eq(w->component, "message_row")) {
+                int bx = w->x + w->w - 14;
+                int by = w->y + 8;
+                draw_round_rect(g, bx, by, 8, 8, 4, COL_ACCENT, 1);
+            }
+        } else {
+            if (primary)
+                draw_round_rect(g, w->x, w->y, w->w, w->h, br, bg, 1);
+            else
+                draw_elevated_rect(g, w->x, w->y, w->w, w->h, br, bg, border);
+            if (primary)
+                draw_round_rect(g, w->x, w->y, w->w, w->h, br, border, 0);
+            int pad = g->pad > 0 ? g->pad : 4;
+            int tw_avail = w->w - pad * 2;
+            if (tw_avail < 0)
+                tw_avail = 0;
+            int text_w = font_text_w_style(g, &btn_st, w->text);
+            int tx = w->x + pad;
+            if (text_w < tw_avail)
+                tx = w->x + (w->w - text_w) / 2;
+            int ty = w->y + (w->h - btn_fh) / 2;
+            font_draw_text_style_clip(g, &btn_st, tx, ty, tw_avail, w->text, fg, bg, 1);
         }
         break;
     }
-    case W_LIST:
-        draw_fill(g, w->x, w->y, w->w, w->h, COL_PANEL);
-        draw_rect(g, w->x, w->y, w->w, w->h, COL_BORDER);
-        for (int i = 0; i < w->child_count; i++)
-            draw_widget(s, g, &s->widgets[w->children[i]]);
+    case W_INPUT: {
+        uint16_t bg = w->focused ? COL_PANEL : (w->bg ? w->bg : COL_PANEL);
+        uint16_t fg = w->fg ? w->fg : COL_TEXT;
+        FontStyle in_st = widget_font_style(g, w, FONT_MONO);
+        int ih = font_char_h_style(g, &in_st);
+        int br = w->radius > 0 ? clamp_i(w->radius, 2, 12) : radius;
+        draw_round_rect(g, w->x, w->y, w->w, w->h, br, bg, 1);
+        draw_round_rect(g, w->x, w->y, w->w, w->h, br, w->focused ? COL_ACCENT : COL_BORDER, 0);
+        int pad = g->pad > 0 ? g->pad : 6;
+        font_draw_text_style_clip(g, &in_st, w->x + pad, w->y + (w->h - ih) / 2, w->w - pad * 2, w->text, fg, bg, 1);
+        if (w->focused) {
+            int tw = font_text_w_style(g, &in_st, w->text);
+            if (tw > w->w - pad * 2)
+                tw = w->w - pad * 2;
+            draw_vline(g, w->x + pad + tw + 1, w->y + 4, w->h - 8, COL_ACCENT);
+        }
         break;
+    }
+    case W_LIST: {
+        int radius_l = w->radius > 0 ? clamp_i(w->radius, 2, 16) : radius;
+        draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, w->bg ? w->bg : COL_PANEL, 1);
+        draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, w->border_c ? w->border_c : COL_BORDER, 0);
+        if (g->composer)
+            compose_set_clip(g->composer, w->x + 1, w->y + 1, w->w - 2, w->h - 2);
+        for (int i = 0; i < w->child_count; i++) {
+            Widget *item = &s->widgets[w->children[i]];
+            if (!item->visible)
+                continue;
+            if (item->y < w->y || item->y + item->h > w->y + w->h)
+                continue;
+            if (item->x + item->w <= w->x || item->x >= w->x + w->w)
+                continue;
+            draw_widget(s, g, item);
+        }
+        if (g->composer)
+            compose_set_clip(g->composer, 0, 0, g->w, g->h);
+        break;
+    }
     case W_GRID:
-        for (int i = 0; i < w->child_count; i++)
-            draw_widget(s, g, &s->widgets[w->children[i]]);
-        break;
     case W_VBOX:
     case W_HBOX:
+    case W_FLEX:
     case W_SCREEN:
-        for (int i = 0; i < w->child_count; i++)
-            draw_widget(s, g, &s->widgets[w->children[i]]);
+        draw_container(s, g, w);
         break;
     default:
         break;
     }
+}
+
+static void draw_container_children(Screen *s, Gfx *g, Widget *w)
+{
+    for (int i = 0; i < w->child_count; i++)
+        draw_widget(s, g, &s->widgets[w->children[i]]);
 }
 
 static void draw_cursor(Gfx *g, const InputState *in)
@@ -836,16 +686,15 @@ static void draw_cursor(Gfx *g, const InputState *in)
         return;
     int x = in->cursor_x;
     int y = in->cursor_y;
-    int s = clamp_i(g->font_scale, 1, 3);
-    draw_line(g, x + 1, y + 1, x + 8 * s + 1, y + 8 * s + 1, COL_ON_ACCENT);
-    draw_line(g, x + 1, y + 1, x + 1, y + 12 * s + 1, COL_ON_ACCENT);
-    draw_line(g, x + 1, y + 12 * s + 1, x + 4 * s + 1, y + 9 * s + 1, COL_ON_ACCENT);
-    draw_line(g, x + 4 * s + 1, y + 9 * s + 1, x + 8 * s + 1, y + 8 * s + 1, COL_ON_ACCENT);
-    draw_line(g, x, y, x + 8 * s, y + 8 * s, COL_ACCENT);
-    draw_line(g, x, y, x, y + 12 * s, COL_ACCENT);
-    draw_line(g, x, y + 12 * s, x + 4 * s, y + 9 * s, COL_ACCENT);
-    draw_line(g, x + 4 * s, y + 9 * s, x + 8 * s, y + 8 * s, COL_ACCENT);
-    draw_pixel(g, x + s, y + s, COL_TEXT);
+    draw_line(g, x + 1, y + 1, x + 9, y + 9, COL_ON_ACCENT);
+    draw_line(g, x + 1, y + 1, x + 1, y + 13, COL_ON_ACCENT);
+    draw_line(g, x + 1, y + 13, x + 5, y + 10, COL_ON_ACCENT);
+    draw_line(g, x + 5, y + 10, x + 9, y + 9, COL_ON_ACCENT);
+    draw_line(g, x, y, x + 8, y + 8, COL_ACCENT);
+    draw_line(g, x, y, x, y + 12, COL_ACCENT);
+    draw_line(g, x, y + 12, x + 4, y + 9, COL_ACCENT);
+    draw_line(g, x + 4, y + 9, x + 8, y + 8, COL_ACCENT);
+    draw_pixel(g, x + 1, y + 1, COL_TEXT);
 }
 
 void screen_render(Screen *s, Gfx *g, const InputState *in)
@@ -1137,6 +986,10 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
         append_digit(s, action[6]);
         return 2;
     }
+    if (str_starts(action, "key:")) {
+        append_digit(s, action[4]);
+        return 2;
+    }
     if (str_eq(action, "call")) {
         Widget *num = screen_find(s, "number");
         const char *n = (num && num->text[0]) ? num->text : "";
@@ -1174,6 +1027,8 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
     }
     if (str_eq(action, "send")) {
         Widget *body = screen_find(s, "msg");
+        if (!body)
+            body = screen_find(s, "msg_input");
         if (!body)
             body = screen_find(s, "note");
         Widget *st = screen_find(s, "msgstatus");

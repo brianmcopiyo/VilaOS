@@ -129,54 +129,49 @@ void draw_round_rect(Gfx *g, int x, int y, int w, int h, int r, uint16_t c, int 
         draw_fill(g, x + r, y, w - 2 * r, h, c);
         draw_fill(g, x, y + r, r, h - 2 * r, c);
         draw_fill(g, x + w - r, y + r, r, h - 2 * r, c);
-
-        int f = 1 - r;
-        int ddF_x = 1;
-        int ddF_y = -2 * r;
-        int px = 0;
-        int py = r;
-        while (px < py) {
-            if (f >= 0) {
-                py--;
-                ddF_y += 2;
-                f += ddF_y;
+        for (int j = 0; j < r; j++) {
+            for (int i = 0; i < r; i++) {
+                int dx = r - 1 - i;
+                int dy = r - 1 - j;
+                if (dx * dx + dy * dy <= r * r) {
+                    draw_pixel(g, x + i, y + j, c);
+                    draw_pixel(g, x + w - 1 - i, y + j, c);
+                    draw_pixel(g, x + i, y + h - 1 - j, c);
+                    draw_pixel(g, x + w - 1 - i, y + h - 1 - j, c);
+                }
             }
-            px++;
-            ddF_x += 2;
-            f += ddF_x;
-            draw_hline(g, x + r - px, y + r - py, 2 * px, c);
-            draw_hline(g, x + r - px, y + h - r + py - 1, 2 * px, c);
-            draw_hline(g, x + w - r - px, y + r - py, 2 * px, c);
-            draw_hline(g, x + w - r - px, y + h - r + py - 1, 2 * px, c);
-            draw_hline(g, x + r - py, y + r - px, 2 * py, c);
-            draw_hline(g, x + r - py, y + h - r + px - 1, 2 * py, c);
-            draw_hline(g, x + w - r - py, y + r - px, 2 * py, c);
-            draw_hline(g, x + w - r - py, y + h - r + px - 1, 2 * py, c);
         }
     } else {
         draw_hline(g, x + r, y, w - 2 * r, c);
         draw_hline(g, x + r, y + h - 1, w - 2 * r, c);
         draw_vline(g, x, y + r, h - 2 * r, c);
         draw_vline(g, x + w - 1, y + r, h - 2 * r, c);
-
         int f = 1 - r;
-        int ddF_x = 1;
-        int ddF_y = -2 * r;
+        int ddfx = 1;
+        int ddfy = -2 * r;
         int px = 0;
         int py = r;
         int cx0 = x + r;
         int cy0 = y + r;
         int cx1 = x + w - 1 - r;
         int cy1 = y + h - 1 - r;
+        draw_pixel(g, cx0, cy0 - r, c);
+        draw_pixel(g, cx0, cy1 + r, c);
+        draw_pixel(g, cx1, cy0 - r, c);
+        draw_pixel(g, cx1, cy1 + r, c);
+        draw_pixel(g, cx0 - r, cy0, c);
+        draw_pixel(g, cx0 + r, cy0, c);
+        draw_pixel(g, cx1 - r, cy1, c);
+        draw_pixel(g, cx1 + r, cy1, c);
         while (px < py) {
             if (f >= 0) {
                 py--;
-                ddF_y += 2;
-                f += ddF_y;
+                ddfy += 2;
+                f += ddfy;
             }
             px++;
-            ddF_x += 2;
-            f += ddF_x;
+            ddfx += 2;
+            f += ddfx;
             draw_pixel(g, cx0 - px, cy0 - py, c);
             draw_pixel(g, cx0 - py, cy0 - px, c);
             draw_pixel(g, cx1 + px, cy0 - py, c);
@@ -187,4 +182,43 @@ void draw_round_rect(Gfx *g, int x, int y, int w, int h, int r, uint16_t c, int 
             draw_pixel(g, cx1 + py, cy1 + px, c);
         }
     }
+}
+
+void draw_elevated_rect(Gfx *g, int x, int y, int w, int h, int r, uint16_t fill, uint16_t border)
+{
+    if (!g || w <= 0 || h <= 0)
+        return;
+    uint16_t shadow = RGB565(212, 197, 176);
+    draw_round_rect(g, x + 1, y + 2, w, h, r, shadow, 1);
+    draw_round_rect(g, x, y, w, h, r, fill, 1);
+    draw_round_rect(g, x, y, w, h, r, border, 0);
+}
+
+void draw_pixel_aa(Gfx *g, int x, int y, uint16_t c, uint8_t cover)
+{
+    if (!g || cover == 0)
+        return;
+    if (cover >= 255) {
+        draw_pixel(g, x, y, c);
+        return;
+    }
+    if (x < 0 || y < 0 || x >= g->w || y >= g->h)
+        return;
+    uint32_t src = compose_rgb565_to_argb(c);
+    src = (src & 0x00FFFFFFu) | ((uint32_t)cover << 24);
+    if (g->composer && g->composer->px) {
+        uint32_t *p = &g->composer->px[y * g->composer->stride + x];
+        *p = compose_blend(*p, src);
+        g->back[y * g->w + x] = compose_argb_to_rgb565(*p);
+    } else {
+        uint16_t dst = g->back[y * g->w + x];
+        int r1 = (dst >> 11) & 0x1F, g1 = (dst >> 5) & 0x3F, b1 = dst & 0x1F;
+        int r2 = (c >> 11) & 0x1F, g2 = (c >> 5) & 0x3F, b2 = c & 0x1F;
+        int a = cover;
+        int r = (r1 * (255 - a) + r2 * a) / 255;
+        int gg = (g1 * (255 - a) + g2 * a) / 255;
+        int b = (b1 * (255 - a) + b2 * a) / 255;
+        g->back[y * g->w + x] = (uint16_t)((r << 11) | (gg << 5) | b);
+    }
+    gfx_dirty(g, x, y, 1, 1);
 }

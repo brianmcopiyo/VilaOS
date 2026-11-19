@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<resources>
+  <font name="ui" family="Inter" size="12" weight="400"/>
+  <font name="ui_bold" family="Inter" size="12" weight="700"/>
+  <font name="display" family="DM Sans" size="14" weight="600"/>
+  <font name="mono" family="JetBrains Mono" size="12" weight="400"/>
+  <font name="clock" family="JetBrains Mono" size="28" weight="500"/>
+</resources>

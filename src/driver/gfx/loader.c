@@ -2,6 +2,7 @@
 #include "gfx_driver.h"
 #include "compose.h"
 #include "hwinfo.h"
+#include "ttfont.h"
 #include "util.h"
 #include "fb.h"
 
@@ -125,6 +126,7 @@ int gfx_loader_init(Gfx *g, int desktop)
         compose_resize(g->composer, g->w, g->h);
     g->compose_px = g->composer ? g->composer->px : NULL;
     g->compose_pixels = g->composer ? g->composer->pixels : 0;
+    font_system_init(&hw);
     return 0;
 }
 
@@ -132,6 +134,7 @@ void gfx_loader_shutdown(Gfx *g)
 {
     if (!g)
         return;
+    font_system_shutdown();
     if (g->drv && g->drv->shutdown)
         g->drv->shutdown(g);
 #if !defined(_WIN32) && !defined(PHONE_VFB)

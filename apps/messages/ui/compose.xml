@@ -1,15 +1,16 @@
 <?xml version="1.0"?>
-<screen id="compose" bg="#F5EFE6">
+<screen id="compose" class="page">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="New message" fg="#1C1917" w="100%" h="auto"/>
-    <label id="mode_badge" text="[T9: abc]" fg="#57534E" w="100%" h="auto"/>
-    <label id="to_lbl" text="To" fg="#57534E" w="100%" h="auto"/>
-    <input id="to" text="" max_len="32" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-    <label id="body_lbl" text="Message" fg="#57534E" w="100%" h="auto"/>
-    <input id="msg" text="" max_len="120" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-    <label id="msgstatus" text="Ready" fg="#15803D" w="100%" h="auto"/>
-  </vbox>
+  <flex id="body" class="col gap-8 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <label id="title" text="New message" class="text-primary" width="100%" height="wrap" font-family="DM Sans" font-size="16" font-weight="700"/>
+    <badge id="mode_badge" text="T9"/>
+    <label id="to_lbl" text="To" class="text-secondary" width="100%" height="22"/>
+    <input id="to" text="" width="100%" height="36" class="surface" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" placeholder="Recipient"/>
+    <label id="body_lbl" text="Message" class="text-secondary" width="100%" height="22"/>
+    <input id="msg_input" text="" width="100%" height="72" class="surface" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" placeholder="Type message"/>
+    <button id="send_btn" variant="primary" text="Send" action="send" width="100%" height="40"/>
+    <label id="msgstatus" text="Ready" color="#15803D" width="100%" height="wrap"/>
+  </flex>
   <softkeys left="Send" center="OK" right="Back"
-            left_action="send" center_action="send" right_action="route:pop"/>
+            left-action="send" center-action="send" right-action="route:pop"/>
 </screen>

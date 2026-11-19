@@ -139,8 +139,12 @@ int parse_dim(const char *s, int *out_val, int *out_unit)
     *out_unit = UNIT_AUTO;
     if (!s || !s[0])
         return 0;
-    if (str_eq(s, "auto") || str_eq(s, "fill") || str_eq(s, "*")) {
+    if (str_eq(s, "auto") || str_eq(s, "wrap")) {
         *out_unit = UNIT_AUTO;
+        return 0;
+    }
+    if (str_eq(s, "fill") || str_eq(s, "flex") || str_eq(s, "*")) {
+        *out_unit = UNIT_FILL;
         return 0;
     }
     char *end = NULL;
@@ -151,6 +155,11 @@ int parse_dim(const char *s, int *out_val, int *out_unit)
         end++;
     if (*end == '%') {
         *out_unit = UNIT_PCT;
+        *out_val = (int)v;
+        return 0;
+    }
+    if ((end[0] == 'p' || end[0] == 'P') && (end[1] == 'x' || end[1] == 'X') && end[2] == 0) {
+        *out_unit = UNIT_PX;
         *out_val = (int)v;
         return 0;
     }

@@ -1,0 +1,15 @@
+on_load
+  require ui
+end
+
+on_soft left
+  action ok
+end
+
+on_soft center
+  action ok
+end
+
+on_soft right
+  ui.pop
+end

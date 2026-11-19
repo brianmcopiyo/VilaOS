@@ -1,0 +1,8 @@
+﻿<?xml version="1.0"?>
+<app id="music" name="Music" version="1.0.0" version_code="1" icon="music">
+ <summary text="Background music player"/>
+ <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="audio.bg"/>
+ <service id="musicd" binary="/bin/vilaos-musicd" socket="music.sock" autostart="false"/>
+</app>

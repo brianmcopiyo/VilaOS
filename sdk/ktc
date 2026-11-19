@@ -1,0 +1,450 @@
+#!/usr/bin/env python3
+import os
+import re
+import sys
+
+CAP = {
+    "Cap.UI": "ui",
+    "Cap.STORAGE": "storage.app",
+    "Cap.STORAGE_APP": "storage.app",
+    "Cap.STORAGE_FILES": "storage.files",
+    "Cap.TELEPHONY": "telephony",
+    "Cap.MESSAGES": "messages",
+    "Cap.CONTACTS": "contacts",
+    "Cap.AUDIO": "audio.bg",
+    "Cap.AUDIO_BG": "audio.bg",
+    "Cap.CLOCK": "system.clock",
+    "Cap.SYSTEM_CLOCK": "system.clock",
+    "Cap.SYSTEM_POWER": "system.power",
+    "Cap.SYSTEM_DEVICE": "system.device",
+    "Cap.NETWORK": "network",
+}
+
+SOFT = {
+    "SoftKey.LEFT": "left",
+    "SoftKey.CENTER": "center",
+    "SoftKey.RIGHT": "right",
+    "LEFT": "left",
+    "CENTER": "center",
+    "RIGHT": "right",
+}
+
+def strip_comments(src: str) -> str:
+    out = []
+    i = 0
+    n = len(src)
+    while i < n:
+        if src[i:i+2] == "//":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if src[i:i+2] == "/*":
+            i += 2
+            while i + 1 < n and src[i:i+2] != "*/":
+                i += 1
+            i = min(i + 2, n)
+            continue
+        out.append(src[i])
+        i += 1
+    return "".join(out)
+
+def unquote(s: str) -> str:
+    s = s.strip()
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        return s[1:-1]
+    return s
+
+def resolve_value_expr(expr: str, bindings: dict) -> str:
+    expr = expr.strip()
+    m = re.match(r'(\w+)\.value\s*\(\s*screen\s*\)$', expr)
+    if m:
+        bid = bindings.get(m.group(1), {}).get("id")
+        if bid:
+            return f"text:{bid}"
+    m = re.match(r'Widget\.text\s*\(\s*(.+)\s*\)$', expr)
+    if m:
+        return f"text:{unquote(m.group(1))}"
+    return unquote(expr)
+
+def map_call(expr: str, bindings: dict | None = None) -> str | None:
+    bindings = bindings or {}
+    expr = expr.strip().rstrip(";").strip()
+    if not expr:
+        return None
+    if re.match(r'\w+\.attach\s*\(', expr):
+        return ""
+    m = re.match(r'require\((.+)\)$', expr)
+    if m:
+        args = [a.strip() for a in m.group(1).split(",") if a.strip()]
+        lines = []
+        for a in args:
+            cap = CAP.get(a, a.replace("Cap.", "").lower().replace("_", "."))
+            if cap.startswith("storage.app") or a.endswith("STORAGE_APP") or a.endswith("STORAGE)"):
+                cap = "storage.app"
+            lines.append(f"require {cap}")
+        return "\n".join(lines)
+
+    if re.search(r'\bKeypad\b|\bGraphics\b|\bKeyboard\b|\bFont\b|\bDraw\b', expr):
+        raise SystemExit(f"apps must not use graphics/keyboard APIs: {expr}")
+
+    m = re.match(r'(\w+)\.clear\s*\(\s*screen\s*\)$', expr)
+    if m and m.group(1) in bindings:
+        return f"ui.clear_text {bindings[m.group(1)]['id']}"
+    m = re.match(r'(\w+)\.setText\s*\(\s*screen\s*,\s*(.+)\)$', expr)
+    if m and m.group(1) in bindings:
+        return f"ui.set_text {bindings[m.group(1)]['id']} {resolve_value_expr(m.group(2), bindings)}"
+
+    patterns = [
+        (r'Ui(?:Api)?\.setText\(([^,]+),\s*(.+)\)$', lambda a, b: f"ui.set_text {unquote(a)} {resolve_value_expr(b, bindings)}"),
+        (r'Ui(?:Api)?\.appendText\(([^,]+),\s*(.+)\)$', lambda a, b: f"ui.append_text {unquote(a)} {resolve_value_expr(b, bindings)}"),
+        (r'Ui(?:Api)?\.clearText\((.+)\)$', lambda a: f"ui.clear_text {unquote(a)}"),
+        (r'Ui(?:Api)?\.push\((.+)\)$', lambda a: f"ui.push {unquote(a)}"),
+        (r'Ui(?:Api)?\.replace\((.+)\)$', lambda a: f"ui.replace {unquote(a)}"),
+        (r'Ui(?:Api)?\.pop\(\)$', lambda: "ui.pop"),
+        (r'Ui(?:Api)?\.home\(\)$', lambda: "ui.home"),
+        (r'Ui(?:Api)?\.softkey\((SoftKey\.\w+|ui\.SoftKey\.\w+),\s*([^,]+),\s*(.+)\)$',
+         lambda a, b, c: f"ui.softkey {SOFT.get(a.split('.')[-1] if a.startswith('ui.') else a, a.lower())} {unquote(b)} {unquote(c)}"),
+        (r'Ui(?:Api)?\.softkey\((SoftKey\.\w+|ui\.SoftKey\.\w+),\s*(.+)\)$',
+         lambda a, b: f"ui.softkey {SOFT.get(a.split('.')[-1] if a.startswith('ui.') else a, a.lower())} {unquote(b)}"),
+        (r'Storage\.get\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.get {unquote(a)} {unquote(b)}"),
+        (r'Storage\.set\(([^,]+),\s*Widget\.text\((.+)\)\)$', lambda a, b: f"storage.app.set {unquote(a)} text:{unquote(b)}"),
+        (r'Storage\.set\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.set {unquote(a)} {resolve_value_expr(b, bindings)}"),
+        (r'Storage\.setFromWidget\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.set {unquote(a)} text:{unquote(b)}"),
+        (r'Storage\.filesList\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.files.list {unquote(a)} {unquote(b)}"),
+        (r'Storage\.filesRead\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.files.read {unquote(a)} {unquote(b)}"),
+        (r'Storage\.assetRead\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.asset.read {unquote(a)} {unquote(b)}"),
+        (r'Service\.start\((.+)\)$', lambda a: f"service.start {unquote(a)}"),
+        (r'Service\.stop\((.+)\)$', lambda a: f"service.stop {unquote(a)}"),
+        (r'Service\.status\(([^,]+),\s*(.+)\)$', lambda a, b: f"service.status {unquote(a)} {unquote(b)}"),
+        (r'Service\.cmd\(([^,]+),\s*([^,]+),\s*(.+)\)$', lambda a, b, c: f"service.cmd {unquote(a)} {unquote(b)} {unquote(c)}"),
+        (r'Audio\.play\(\)$', lambda: "audio.play"),
+        (r'Audio\.pause\(\)$', lambda: "audio.pause"),
+        (r'Audio\.skip\(\)$', lambda: "audio.skip"),
+        (r'Audio\.stop\(\)$', lambda: "audio.stop"),
+        (r'Audio\.stop\(([^,]+),\s*(.+)\)$', lambda a, b: f"audio.stop {unquote(a)} {unquote(b)}"),
+        (r'Audio\.stop\((.+)\)$', lambda a: f"audio.stop {unquote(a)}"),
+        (r'Telephony\.digit\((.+)\)$', lambda a: f"telephony.digit {resolve_value_expr(a, bindings)}"),
+        (r'Telephony\.call\(\)$', lambda: "telephony.call"),
+        (r'Telephony\.end\(\)$', lambda: "telephony.end"),
+        (r'Telephony\.clear\(\)$', lambda: "telephony.clear"),
+        (r'Messages\.openThread\((.+)\)$', lambda a: "messages.open"),
+        (r'Messages\.open\(\)$', lambda: "messages.open"),
+        (r'Messages\.compose\(\)$', lambda: "messages.compose"),
+        (r'Messages\.send\((.+)\)$', lambda a: "messages.send"),
+        (r'Messages\.send\(\)$', lambda: "messages.send"),
+        (r'Contacts\.open\(\)$', lambda: "contacts.open"),
+        (r'Contacts\.search\((.+)\)$', lambda a: f"contacts.search {unquote(a)}"),
+        (r'Contacts\.call\(\)$', lambda: "contacts.call"),
+        (r'Clock\.now\((.+)\)$', lambda a: f"clock.now {unquote(a)}"),
+        (r'Clock\.date\((.+)\)$', lambda a: f"clock.date {unquote(a)}"),
+        (r'Clock\.tick\((.+)\)$', lambda a: f"clock.tick {unquote(a)}"),
+        (r'System\.deviceInfo\((.+)\)$', lambda a: f"system.device.info {unquote(a)}"),
+        (r'System\.locale\((.+)\)$', lambda a: f"system.locale {unquote(a)}"),
+        (r'System\.theme\((.+)\)$', lambda a: f"system.theme {unquote(a)}"),
+        (r'System\.time\((.+)\)$', lambda a: f"system.time {unquote(a)}"),
+        (r'System\.powerMenu\(\)$', lambda: "system.power.menu"),
+        (r'System\.powerOff\(\)$', lambda: "system.power.off"),
+        (r'System\.powerRestart\(\)$', lambda: "system.power.restart"),
+        (r'System\.apiVersion\((.+)\)$', lambda a: f"system.api.version {unquote(a)}"),
+        (r'Action\.run\((.+)\)$', lambda a: f"action {unquote(a)}"),
+        (r'StatusBadge\((\w+)\)\.setText\((.+)\)$', lambda a, b: f"ui.set_text {unquote(a)} {unquote(b)}"),
+    ]
+    for pat, fn in patterns:
+        m = re.match(pat, expr)
+        if m:
+            return fn(*m.groups()) if m.groups() else fn()
+    return None
+
+def split_statements(body: str):
+    parts = []
+    cur = []
+    depth = 0
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if ch in "([{":
+            depth += 1
+            cur.append(ch)
+        elif ch in ")]}":
+            depth = max(0, depth - 1)
+            cur.append(ch)
+        elif ch == ";" and depth == 0:
+            s = "".join(cur).strip()
+            if s:
+                parts.append(s)
+            cur = []
+        elif ch == "\n" and depth == 0:
+            s = "".join(cur).strip()
+            if s:
+                parts.append(s)
+            cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    s = "".join(cur).strip()
+    if s:
+        parts.append(s)
+    return parts
+
+def map_statements(body: str, bindings: dict) -> list[str]:
+    lines = []
+    for st in split_statements(body):
+        st = st.strip()
+        if not st or st.startswith("when"):
+            continue
+        if st.startswith("if ") or st.startswith("if("):
+            bm = re.search(r'\{(.*)\}\s*$', st, re.S)
+            if bm:
+                lines.extend(map_statements(bm.group(1), bindings))
+            continue
+        if st.startswith("val ") or st.startswith("var "):
+            continue
+        mapped = map_call(st, bindings)
+        if mapped is None:
+            raise SystemExit(f"unsupported statement: {st}")
+        if mapped:
+            lines.extend(mapped.splitlines())
+    return lines
+
+def map_block_or_expr(expr: str, bindings: dict) -> str:
+    expr = expr.strip().rstrip(",").strip()
+    if expr.startswith("{") and expr.endswith("}"):
+        return "\n".join(map_statements(expr[1:-1], bindings))
+    mapped = map_call(expr, bindings)
+    if mapped is None:
+        raise SystemExit(f"unsupported expression in when: {expr}")
+    return mapped
+
+def compile_when(param: str, body: str, bindings: dict):
+    handlers = []
+    i = 0
+    while i < len(body):
+        m = re.match(
+            r'\s*(?:"([^"]+)"|\'([^\']+)\'|(SoftKey\.\w+)|([A-Za-z0-9_]+))\s*->\s*',
+            body[i:],
+        )
+        if not m:
+            i += 1
+            continue
+        key = m.group(1) or m.group(2) or m.group(3) or m.group(4)
+        if key.startswith("ui.SoftKey."):
+            key = "SoftKey." + key.split(".")[-1]
+        i += m.end()
+        if i < len(body) and body[i] == "{":
+            depth = 0
+            j = i
+            while j < len(body):
+                if body[j] == "{":
+                    depth += 1
+                elif body[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        j += 1
+                        break
+                j += 1
+            expr = body[i:j]
+            i = j
+        else:
+            j = i
+            while j < len(body) and body[j] not in "\n":
+                j += 1
+            expr = body[i:j]
+            i = j
+        mapped = map_block_or_expr(expr, bindings)
+        if param == "id":
+            handlers.append((f"click {key}", mapped))
+        elif param == "side":
+            sk = SOFT.get(key, key.lower().replace("SoftKey.", ""))
+            handlers.append((f"soft {sk}", mapped))
+        elif param == "action":
+            handlers.append((f"action {key}", mapped))
+        elif param == "number":
+            handlers.append((f"number {key}", mapped))
+        else:
+            handlers.append((param, mapped))
+    return handlers
+
+def extract_fun_bodies(src: str):
+    funs = []
+    for m in re.finditer(r'(?:override\s+)?fun\s+(\w+)\s*\(([^)]*)\)\s*\{', src):
+        name = m.group(1)
+        params = m.group(2).strip()
+        start = m.end()
+        depth = 1
+        i = start
+        while i < len(src) and depth > 0:
+            if src[i] == "{":
+                depth += 1
+            elif src[i] == "}":
+                depth -= 1
+            i += 1
+        body = src[start:i-1]
+        funs.append((name, params, body))
+    return funs
+
+def extract_named_arg(args: str, name: str) -> str | None:
+    m = re.search(rf'{name}\s*=\s*("([^"]*)"|\'([^\']*)\'|([^,\)]+))', args)
+    if not m:
+        return None
+    return m.group(2) if m.group(2) is not None else (m.group(3) if m.group(3) is not None else m.group(4).strip())
+
+def extract_lambda_after(src: str, start: int):
+    i = start
+    while i < len(src) and src[i].isspace():
+        i += 1
+    if i >= len(src) or src[i] != '{':
+        return "", i
+    depth = 0
+    j = i
+    while j < len(src):
+        if src[j] == '{':
+            depth += 1
+        elif src[j] == '}':
+            depth -= 1
+            if depth == 0:
+                j += 1
+                break
+        j += 1
+    return src[i+1:j-1], j
+
+def extract_bindings(src: str) -> dict:
+    bindings = {}
+    for m in re.finditer(
+        r'(?:private\s+|val\s+|private\s+val\s+)(\w+)\s*=\s*(DialKeypad|TextInput|ActionButton|ListRow|SurfaceCard|StatusBadge|AppTile)\s*\((.*?)\)\s*(\{)?',
+        src,
+        re.S,
+    ):
+        var = m.group(1)
+        kind = m.group(2)
+        args = m.group(3)
+        has_brace = m.group(4)
+        cid = extract_named_arg(args, "id") or var
+        placeholder = extract_named_arg(args, "placeholder") or ""
+        variant = extract_named_arg(args, "variant") or ""
+        end = m.end()
+        lambda_body = ""
+        lambda_param = ""
+        if has_brace:
+            body, end = extract_lambda_after(src, m.end() - 1)
+            lm = re.match(r'\s*(\w+)\s*(?::\s*[\w\.<>]+)?\s*->\s*(.*)\s*$', body, re.S)
+            if lm:
+                lambda_param = lm.group(1)
+                lambda_body = lm.group(2).strip()
+            else:
+                lambda_body = body.strip()
+        bindings[var] = {
+            "kind": kind,
+            "id": cid,
+            "placeholder": placeholder,
+            "variant": variant,
+            "lambda_param": lambda_param,
+            "lambda_body": lambda_body,
+        }
+    return bindings
+
+def emit_handler(out: list, event: str, lines: list[str]):
+    if not lines:
+        return
+    out.append(f"on_{event}")
+    for line in lines:
+        out.append(f"  {line}")
+    out.append("end")
+    out.append("")
+
+def compile_bindings(bindings: dict, out: list):
+    for var, b in bindings.items():
+        kind = b["kind"]
+        body = b["lambda_body"]
+        if not body:
+            continue
+        param = b["lambda_param"]
+        body2 = body
+        if param:
+            body2 = re.sub(rf'\b{re.escape(param)}\b', "$key", body2)
+        lines = map_statements(body2, bindings)
+        if kind == "DialKeypad":
+            emit_handler(out, "number *", lines)
+        elif kind == "ActionButton":
+            emit_handler(out, f"click {b['id']}", lines)
+        elif kind == "ListRow":
+            for row_id in ("m1", "m2", "m3", "m4", "c1", "c2", "c3", "c4", "c5"):
+                emit_handler(out, f"click {row_id}", lines)
+
+def compile_kt(src: str) -> str:
+    src = strip_comments(src)
+    src = re.sub(r'package\s+[^\n]+', '', src)
+    src = re.sub(r'import\s+[^\n]+', '', src)
+    bindings = extract_bindings(src)
+    out = []
+    compile_bindings(bindings, out)
+
+    for name, params, body in extract_fun_bodies(src):
+        body = body.strip()
+        if name in ("onLoad", "onStart"):
+            lines = map_statements(body, bindings)
+            emit_handler(out, "load", lines if lines else ["require ui"])
+        elif name == "onTick":
+            lines = map_statements(body, bindings)
+            emit_handler(out, "tick", lines)
+        elif name in ("onClick", "onSoft", "onAction", "onNumber"):
+            if name in ("onKey", "onDigit") or "Keypad" in body or "Keyboard" in body:
+                raise SystemExit("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber")
+            param = "id"
+            if name == "onSoft":
+                param = "side"
+            elif name == "onAction":
+                param = "action"
+            elif name == "onNumber":
+                param = "number"
+            wm = re.search(r'when\s*\(([^)]+)\)\s*\{(.*)\}\s*$', body, re.S)
+            if wm:
+                for ev, mapped in compile_when(param, wm.group(2), bindings):
+                    emit_handler(out, ev, mapped.splitlines() if mapped else [])
+            elif name == "onNumber":
+                body2 = body.replace("value", "$key")
+                lines = map_statements(body2, bindings)
+                emit_handler(out, "number *", lines)
+            else:
+                raise SystemExit(f"{name} requires when(...) {{ }}")
+        elif name in ("onKey", "onDigit"):
+            raise SystemExit("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber")
+        else:
+            continue
+    return "\n".join(out).rstrip() + "\n"
+
+def compile_dir(app_dir: str, out_path: str):
+    src_dir = os.path.join(app_dir, "src")
+    files = sorted(
+        os.path.join(src_dir, f)
+        for f in os.listdir(src_dir)
+        if f.endswith(".kt")
+    )
+    if not files:
+        raise SystemExit(f"no .kt sources in {src_dir}")
+    combined = []
+    for f in files:
+        with open(f, "r", encoding="utf-8") as fh:
+            combined.append(fh.read())
+    ir = compile_kt("\n".join(combined))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(ir)
+    return out_path
+
+def main():
+    if len(sys.argv) < 2:
+        print("usage: ktc <app_dir> [-o bin/main.kbc]", file=sys.stderr)
+        return 1
+    app_dir = os.path.abspath(sys.argv[1])
+    out = os.path.join(app_dir, "bin", "main.kbc")
+    if "-o" in sys.argv:
+        i = sys.argv.index("-o")
+        out = sys.argv[i + 1]
+        if not os.path.isabs(out):
+            out = os.path.join(app_dir, out)
+    path = compile_dir(app_dir, out)
+    print(path)
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

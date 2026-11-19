@@ -2,6 +2,7 @@
 #include "util.h"
 #include "fb.h"
 #include "screen.h"
+#include "procman.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -15,10 +16,12 @@
 
 static void persist_and_sync(void)
 {
+    procman_stop_all(&g_procman);
 #ifndef _WIN32
     sync();
     umount2("/data", MNT_DETACH);
     umount2("/var", MNT_DETACH);
+    umount2("/run", MNT_DETACH);
     sync();
 #endif
 }

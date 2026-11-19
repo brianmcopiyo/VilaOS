@@ -1,7 +1,9 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <app id="settings" name="Settings" version="1.0.0" version_code="1" icon="settings">
-  <summary text="Display, input mode, sound and system info"/>
-  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
-  <capability name="display"/>
-  <capability name="storage"/>
+ <summary text="Display, input mode, sound and system info"/>
+ <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="system.device"/>
+ <capability name="system.power"/>
+ <capability name="storage.app"/>
 </app>

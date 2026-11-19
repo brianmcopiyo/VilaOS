@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
-<screen id="contacts" bg="#F5EFE6">
+<screen id="contacts" background="#F5EFE6">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Contacts" fg="#1C1917" w="100%" h="auto"/>
-    <input id="filter" text="" max_len="24" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-    <list id="people" w="100%" h="auto" bg="#EAE0D0">
-      <button id="c1" text="Alice Chen" action="nav:assets/screens/contact_detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="65"/>
-      <button id="c2" text="Bob Okonkwo" action="nav:assets/screens/contact_detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="66"/>
-      <button id="c3" text="Carol Diaz" action="nav:assets/screens/contact_detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="67"/>
-      <button id="c4" text="Dave Park" action="nav:assets/screens/contact_detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="68"/>
-      <button id="c5" text="Elena Rossi" action="nav:assets/screens/contact_detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="69"/>
+  <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
+    <label id="title" text="Contacts" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="16" font-weight="700"/>
+    <input_field id="filter" text="" width="100%" height="36" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8"/>
+    <list id="people" width="100%" height="fill" grow="1" min-height="120" padding="4" gap="4" radius="8" background="#EAE0D0" border-width="1" border-color="#D4C5B0">
+      <button id="c1" text="Alice Chen" action="route:push:res/layout/detail.xml" background="#EAE0D0" color="#1C1917" value="65" radius="10" height="48" component="list_row" font-family="Inter" font-size="12"/>
+      <button id="c2" text="Bob Okonkwo" action="route:push:res/layout/detail.xml" background="#EAE0D0" color="#1C1917" value="66" radius="10" height="48" component="list_row" font-family="Inter" font-size="12"/>
+      <button id="c3" text="Carol Diaz" action="route:push:res/layout/detail.xml" background="#EAE0D0" color="#1C1917" value="67" radius="10" height="48" component="list_row" font-family="Inter" font-size="12"/>
+      <button id="c4" text="Dave Park" action="route:push:res/layout/detail.xml" background="#EAE0D0" color="#1C1917" value="68" radius="10" height="48" component="list_row" font-family="Inter" font-size="12"/>
+      <button id="c5" text="Elena Rossi" action="route:push:res/layout/detail.xml" background="#EAE0D0" color="#1C1917" value="69" radius="10" height="48" component="list_row" font-family="Inter" font-size="12"/>
     </list>
-  </vbox>
+  </flex>
   <softkeys left="Call" center="Open" right="Back"
-            left_action="call" center_action="ok" right_action="back"/>
+            left-action="call" center-action="ok" right-action="route:pop"/>
 </screen>

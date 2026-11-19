@@ -1,0 +1,17 @@
+.page { background: #F5EFE6; width: fill; height: fill; flex-direction: column; }
+.surface { background: #EAE0D0; border-radius: 12; border: 1 #D4C5B0; }
+.card { background: #EAE0D0; border-radius: 12; border: 1 #D4C5B0; padding: 14; }
+.btn-primary { background: #EA580C; color: #FFFFFF; border-radius: 12; }
+.btn-secondary { background: #EAE0D0; color: #1C1917; border-radius: 10; }
+.btn-ghost { background: #F5EFE6; color: #EA580C; border-radius: 10; border: 1 #EA580C; }
+.btn-destructive { background: #B91C1C; color: #FFFFFF; border-radius: 12; }
+.pill { background: #EA580C; color: #FFFFFF; border-radius: 12; padding: 4; }
+.text-primary { color: #1C1917; }
+.text-secondary { color: #57534E; }
+.text-accent { color: #EA580C; }
+.text-positive { color: #15803D; }
+.text-destructive { color: #B91C1C; }
+.bg-page { background: #F5EFE6; }
+.bg-surface { background: #EAE0D0; }
+.rounded { border-radius: 10; }
+.rounded-lg { border-radius: 14; }

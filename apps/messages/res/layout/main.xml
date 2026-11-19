@@ -1,18 +1,21 @@
 <?xml version="1.0"?>
-<screen id="messages" bg="#F5EFE6">
+<screen id="messages" class="page">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Messages" fg="#1C1917" w="100%" h="auto"/>
-    <list id="inbox" w="100%" h="auto" bg="#EAE0D0">
-      <button id="m1" text="Mom  Call me later" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
-      <button id="m2" text="Work  Meeting at 3" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
-      <button id="m3" text="Sam  Lunch tomorrow?" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-      <button id="m4" text="Ada  Designs look great" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+  <flex id="body" class="col gap-16 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <card class="row items-center justify-between p-14">
+      <row id="status_summary" title="Inbox" subtitle="2 unread threads"/>
+      <badge text="2"/>
+    </card>
+    <list id="thread_list" width="100%" height="fill" grow="1" min-height="120" class="surface" padding="4" gap="4" overflow="scroll">
+      <row id="m1" title="Mom" subtitle="Call me later" action="route:push:res/layout/thread.xml"/>
+      <row id="m2" title="Work" subtitle="Meeting at 3" action="route:push:res/layout/thread.xml"/>
+      <row id="m3" title="Sam" subtitle="Lunch tomorrow?" action="route:push:res/layout/thread.xml"/>
+      <row id="m4" title="Ada" subtitle="Designs look great" action="route:push:res/layout/thread.xml"/>
     </list>
-    <button id="newmsg" text="New message" action="route:push:res/layout/compose.xml" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
-  </vbox>
+    <button id="compose_btn" variant="primary" text="New message" action="route:push:res/layout/compose.xml" width="100%" height="40"/>
+  </flex>
   <softkeys left="New" center="Open" right="Back"
-            left_action="route:push:res/layout/compose.xml"
-            center_action="ok"
-            right_action="route:pop"/>
+            left-action="route:push:res/layout/compose.xml"
+            center-action="ok"
+            right-action="route:pop"/>
 </screen>

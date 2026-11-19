@@ -1,4 +1,6 @@
 #include "bridge.h"
+#include "vapi.h"
+#include "procman.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -14,7 +16,7 @@
 
 int bridge_check_cap(const VslRuntime *rt, unsigned cap)
 {
-    if (!rt)
+    if (!rt || cap == 0)
         return 0;
     return (rt->app.caps & cap) == cap;
 }
@@ -70,18 +72,7 @@ static int ensure_data_dir(const VslRuntime *rt)
 
 int bridge_storage_set(VslRuntime *rt, const char *key, const char *val)
 {
-    if (!rt || !key)
-        return -1;
-    if (ensure_data_dir(rt) != 0)
-        return -1;
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s/%s/%s", PKG_DATA_ROOT, rt->app.id, key);
-    FILE *f = fopen(path, "w");
-    if (!f)
-        return -1;
-    fputs(val ? val : "", f);
-    fclose(f);
-    return 0;
+    return vapi_bridge(rt, "storage.app.set", key, val);
 }
 
 int bridge_storage_get(VslRuntime *rt, const char *key, char *out, size_t n)
@@ -89,20 +80,12 @@ int bridge_storage_get(VslRuntime *rt, const char *key, char *out, size_t n)
     if (!rt || !key || !out || n == 0)
         return -1;
     out[0] = 0;
-    if (!bridge_check_cap(rt, PKG_CAP_STORAGE))
-        return -1;
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s/%s/%s", PKG_DATA_ROOT, rt->app.id, key);
-    FILE *f = fopen(path, "r");
-    if (!f)
-        return -1;
-    if (!fgets(out, (int)n, f))
-        out[0] = 0;
-    fclose(f);
-    size_t L = strlen(out);
-    while (L > 0 && (out[L - 1] == '\n' || out[L - 1] == '\r'))
-        out[--L] = 0;
-    return 0;
+    VapiCtx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.rt = rt;
+    ctx.screen = rt->screen;
+    ctx.app = &rt->app;
+    return vapi_call(&ctx, "storage.app.get", key, NULL, out, n) == VAPI_OK ? 0 : -1;
 }
 
 static void normalize_app_rel(const char *in, char *out, size_t n)
@@ -150,51 +133,48 @@ int bridge_exec_cmd(VslRuntime *rt, const char *cmd, const char *a1, const char 
 {
     if (!rt || !cmd)
         return -1;
+
+    if (strchr(cmd, '.'))
+        return vapi_bridge(rt, cmd, a1, a2);
+
     if (str_eq(cmd, "set_text"))
-        return bridge_set_text(rt, a1, a2);
+        return vapi_bridge(rt, "ui.set_text", a1, a2);
     if (str_eq(cmd, "append_text"))
-        return bridge_append_text(rt, a1, a2);
+        return vapi_bridge(rt, "ui.append_text", a1, a2);
     if (str_eq(cmd, "clear_text"))
-        return bridge_clear_text(rt, a1);
+        return vapi_bridge(rt, "ui.clear_text", a1, NULL);
     if (str_eq(cmd, "nav"))
         return bridge_nav(rt, a1);
-    if (str_eq(cmd, "back") || str_eq(cmd, "pop_route")) {
-        str_copy(rt->nav, sizeof(rt->nav), "route:pop");
-        return 0;
-    }
-    if (str_eq(cmd, "home") || str_eq(cmd, "go_home")) {
-        str_copy(rt->nav, sizeof(rt->nav), "route:home");
-        return 0;
-    }
-    if (str_eq(cmd, "push_route") && a1) {
-        char rel[MAX_PATH];
-        normalize_app_rel(a1, rel, sizeof(rel));
-        snprintf(rt->nav, sizeof(rt->nav), "route:push:%s", rel);
-        return 0;
-    }
-    if (str_eq(cmd, "replace_route") && a1) {
-        char rel[MAX_PATH];
-        normalize_app_rel(a1, rel, sizeof(rel));
-        snprintf(rt->nav, sizeof(rt->nav), "route:replace:%s", rel);
-        return 0;
-    }
+    if (str_eq(cmd, "back") || str_eq(cmd, "pop_route"))
+        return vapi_bridge(rt, "ui.pop", NULL, NULL);
+    if (str_eq(cmd, "home") || str_eq(cmd, "go_home"))
+        return vapi_bridge(rt, "ui.home", NULL, NULL);
+    if (str_eq(cmd, "push_route") && a1)
+        return vapi_bridge(rt, "ui.push", a1, NULL);
+    if (str_eq(cmd, "replace_route") && a1)
+        return vapi_bridge(rt, "ui.replace", a1, NULL);
     if (str_eq(cmd, "require")) {
         unsigned c = pkg_cap_from_name(a1);
+        if (!c)
+            return -1;
         return bridge_check_cap(rt, c) ? 0 : -1;
     }
     if (str_eq(cmd, "storage_set"))
-        return bridge_storage_set(rt, a1, a2);
-    if (str_eq(cmd, "storage_get")) {
-        char val[MAX_TEXT];
-        if (bridge_storage_get(rt, a1, val, sizeof(val)) != 0)
-            val[0] = 0;
-        return bridge_set_text(rt, a2, val);
-    }
-    if (str_eq(cmd, "call")) {
-        if (!bridge_check_cap(rt, PKG_CAP_TELEPHONY))
-            return -1;
-        str_copy(rt->nav, sizeof(rt->nav), "route:replace:res/layout/call_active.xml");
-        return 0;
-    }
+        return vapi_bridge(rt, "storage.app.set", a1, a2);
+    if (str_eq(cmd, "storage_get"))
+        return vapi_bridge(rt, "storage.app.get", a1, a2);
+    if (str_eq(cmd, "call"))
+        return vapi_bridge(rt, "telephony.call", NULL, NULL);
+    if (str_eq(cmd, "digit") && a1)
+        return vapi_bridge(rt, "telephony.digit", a1, NULL);
+    if (str_eq(cmd, "svc_start") && a1)
+        return vapi_bridge(rt, "service.start", a1, NULL);
+    if (str_eq(cmd, "svc_stop") && a1)
+        return vapi_bridge(rt, "service.stop", a1, NULL);
+    if (str_eq(cmd, "svc_status") && a1)
+        return vapi_bridge(rt, "service.status", a1, a2);
+    if (str_eq(cmd, "svc_cmd") && a1 && a2)
+        return vapi_bridge(rt, "service.cmd", a1, a2);
+    (void)ensure_data_dir;
     return -1;
 }

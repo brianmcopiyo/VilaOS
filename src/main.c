@@ -8,6 +8,9 @@
 #include "apprun.h"
 #include "pkg.h"
 #include "syspower.h"
+#include "procman.h"
+#include "touch.h"
+#include "vapi.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,6 +108,9 @@ static int activate_focus(Screen *s, Gfx *g, char *nav, size_t nav_sz)
     if (s->focus < 0)
         return 0;
     Widget *w = &s->widgets[s->focus];
+    if (w->action[0] && str_starts(w->action, "key:")) {
+        return apphost_handle_action(&g_host, s, g, w->action, nav, nav_sz);
+    }
     if (g_host.in_app) {
         apphost_fire_event(&g_host, "click", w->id);
         char taken[MAX_PATH];
@@ -126,6 +132,9 @@ static Widget *focused_input(Screen *s)
     Widget *msg = screen_find(s, "msg");
     if (msg)
         return msg;
+    Widget *msg_input = screen_find(s, "msg_input");
+    if (msg_input)
+        return msg_input;
     Widget *note = screen_find(s, "note");
     if (note)
         return note;
@@ -285,6 +294,7 @@ static int run_boot_sequence(Gfx *g, InputMux *input, Screen *s)
 
     boot_set_stage(s, g, input, "Loading apps...", 55);
     apphost_init(&g_host);
+    procman_init(&g_procman);
     boot_sleep_ms(400);
 
     boot_set_stage(s, g, input, "Loading apps...", 78);
@@ -339,6 +349,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "gfx: %s\n", gfx_status);
     }
 
+    vapi_init();
+
     InputMux input;
     if (input_init(&input) != 0)
         fprintf(stderr, "input_init failed (continuing without epoll)\n");
@@ -348,10 +360,13 @@ int main(int argc, char **argv)
     if (!skip_boot) {
         if (run_boot_sequence(&gfx, &input, &screen) != 0) {
             apphost_init(&g_host);
+            if (!g_procman.ready)
+                procman_init(&g_procman);
         }
         start = "assets/screens/idle.xml";
     } else {
         apphost_init(&g_host);
+        procman_init(&g_procman);
     }
 
     if (screen_load(&screen, start) != 0) {
@@ -383,6 +398,7 @@ restart_loop:
 
         uint64_t t = now_ms();
         if (t - last_tick > 200) {
+            procman_tick(&g_procman);
             screen_tick(&screen, &gfx);
             apphost_on_tick(&g_host);
             apphost_update_softkeys(&g_host, &screen);
@@ -489,31 +505,53 @@ restart_loop:
                     apphost_fire_event(&g_host, "key", "char");
                 break;
             case IE_CLICK: {
-                int sk = screen_hit_softkey(&screen, &gfx, ev.x, ev.y);
-                if (sk == 1) {
-                    arc = run_soft(&screen, &gfx, 1,
-                                   screen.soft_left_act[0] ? screen.soft_left_act : "ok",
-                                   nav, sizeof(nav));
-                    apply_power_result(arc, &screen, &gfx, &input);
-                } else if (sk == 2) {
-                    arc = activate_focus(&screen, &gfx, nav, sizeof(nav));
+                char tap_nav[MAX_PATH];
+                tap_nav[0] = 0;
+                int tr = screen_handle_pointer_tap(&screen, &gfx, ev.x, ev.y, tap_nav, sizeof(tap_nav));
+                if (tr >= 11 && tr <= 13) {
+                    int side = tr - 10;
+                    arc = run_soft(&screen, &gfx, side, tap_nav, nav, sizeof(nav));
                     if (apply_power_result(arc, &screen, &gfx, &input))
                         break;
-                    if (!nav[0]) {
-                        arc = run_soft(&screen, &gfx, 2,
-                                       screen.soft_center_act[0] ? screen.soft_center_act : "ok",
-                                       nav, sizeof(nav));
-                        apply_power_result(arc, &screen, &gfx, &input);
-                    }
-                } else if (sk == 3) {
-                    arc = run_soft(&screen, &gfx, 3,
-                                   screen.soft_right_act[0] ? screen.soft_right_act : "route:pop",
-                                   nav, sizeof(nav));
-                    if (apply_power_result(arc, &screen, &gfx, &input))
-                        break;
-                    if (str_eq(screen.soft_right_act, "power_cancel") && !nav[0])
+                    if (side == 3 && str_eq(screen.soft_right_act, "power_cancel") && !nav[0])
                         cancel_power_menu(&screen, &gfx, &input, nav, sizeof(nav));
-                } else if (screen_focus_at(&screen, ev.x, ev.y) >= 0) {
+                    else if (side == 3 && !nav[0] && !g_host.in_app) {
+                        if (strstr(screen.path, "idle.xml"))
+                            nav[0] = 0;
+                        else if (strstr(screen.path, "home.xml"))
+                            str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
+                        else if (!strstr(screen.path, "boot.xml") && !strstr(screen.path, "shutdown.xml"))
+                            str_copy(nav, sizeof(nav), "assets/screens/home.xml");
+                    }
+                } else if (tr == 2) {
+                    arc = activate_focus(&screen, &gfx, nav, sizeof(nav));
+                    apply_power_result(arc, &screen, &gfx, &input);
+                    apphost_update_softkeys(&g_host, &screen);
+                }
+                break;
+            }
+            case IE_TOUCH_DOWN:
+            case IE_TOUCH_MOVE:
+            case IE_TOUCH_UP: {
+                char tap_nav[MAX_PATH];
+                tap_nav[0] = 0;
+                int tr = screen_handle_touch(&screen, &gfx, &input, &ev, tap_nav, sizeof(tap_nav));
+                if (ev.kind == IE_TOUCH_UP && tr >= 11 && tr <= 13) {
+                    int side = tr - 10;
+                    arc = run_soft(&screen, &gfx, side, tap_nav, nav, sizeof(nav));
+                    if (apply_power_result(arc, &screen, &gfx, &input))
+                        break;
+                    if (side == 3 && str_eq(screen.soft_right_act, "power_cancel") && !nav[0])
+                        cancel_power_menu(&screen, &gfx, &input, nav, sizeof(nav));
+                    else if (side == 3 && !nav[0] && !g_host.in_app) {
+                        if (strstr(screen.path, "idle.xml"))
+                            nav[0] = 0;
+                        else if (strstr(screen.path, "home.xml"))
+                            str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
+                        else if (!strstr(screen.path, "boot.xml") && !strstr(screen.path, "shutdown.xml"))
+                            str_copy(nav, sizeof(nav), "assets/screens/home.xml");
+                    }
+                } else if (ev.kind == IE_TOUCH_UP && tr == 2) {
                     arc = activate_focus(&screen, &gfx, nav, sizeof(nav));
                     apply_power_result(arc, &screen, &gfx, &input);
                     apphost_update_softkeys(&g_host, &screen);
@@ -550,6 +588,7 @@ restart_loop:
     }
 
     input_shutdown(&input);
+    procman_shutdown(&g_procman);
     gfx_shutdown(&gfx);
     return 0;
 }

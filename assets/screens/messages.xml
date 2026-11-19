@@ -1,18 +1,19 @@
 <?xml version="1.0"?>
-<screen id="messages" bg="#F5EFE6">
+<screen id="messages" background="#F5EFE6">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Messages" fg="#1C1917" w="100%" h="auto"/>
-    <list id="inbox" w="100%" h="auto" bg="#EAE0D0">
-      <button id="m1" text="Mom  Call me later" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
-      <button id="m2" text="Work  Meeting at 3" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
-      <button id="m3" text="Sam  Lunch tomorrow?" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-      <button id="m4" text="Ada  Designs look great" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+  <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
+    <label id="title" text="Messages" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="16" font-weight="700"/>
+    <label id="sec_inbox" text="Inbox" color="#57534E" width="100%" height="22" font-family="DM Sans" font-size="13" font-weight="600"/>
+    <list id="inbox" width="100%" height="fill" grow="1" min-height="120" padding="4" gap="4" radius="8" background="#EAE0D0" border-width="1" border-color="#D4C5B0" overflow="scroll">
+      <button id="m1" text="Mom Call me later" action="route:push:res/layout/thread.xml" background="#EAE0D0" color="#1C1917" value="50" radius="10" height="48" component="message_row" font-family="Inter" font-size="12"/>
+      <button id="m2" text="Work Meeting at 3" action="route:push:res/layout/thread.xml" background="#EAE0D0" color="#1C1917" value="50" radius="10" height="48" component="message_row" font-family="Inter" font-size="12"/>
+      <button id="m3" text="Sam Lunch tomorrow?" action="route:push:res/layout/thread.xml" background="#EAE0D0" color="#1C1917" radius="10" height="48" component="message_row" font-family="Inter" font-size="12"/>
+      <button id="m4" text="Ada Designs look great" action="route:push:res/layout/thread.xml" background="#EAE0D0" color="#1C1917" radius="10" height="48" component="message_row" font-family="Inter" font-size="12"/>
     </list>
-    <button id="newmsg" text="New message" action="nav:assets/screens/compose.xml" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
-  </vbox>
+    <button id="newmsg" text="New message" action="route:push:res/layout/compose.xml" background="#EA580C" color="#FFFFFF" width="100%" height="40" radius="10" font-family="DM Sans" font-weight="700"/>
+  </flex>
   <softkeys left="New" center="Open" right="Back"
-            left_action="nav:assets/screens/compose.xml"
-            center_action="ok"
-            right_action="back"/>
+            left-action="route:push:res/layout/compose.xml"
+            center-action="ok"
+            right-action="route:pop"/>
 </screen>

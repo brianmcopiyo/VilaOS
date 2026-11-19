@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<resources>
+ <color name="preview_bg" value="#EAE0D0"/>
+ <color name="preview_fg" value="#57534E"/>
+</resources>

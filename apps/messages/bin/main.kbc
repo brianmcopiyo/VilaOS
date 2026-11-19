@@ -1,0 +1,57 @@
+on_click send_btn
+  messages.send
+  ui.clear_text msg_input
+end
+
+on_click m1
+  messages.open
+end
+
+on_click m2
+  messages.open
+end
+
+on_click m3
+  messages.open
+end
+
+on_click m4
+  messages.open
+end
+
+on_click c1
+  messages.open
+end
+
+on_click c2
+  messages.open
+end
+
+on_click c3
+  messages.open
+end
+
+on_click c4
+  messages.open
+end
+
+on_click c5
+  messages.open
+end
+
+on_load
+  require ui
+  require messages
+end
+
+on_soft left
+  messages.compose
+end
+
+on_soft center
+  messages.open
+end
+
+on_soft right
+  ui.pop
+end

@@ -22,6 +22,18 @@
 #define UNIT_PX 0
 #define UNIT_PCT 1
 #define UNIT_AUTO 2
+#define UNIT_FILL 3
+
+#define FLEX_COL 0
+#define FLEX_ROW 1
+#define JUSTIFY_START 0
+#define JUSTIFY_CENTER 1
+#define JUSTIFY_END 2
+#define JUSTIFY_BETWEEN 3
+#define ALIGN_START 0
+#define ALIGN_CENTER 1
+#define ALIGN_END 2
+#define ALIGN_STRETCH 3
 
 #define RGB565(r, g, b) ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | (((b) & 0xF8) >> 3)))
 
@@ -49,7 +61,9 @@ typedef enum {
     W_INPUT,
     W_LIST,
     W_STATUSBAR,
-    W_SOFTKEYS
+    W_SOFTKEYS,
+    W_FLEX,
+    W_COMPONENT
 } WidgetType;
 
 typedef enum {
@@ -75,13 +89,34 @@ struct Widget {
     char text[MAX_TEXT];
     char action[MAX_PATH];
     char icon[MAX_ID];
+    char component[MAX_ID];
+    char font_family[MAX_ID];
+    int16_t font_size;
+    int16_t font_weight;
     int x, y, w, h;
     int sx, sy, sw, sh;
     unsigned xu : 2;
     unsigned yu : 2;
     unsigned wu : 2;
     unsigned hu : 2;
-    uint16_t bg, fg, focus_bg;
+    int16_t margin_t, margin_r, margin_b, margin_l;
+    int16_t pad_t, pad_r, pad_b, pad_l;
+    int16_t gap, row_gap, col_gap;
+    int16_t border, radius;
+    int16_t min_w, min_h, max_w, max_h;
+    int16_t grow, shrink;
+    uint8_t flex_dir;
+    uint8_t justify;
+    uint8_t align;
+    uint8_t wrap;
+    uint8_t text_align;
+    uint8_t overflow;
+    uint8_t bg_set;
+    uint8_t fg_set;
+    int16_t grid_cols, grid_rows;
+    int16_t col_span, row_span;
+    int16_t meas_w, meas_h;
+    uint16_t bg, fg, focus_bg, border_c;
     int max_len;
     int focusable;
     int focused;
@@ -114,6 +149,7 @@ typedef struct {
     int fb_w, fb_h, fb_bpp, fb_stride;
     int is_xrgb;
     int font_scale;
+    float aspect_ratio;
     int status_h, softkey_h;
     int pad;
     int item_h;

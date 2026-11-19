@@ -56,17 +56,17 @@ static void dirty_expand(DirtyRect *d, int x, int y, int w, int h)
 
 static void gfx_update_metrics(Gfx *g)
 {
-    int short_edge = g->w < g->h ? g->w : g->h;
-    int scale = short_edge / REF_W;
-    if (scale < 1)
-        scale = 1;
-    if (scale > 4)
-        scale = 4;
-    g->font_scale = scale;
-    g->status_h = clamp_i(g->h / 16, 18, 48);
-    g->softkey_h = clamp_i(g->h / 14, 22, 56);
-    g->pad = clamp_i(g->w / 40, 4, 16);
-    g->item_h = clamp_i(g->h / 12, 24, 48);
+    g->font_scale = 1;
+    g->aspect_ratio = (g->h > 0) ? ((float)g->w / (float)g->h) : 1.0f;
+    g->status_h = 24;
+    g->softkey_h = 28;
+    g->pad = 8;
+    g->item_h = 36;
+    if (g->h < 160) {
+        g->status_h = 18;
+        g->softkey_h = 22;
+        g->item_h = 28;
+    }
 }
 
 int gfx_set_size(Gfx *g, int w, int h)

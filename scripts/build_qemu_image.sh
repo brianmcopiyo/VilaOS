@@ -20,16 +20,20 @@ if command -v musl-gcc >/dev/null 2>&1; then
   make musl
   UI_BIN="${ROOT}/vilaos-musl"
   PKG_BIN="${ROOT}/vilaos-pkg-musl"
+  MUSIC_BIN="${ROOT}/vilaos-musicd-musl"
 else
   make clean
-  make CFLAGS="-std=c11 -O2 -Wall -Wextra" LDFLAGS="" LIBS="-lm -ldl -lpthread" APP=vilaos-static PKG_APP=vilaos-pkg-static all
+  make CFLAGS="-std=c11 -O2 -Wall -Wextra" LDFLAGS="" LIBS="-lm -ldl -lpthread" APP=vilaos-static PKG_APP=vilaos-pkg-static MUSICD=vilaos-musicd-static all
   UI_BIN="${ROOT}/vilaos-static"
   PKG_BIN="${ROOT}/vilaos-pkg-static"
+  MUSIC_BIN="${ROOT}/vilaos-musicd-static"
 fi
 test -x "${UI_BIN}"
 test -x "${PKG_BIN}"
+test -x "${MUSIC_BIN}"
 strip --strip-unneeded "${UI_BIN}" 2>/dev/null || true
 strip --strip-unneeded "${PKG_BIN}" 2>/dev/null || true
+strip --strip-unneeded "${MUSIC_BIN}" 2>/dev/null || true
 bash "${ROOT}/scripts/pack_apps.sh" || true
 bash "${ROOT}/scripts/pack_gfx_driver.sh" || true
 
@@ -154,6 +158,10 @@ configure_kernel_tiny() {
   $cfg --enable CONFIG_INPUT_EVDEV
   $cfg --enable CONFIG_INPUT_KEYBOARD
   $cfg --enable CONFIG_INPUT_MOUSE
+  $cfg --enable CONFIG_INPUT_TABLET || true
+  $cfg --enable CONFIG_TABLET_USB_WACOM || true
+  $cfg --enable CONFIG_INPUT_TOUCHSCREEN || true
+  $cfg --enable CONFIG_TOUCHSCREEN_USB_COMPOSITE || true
   $cfg --enable CONFIG_SERIO
   $cfg --enable CONFIG_SERIO_I8042
   $cfg --enable CONFIG_SERIO_LIBPS2
@@ -195,15 +203,15 @@ configure_kernel_tiny() {
   $cfg --disable CONFIG_DRM_FBDEV_EMULATION || true
   $cfg --disable CONFIG_SOUND || true
   $cfg --disable CONFIG_SND || true
-  $cfg --disable CONFIG_NET || true
+  $cfg --enable CONFIG_NET || true
+  $cfg --enable CONFIG_UNIX || true
+  $cfg --disable CONFIG_INET || true
+  $cfg --disable CONFIG_PACKET || true
   $cfg --disable CONFIG_NETDEVICES || true
   $cfg --disable CONFIG_WIRELESS || true
   $cfg --disable CONFIG_WLAN || true
   $cfg --disable CONFIG_BT || true
   $cfg --disable CONFIG_IPV6 || true
-  $cfg --disable CONFIG_INET || true
-  $cfg --disable CONFIG_PACKET || true
-  $cfg --disable CONFIG_UNIX || true
   $cfg --disable CONFIG_SECURITY || true
   $cfg --disable CONFIG_SECURITY_SELINUX || true
   $cfg --disable CONFIG_IMA || true
@@ -236,8 +244,6 @@ configure_kernel_tiny() {
   $cfg --disable CONFIG_WLAN || true
   $cfg --disable CONFIG_RFKILL || true
   $cfg --disable CONFIG_INPUT_JOYSTICK || true
-  $cfg --disable CONFIG_INPUT_TABLET || true
-  $cfg --disable CONFIG_INPUT_TOUCHSCREEN || true
   $cfg --disable CONFIG_INPUT_MISC || true
   $cfg --disable CONFIG_MEDIA_SUPPORT || true
   $cfg --disable CONFIG_VIDEO_DEV || true
@@ -271,17 +277,20 @@ ls -lh "${BUILD}/bzImage"
 
 echo "==> Assembling rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,assets/screens,apps,data/apps,var/lib/vilaos,packages,drivers/gfx}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,apps,data/apps,var/lib/vilaos,packages,drivers/gfx}
 cp -f "${BUILD}/busybox" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
 done
 cp -f "${UI_BIN}" "${ROOTFS}/bin/vilaos"
 cp -f "${PKG_BIN}" "${ROOTFS}/bin/vilaos-pkg"
-chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
+cp -f "${MUSIC_BIN}" "${ROOTFS}/bin/vilaos-musicd"
+chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg" "${ROOTFS}/bin/vilaos-musicd"
 install_musl_runtime "${ROOTFS}"
 install_gfx_drivers "${ROOTFS}"
 cp -a "${ROOT}/assets/screens/." "${ROOTFS}/assets/screens/"
+if [[ -d "${ROOT}/assets/values" ]]; then cp -a "${ROOT}/assets/values/." "${ROOTFS}/assets/values/"; fi
+if [[ -d "${ROOT}/assets/components" ]]; then cp -a "${ROOT}/assets/components/." "${ROOTFS}/assets/components/"; fi
 cp -a "${ROOT}/apps/." "${ROOTFS}/apps/"
 if [[ -d "${ROOT}/build/packages" ]]; then
   cp -a "${ROOT}/build/packages/." "${ROOTFS}/packages/" || true
@@ -297,7 +306,9 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib /run/vilaos
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mkdir -p /run/vilaos
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 export LD_LIBRARY_PATH=/lib:/drivers/gfx/builtin

@@ -30,6 +30,19 @@ $cfg --enable CONFIG_ACPI_FAN || true
 $cfg --enable CONFIG_ACPI_PROCESSOR || true
 $cfg --enable CONFIG_ACPI_THERMAL || true
 $cfg --enable CONFIG_X86_ACPI_CPUFREQ || true
+$cfg --enable CONFIG_NET || true
+$cfg --enable CONFIG_UNIX || true
+$cfg --enable CONFIG_INPUT_TABLET || true
+$cfg --enable CONFIG_INPUT_TOUCHSCREEN || true
+$cfg --enable CONFIG_HID_MULTITOUCH || true
+$cfg --enable CONFIG_TABLET_USB_WACOM || true
+$cfg --disable CONFIG_INET || true
+$cfg --disable CONFIG_PACKET || true
+$cfg --disable CONFIG_NETDEVICES || true
+$cfg --disable CONFIG_WIRELESS || true
+$cfg --disable CONFIG_WLAN || true
+$cfg --disable CONFIG_BT || true
+$cfg --disable CONFIG_IPV6 || true
 
 make olddefconfig
 make -j"$(nproc)" bzImage
@@ -38,5 +51,5 @@ cp -f arch/x86/boot/bzImage "${VILA_BUILD}/bzImage"
 cp -f arch/x86/boot/bzImage "${OLD_BUILD}/bzImage"
 cp -f arch/x86/boot/bzImage "${HOST}/build/bzImage"
 ls -lh "${HOST}/build/bzImage"
-grep -E '^CONFIG_ACPI|^CONFIG_PM' .config | head -20
-echo "kernel ready with ACPI/PM"
+grep -E '^CONFIG_ACPI|^CONFIG_PM|^CONFIG_NET|^CONFIG_UNIX' .config | head -30
+echo "kernel ready with ACPI/PM/UNIX"

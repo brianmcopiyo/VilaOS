@@ -1,7 +1,8 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <app id="dialer" name="Dialer" version="1.0.0" version_code="1" icon="dialer">
-  <summary text="Keypad and call history"/>
-  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
-  <capability name="telephony"/>
-  <capability name="contacts"/>
+ <summary text="Keypad and call history"/>
+ <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="telephony"/>
+ <capability name="contacts"/>
 </app>

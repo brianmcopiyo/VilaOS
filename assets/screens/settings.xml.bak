@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<screen id="settings" background="#F5EFE6">
+ <statusbar id="status"/>
+ <vbox id="body" x="0%" y="auto" width="100%" height="auto">
+ <label id="title" text="Settings" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_display" text="Display" color="#57534E" width="100%" height="auto"/>
+ <button id="toggle_text" text="Large text: Off" action="toggle_text" background="#EAE0D0" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_input" text="Input and keypad" color="#57534E" width="100%" height="auto"/>
+ <label id="input_help" text="T9, 123, and QWERTY supported" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_sound" text="Sound and profiles" color="#57534E" width="100%" height="auto"/>
+ <button id="toggle_sound" text="Sound: On" action="toggle_sound" background="#EAE0D0" color="#1C1917" width="100%" height="auto"/>
+ <button id="toggle_vibrate" text="Vibrate: On" action="toggle_vibrate" background="#EAE0D0" color="#1C1917" width="100%" height="auto"/>
+ <button id="toggle_profile" text="Profile: General" action="cycle_profile" background="#EAE0D0" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_time" text="Date and time" color="#57534E" width="100%" height="auto"/>
+ <label id="time_help" text="Uses device clock automatically" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_power" text="Power" color="#57534E" width="100%" height="auto"/>
+ <button id="btn_power" text="Power menu" action="power_menu" background="#EAE0D0" color="#1C1917" width="100%" height="auto"/>
+ <label id="sec_about" text="About VilaOS" color="#57534E" width="100%" height="auto"/>
+ <label id="about1" text="VilaOS Feature Phone" color="#1C1917" width="100%" height="auto"/>
+ <label id="about2" text="Version 1.0" color="#57534E" width="100%" height="auto"/>
+ </vbox>
+ <softkeys left="Toggle" center="OK" right="Back"
+ left-action="ok" center-action="ok" right-action="back"/>
+</screen>

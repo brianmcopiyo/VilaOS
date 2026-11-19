@@ -128,6 +128,44 @@ static void expand16(const uint8_t *src12, uint8_t out16[16])
     out16[15] = 0;
 }
 
+static int use_tt(const FontStyle *style)
+{
+    return font_system_ready() && style && font_tt_available(style->face, style->weight);
+}
+
+FontStyle font_style_from_id(Gfx *g, FontId id)
+{
+    int s = (g && g->font_scale > 0) ? g->font_scale : 1;
+    FontFace face = FONT_FACE_UI;
+    int size = 12;
+    int weight = 400;
+    switch (id) {
+    case FONT_8X16:
+        size = 16 * s;
+        face = FONT_FACE_MONO;
+        break;
+    case FONT_DISPLAY:
+        size = 14 * s;
+        face = FONT_FACE_DISPLAY;
+        weight = 600;
+        break;
+    case FONT_MONO:
+        size = 12 * s;
+        face = FONT_FACE_MONO;
+        break;
+    case FONT_UI:
+        size = 12 * s;
+        face = FONT_FACE_UI;
+        break;
+    case FONT_8X12:
+    default:
+        size = 12 * s;
+        face = FONT_FACE_UI;
+        break;
+    }
+    return font_style_default(face, size, weight);
+}
+
 int font_char_w(FontId id)
 {
     (void)id;
@@ -136,23 +174,74 @@ int font_char_w(FontId id)
 
 int font_char_h(FontId id)
 {
-    return id == FONT_8X16 ? 16 : 12;
+    if (id == FONT_8X16 || id == FONT_DISPLAY)
+        return 16;
+    return 12;
 }
 
 int font_char_w_scaled(Gfx *g, FontId id)
 {
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st)) {
+        int w = font_tt_text_w(&st, "M");
+        return w > 0 ? w : (st.size_px * 3) / 5;
+    }
     int s = (g && g->font_scale > 0) ? g->font_scale : 1;
     return font_char_w(id) * s;
 }
 
 int font_char_h_scaled(Gfx *g, FontId id)
 {
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st))
+        return font_tt_char_h(&st);
     int s = (g && g->font_scale > 0) ? g->font_scale : 1;
     return font_char_h(id) * s;
 }
 
-void font_draw_char(Gfx *g, FontId id, int x, int y, char ch, uint16_t fg, uint16_t bg, int opaque)
+int font_char_h_style(Gfx *g, const FontStyle *style)
 {
+    (void)g;
+    if (use_tt(style))
+        return font_tt_char_h(style);
+    return style && style->size_px > 0 ? style->size_px : 12;
+}
+
+int font_text_w_style(Gfx *g, const FontStyle *style, const char *text)
+{
+    if (use_tt(style))
+        return font_tt_text_w(style, text);
+    return font_text_w_scaled(g, FONT_8X12, text);
+}
+
+void font_draw_text_style(Gfx *g, const FontStyle *style, int x, int y, const char *text,
+                          uint16_t fg, uint16_t bg, int opaque)
+{
+    if (use_tt(style)) {
+        font_tt_draw_text(g, style, x, y, text, fg, bg, opaque);
+        return;
+    }
+    font_draw_text(g, FONT_8X12, x, y, text, fg, bg, opaque);
+}
+
+void font_draw_text_style_clip(Gfx *g, const FontStyle *style, int x, int y, int max_w, const char *text,
+                               uint16_t fg, uint16_t bg, int opaque)
+{
+    if (use_tt(style)) {
+        font_tt_draw_text_clip(g, style, x, y, max_w, text, fg, bg, opaque);
+        return;
+    }
+    font_draw_text_clip(g, FONT_8X12, x, y, max_w, text, fg, bg, opaque);
+}
+
+void font_draw_char_aa(Gfx *g, FontId id, int x, int y, char ch, uint16_t fg)
+{
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st)) {
+        char buf[2] = {ch, 0};
+        font_tt_draw_text(g, &st, x, y, buf, fg, 0, 0);
+        return;
+    }
     const uint8_t *rows = glyph12(ch);
     uint8_t tmp[16];
     int h = 12;
@@ -162,25 +251,87 @@ void font_draw_char(Gfx *g, FontId id, int x, int y, char ch, uint16_t fg, uint1
         rows = tmp;
         h = 16;
     }
+    if (s <= 1) {
+        for (int row = 0; row < h; row++) {
+            uint8_t bits = rows[row];
+            for (int col = 0; col < 8; col++) {
+                if (bits & (0x80 >> col))
+                    draw_pixel(g, x + col, y + row, fg);
+            }
+        }
+        gfx_dirty(g, x, y, 8, h);
+        return;
+    }
+    for (int dy = 0; dy < h * s; dy++) {
+        for (int dx = 0; dx < 8 * s; dx++) {
+            int cover = 0;
+            int samples = 0;
+            for (int sy = 0; sy < 2; sy++) {
+                for (int sx = 0; sx < 2; sx++) {
+                    float fx = ((float)dx + (sx ? 0.75f : 0.25f)) / (float)s;
+                    float fy = ((float)dy + (sy ? 0.75f : 0.25f)) / (float)s;
+                    int col = (int)fx;
+                    int row = (int)fy;
+                    samples++;
+                    if (col < 0 || col >= 8 || row < 0 || row >= h)
+                        continue;
+                    if (rows[row] & (0x80 >> col))
+                        cover += 255;
+                }
+            }
+            if (cover <= 0)
+                continue;
+            uint8_t a = (uint8_t)(cover / samples);
+            if (a >= 250)
+                draw_pixel(g, x + dx, y + dy, fg);
+            else
+                draw_pixel_aa(g, x + dx, y + dy, fg, a);
+        }
+    }
+    gfx_dirty(g, x, y, 8 * s, h * s);
+}
+
+void font_draw_char(Gfx *g, FontId id, int x, int y, char ch, uint16_t fg, uint16_t bg, int opaque)
+{
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st)) {
+        char buf[2] = {ch, 0};
+        font_tt_draw_text(g, &st, x, y, buf, fg, bg, opaque);
+        return;
+    }
+    int s = (g && g->font_scale > 0) ? g->font_scale : 1;
+    int h = (id == FONT_8X16) ? 16 : 12;
+    if (s >= 2) {
+        if (opaque)
+            draw_fill(g, x, y, 8 * s, h * s, bg);
+        font_draw_char_aa(g, id, x, y, ch, fg);
+        return;
+    }
+    const uint8_t *rows = glyph12(ch);
+    uint8_t tmp[16];
+    if (id == FONT_8X16) {
+        expand16(rows, tmp);
+        rows = tmp;
+    }
     for (int row = 0; row < h; row++) {
         uint8_t bits = rows[row];
         for (int col = 0; col < 8; col++) {
             int on = bits & (0x80 >> col);
             if (!on && !opaque)
                 continue;
-            uint16_t c = on ? fg : bg;
-            if (s <= 1)
-                draw_pixel(g, x + col, y + row, c);
-            else
-                draw_fill(g, x + col * s, y + row * s, s, s, c);
+            draw_pixel(g, x + col, y + row, on ? fg : bg);
         }
     }
-    if (s <= 1)
-        gfx_dirty(g, x, y, 8, h);
+    gfx_dirty(g, x, y, 8, h);
 }
 
 void font_draw_text(Gfx *g, FontId id, int x, int y, const char *text, uint16_t fg, uint16_t bg, int opaque)
 {
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st)) {
+        font_tt_draw_text(g, &st, x, y, text, fg, bg, opaque);
+        return;
+    }
     if (!text)
         return;
     int cw = font_char_w_scaled(g, id);
@@ -208,29 +359,65 @@ void font_draw_text(Gfx *g, FontId id, int x, int y, const char *text, uint16_t 
 
 void font_draw_text_clip(Gfx *g, FontId id, int x, int y, int max_w, const char *text, uint16_t fg, uint16_t bg, int opaque)
 {
-    int cw = font_char_w_scaled(g, id);
-    if (!text || max_w < cw)
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st)) {
+        font_tt_draw_text_clip(g, &st, x, y, max_w, text, fg, bg, opaque);
         return;
+    }
+    int cw = font_char_w_scaled(g, id);
+    if (!g || !text || max_w < cw || x >= g->w)
+        return;
+    if (x < 0) {
+        max_w += x;
+        x = 0;
+    }
+    if (x + max_w > g->w)
+        max_w = g->w - x;
+    if (max_w < cw)
+        return;
+
+    int full_w = font_text_w_scaled(g, id, text);
+    int need_ellipsis = full_w > max_w;
+    int budget = max_w;
+    if (need_ellipsis) {
+        int dots = cw * 3;
+        if (dots >= max_w) {
+            int cx = x;
+            for (int i = 0; i < 3 && cx + cw <= x + max_w; i++) {
+                font_draw_char(g, id, cx, y, '.', fg, bg, opaque);
+                cx += cw;
+            }
+            return;
+        }
+        budget = max_w - dots;
+    }
+
     int cx = x;
-    int max_x = x + max_w;
-    while (*text && cx + cw <= max_x) {
-        unsigned char c = (unsigned char)*text;
+    const char *p = text;
+    while (*p && cx + cw <= x + budget) {
+        unsigned char c = (unsigned char)*p;
         if (c >= 0xC0) {
             font_draw_char(g, id, cx, y, '?', fg, bg, opaque);
             if ((c & 0xE0) == 0xC0)
-                text += 2;
+                p += 2;
             else if ((c & 0xF0) == 0xE0)
-                text += 3;
+                p += 3;
             else if ((c & 0xF8) == 0xF0)
-                text += 4;
+                p += 4;
             else
-                text++;
+                p++;
             cx += cw;
             continue;
         }
         font_draw_char(g, id, cx, y, (char)c, fg, bg, opaque);
         cx += cw;
-        text++;
+        p++;
+    }
+    if (need_ellipsis) {
+        for (int i = 0; i < 3 && cx + cw <= x + max_w; i++) {
+            font_draw_char(g, id, cx, y, '.', fg, bg, opaque);
+            cx += cw;
+        }
     }
 }
 
@@ -262,6 +449,9 @@ int font_text_w(FontId id, const char *text)
 
 int font_text_w_scaled(Gfx *g, FontId id, const char *text)
 {
+    FontStyle st = font_style_from_id(g, id);
+    if (use_tt(&st))
+        return font_tt_text_w(&st, text);
     int s = (g && g->font_scale > 0) ? g->font_scale : 1;
     return font_text_w(id, text) * s;
 }

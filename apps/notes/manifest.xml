@@ -1,6 +1,7 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <app id="notes" name="Notes" version="1.0.0" version_code="1" icon="notes">
-  <summary text="Offline text memos"/>
-  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
-  <capability name="storage"/>
+ <summary text="Offline text memos"/>
+ <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="storage.app"/>
 </app>

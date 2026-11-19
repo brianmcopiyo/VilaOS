@@ -57,7 +57,7 @@ end
 on_click d9
   digit 9
 end
-on_click dstar
+on_click dsta
   digit *
 end
 on_click dhash
@@ -68,12 +68,12 @@ on_soft left
   action call
 end
 
-on_soft center
+on_soft cente
   action call
 end
 
 on_soft right
-  action clear
+  action clea
 end
 EOF
 
@@ -171,10 +171,10 @@ on_load
 end
 
 on_soft left
-  action calc:clear
+  action calc:clea
 end
 
-on_soft center
+on_soft cente
   action calc:eq
 end
 

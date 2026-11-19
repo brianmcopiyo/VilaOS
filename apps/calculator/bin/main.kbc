@@ -1,0 +1,16 @@
+on_load
+  require ui
+  require system.device
+end
+
+on_soft left
+  action calc:clear
+end
+
+on_soft center
+  action calc:eq
+end
+
+on_soft right
+  ui.pop
+end

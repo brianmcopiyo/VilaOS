@@ -1,0 +1,20 @@
+on_number *
+  telephony.digit $key
+end
+
+on_load
+  require ui
+  require telephony
+end
+
+on_soft left
+  telephony.call
+end
+
+on_soft center
+  telephony.call
+end
+
+on_soft right
+  telephony.clear
+end

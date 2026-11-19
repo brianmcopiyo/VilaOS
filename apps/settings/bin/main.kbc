@@ -1,0 +1,15 @@
+on_load
+  require ui
+  require system.device
+  system.device.info about2
+  system.locale time_help
+  system.theme about1
+end
+
+on_soft left
+  system.power.menu
+end
+
+on_soft right
+  ui.pop
+end

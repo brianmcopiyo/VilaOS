@@ -1,6 +1,7 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <app id="calculator" name="Calculator" version="1.0.0" version_code="1" icon="calculator">
-  <summary text="Basic and scientific keypad math"/>
-  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
-  <capability name="display"/>
+ <summary text="Basic and scientific keypad math"/>
+ <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="system.device"/>
 </app>

@@ -88,7 +88,21 @@ static int load_layout(AppHost *h, Screen *s, Gfx *g, const PkgApp *app, const c
     char rel[MAX_PATH];
     normalize_layout_rel(screen_rel && screen_rel[0] ? screen_rel : app->entry_screen, rel, sizeof(rel));
     snprintf(ui, sizeof(ui), "%s/%s/%s", PKG_APPS_ROOT, app->id, rel);
-    snprintf(script, sizeof(script), "%s/%s/%s", PKG_APPS_ROOT, app->id, app->entry_script);
+    snprintf(script, sizeof(script), "%s/%s/%s", PKG_APPS_ROOT, app->id,
+             app->entry_script[0] ? app->entry_script : "bin/main.kbc");
+    {
+        FILE *probe = fopen(script, "r");
+        if (!probe) {
+            snprintf(script, sizeof(script), "%s/%s/bin/main.kbc", PKG_APPS_ROOT, app->id);
+            probe = fopen(script, "r");
+        }
+        if (!probe) {
+            snprintf(script, sizeof(script), "%s/%s/src/main.kt", PKG_APPS_ROOT, app->id);
+            probe = fopen(script, "r");
+        }
+        if (probe)
+            fclose(probe);
+    }
     if (screen_load(s, ui) != 0) {
         char fallback[MAX_PATH];
         snprintf(fallback, sizeof(fallback), "assets/screens/%s.xml", app->id);
@@ -115,7 +129,8 @@ static int softkey_clearable_input(const Widget *w)
 {
     if (!w || w->type != W_INPUT)
         return 0;
-    return str_eq(w->id, "number") || str_eq(w->id, "note") || str_eq(w->id, "msg");
+    return str_eq(w->id, "number") || str_eq(w->id, "note") || str_eq(w->id, "msg") ||
+           str_eq(w->id, "msg_input");
 }
 
 void apphost_update_softkeys(AppHost *h, Screen *s)
@@ -161,7 +176,7 @@ int apphost_open_app(AppHost *h, Screen *s, Gfx *g, const char *id)
             str_copy(app.id, sizeof(app.id), id);
             str_copy(app.name, sizeof(app.name), id);
             str_copy(app.entry_screen, sizeof(app.entry_screen), "res/layout/main.xml");
-            str_copy(app.entry_script, sizeof(app.entry_script), "src/main.vsl");
+            str_copy(app.entry_script, sizeof(app.entry_script), "bin/main.kbc");
             str_copy(app.icon, sizeof(app.icon), id);
         }
     }
@@ -325,9 +340,43 @@ int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, cha
         return 1;
     }
 
+    if (str_starts(action, "key:")) {
+        const char *key = action + 4;
+        char taken[MAX_PATH];
+        taken[0] = 0;
+        int handled = 0;
+        if (h->in_app)
+            handled = apphost_fire_event(h, "number", key);
+        if (!handled) {
+            char dig_act[16];
+            snprintf(dig_act, sizeof(dig_act), "digit:%s", key);
+            int rc = screen_handle_action(s, dig_act, taken, sizeof(taken));
+            if (rc == 1 && taken[0])
+                return apphost_handle_action(h, s, g, taken, out_nav, out_sz);
+        }
+        if (vsl_consume_nav(&h->vsl, taken, sizeof(taken)))
+            return apphost_handle_action(h, s, g, taken, out_nav, out_sz);
+        apphost_update_softkeys(h, s);
+        if (out_nav)
+            out_nav[0] = 0;
+        return 2;
+    }
+
+    if (h->in_app && apphost_fire_event(h, "action", action) > 0) {
+        char taken[MAX_PATH];
+        if (vsl_consume_nav(&h->vsl, taken, sizeof(taken)))
+            return apphost_handle_action(h, s, g, taken, out_nav, out_sz);
+        apphost_update_softkeys(h, s);
+        if (out_nav)
+            out_nav[0] = 0;
+        return 2;
+    }
+
     if (h->in_app && s && s->focus >= 0) {
         Widget *w = &s->widgets[s->focus];
         if (str_eq(action, "ok") || str_eq(action, "select")) {
+            if (w->action[0] && str_starts(w->action, "key:"))
+                return apphost_handle_action(h, s, g, w->action, out_nav, out_sz);
             apphost_fire_event(h, "click", w->id);
             char taken[MAX_PATH];
             if (vsl_consume_nav(&h->vsl, taken, sizeof(taken)))

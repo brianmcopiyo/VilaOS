@@ -132,13 +132,23 @@ void compose_begin(Composer *c)
 
 void compose_set_clip(Composer *c, int x, int y, int w, int h)
 {
-    if (!c || c->clip_depth >= COMPOSE_MAX_CLIP)
+    if (!c)
         return;
-    Rect *r = &c->clip[c->clip_depth++];
+    if (c->clip_depth <= 0)
+        c->clip_depth = 1;
+    Rect *r = &c->clip[0];
     r->x = x;
     r->y = y;
     r->w = w;
     r->h = h;
+}
+
+static int clip_active(const Composer *c, Rect *out)
+{
+    if (!c || c->clip_depth <= 0 || !out)
+        return 0;
+    *out = c->clip[0];
+    return out->w > 0 && out->h > 0;
 }
 
 void compose_dirty(Composer *c, int x, int y, int w, int h)
@@ -242,6 +252,11 @@ static void put_px(Composer *c, int x, int y, uint32_t argb)
 {
     if (!c || !c->px || x < 0 || y < 0 || x >= c->w || y >= c->h)
         return;
+    Rect clip;
+    if (clip_active(c, &clip)) {
+        if (x < clip.x || y < clip.y || x >= clip.x + clip.w || y >= clip.y + clip.h)
+            return;
+    }
     uint32_t *p = &c->px[y * c->stride + x];
     *p = compose_blend(*p, argb);
 }
@@ -262,6 +277,21 @@ static void fill_rect_imm(Composer *c, int x, int y, int w, int h, uint32_t argb
         w = c->w - x;
     if (y + h > c->h)
         h = c->h - y;
+    Rect clip;
+    if (clip_active(c, &clip)) {
+        int x1 = x + w;
+        int y1 = y + h;
+        if (x < clip.x)
+            x = clip.x;
+        if (y < clip.y)
+            y = clip.y;
+        if (x1 > clip.x + clip.w)
+            x1 = clip.x + clip.w;
+        if (y1 > clip.y + clip.h)
+            y1 = clip.y + clip.h;
+        w = x1 - x;
+        h = y1 - y;
+    }
     if (w <= 0 || h <= 0)
         return;
     uint32_t sa = (argb >> 24) & 0xFF;
@@ -290,6 +320,24 @@ static float cover_circle(float px, float py, float cx, float cy, float r)
     return (dist + 1.0f) * 0.5f;
 }
 
+static void corner_cov(Composer *c, int x, int y, float cx, float cy, float fr, float inner_r, uint32_t argb, int fill)
+{
+    uint32_t base_a = (argb >> 24) & 0xFF;
+    float cov = cover_circle((float)x + 0.5f, (float)y + 0.5f, cx, cy, fr);
+    if (!fill) {
+        float inner = cover_circle((float)x + 0.5f, (float)y + 0.5f, cx, cy, inner_r);
+        cov = cov - inner;
+        if (cov < 0.0f)
+            cov = 0.0f;
+    }
+    if (cov <= 0.01f)
+        return;
+    uint32_t a = (uint32_t)((float)base_a * cov);
+    if (a > 255)
+        a = 255;
+    put_px(c, x, y, (argb & 0x00FFFFFFu) | (a << 24));
+}
+
 static void round_rect_imm(Composer *c, int x, int y, int w, int h, int r, uint32_t argb, int fill)
 {
     if (!c || w <= 0 || h <= 0)
@@ -312,36 +360,30 @@ static void round_rect_imm(Composer *c, int x, int y, int w, int h, int r, uint3
         return;
     }
     float fr = (float)r;
-    uint32_t base_a = (argb >> 24) & 0xFF;
+    float inner_r = fr - 1.15f;
+    if (inner_r < 0.5f)
+        inner_r = 0.5f;
     if (fill) {
         fill_rect_imm(c, x + r, y, w - 2 * r, h, argb);
         fill_rect_imm(c, x, y + r, r, h - 2 * r, argb);
         fill_rect_imm(c, x + w - r, y + r, r, h - 2 * r, argb);
-    }
-    for (int py = 0; py < r; py++) {
-        for (int px = 0; px < r; px++) {
-            float cov = cover_circle((float)px + 0.5f, (float)py + 0.5f, fr - 0.5f, fr - 0.5f, fr);
-            if (!fill) {
-                float inner = cover_circle((float)px + 0.5f, (float)py + 0.5f, fr - 0.5f, fr - 0.5f, fr - 1.2f);
-                cov = cov - inner;
-                if (cov < 0)
-                    cov = 0;
-            }
-            if (cov <= 0.01f)
-                continue;
-            uint32_t a = (uint32_t)(base_a * cov);
-            uint32_t col = (argb & 0x00FFFFFFu) | (a << 24);
-            put_px(c, x + r - 1 - px, y + r - 1 - py, col);
-            put_px(c, x + w - r + px, y + r - 1 - py, col);
-            put_px(c, x + r - 1 - px, y + h - r + py, col);
-            put_px(c, x + w - r + px, y + h - r + py, col);
-        }
-    }
-    if (!fill) {
+    } else {
         fill_rect_imm(c, x + r, y, w - 2 * r, 1, argb);
         fill_rect_imm(c, x + r, y + h - 1, w - 2 * r, 1, argb);
         fill_rect_imm(c, x, y + r, 1, h - 2 * r, argb);
         fill_rect_imm(c, x + w - 1, y + r, 1, h - 2 * r, argb);
+    }
+    float ctlx = (float)(x + r);
+    float ctly = (float)(y + r);
+    float ctrx = (float)(x + w - r);
+    float cbry = (float)(y + h - r);
+    for (int j = 0; j < r; j++) {
+        for (int i = 0; i < r; i++) {
+            corner_cov(c, x + i, y + j, ctlx, ctly, fr, inner_r, argb, fill);
+            corner_cov(c, x + w - 1 - i, y + j, ctrx - 1.0f, ctly, fr, inner_r, argb, fill);
+            corner_cov(c, x + i, y + h - 1 - j, ctlx, cbry - 1.0f, fr, inner_r, argb, fill);
+            corner_cov(c, x + w - 1 - i, y + h - 1 - j, ctrx - 1.0f, cbry - 1.0f, fr, inner_r, argb, fill);
+        }
     }
 }
 

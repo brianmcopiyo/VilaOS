@@ -1,30 +1,12 @@
 <?xml version="1.0"?>
-<screen id="dialer" bg="#F5EFE6">
+<screen id="dialer" class="page">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <input id="number" text="" max_len="24" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-    <label id="contact_match" text="Enter a number" fg="#57534E" w="100%" h="auto"/>
-    <hbox id="row1" w="100%" h="auto">
-      <button id="d1" text="1" action="digit:1" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d2" text="2" action="digit:2" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d3" text="3" action="digit:3" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-    </hbox>
-    <hbox id="row2" w="100%" h="auto">
-      <button id="d4" text="4" action="digit:4" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d5" text="5" action="digit:5" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d6" text="6" action="digit:6" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-    </hbox>
-    <hbox id="row3" w="100%" h="auto">
-      <button id="d7" text="7" action="digit:7" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d8" text="8" action="digit:8" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d9" text="9" action="digit:9" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-    </hbox>
-    <hbox id="row4" w="100%" h="auto">
-      <button id="dstar" text="*" action="digit:*" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="d0" text="0" action="digit:0" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-      <button id="dhash" text="#" action="digit:#" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
-    </hbox>
-  </vbox>
+  <flex id="body" class="col gap-6 p-8" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <input id="number" text="" width="100%" height="44" class="surface" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8" font-family="JetBrains Mono" font-size="16" placeholder="Number"/>
+    <label id="contact_match" text="Enter a number" class="text-secondary" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+    <keypad id="dialpad" width="100%" height="auto"/>
+    <button id="btn_call" variant="primary" text="Call" action="call" width="100%" height="44" border-radius="12" font-family="DM Sans" font-weight="700"/>
+  </flex>
   <softkeys left="Call" center="OK" right="Clear"
-            left_action="call" center_action="call" right_action="clear"/>
+            left-action="call" center-action="call" right-action="clear"/>
 </screen>

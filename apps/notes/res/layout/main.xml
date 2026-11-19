@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
-<screen id="notes" bg="#F5EFE6">
+<screen id="notes" background="#F5EFE6">
   <statusbar id="status"/>
-  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Notes" fg="#1C1917" w="100%" h="auto"/>
-    <label id="mode_badge" text="[T9: abc]" fg="#57534E" w="100%" h="auto"/>
-    <list id="note_list" w="100%" h="30%" bg="#EAE0D0">
-      <button id="n1" text="Shopping list" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-      <button id="n2" text="Ideas" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-      <button id="n3" text="Travel plan" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+  <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
+    <label id="title" text="Notes" color="#1C1917" width="100%" height="wrap"/>
+    <label id="mode_badge" text="T9: abc" value="2" width="auto" height="24" background="#EA580C" color="#FFFFFF" radius="12" component="notification_pill"/>
+    <list id="note_list" width="100%" height="fill" grow="1" min-height="80" padding="4" gap="4" radius="8" background="#EAE0D0" border-width="1" border-color="#D4C5B0">
+      <button id="n1" text="Shopping list" action="none" background="#EAE0D0" color="#1C1917" radius="10" height="40" component="list_row"/>
+      <button id="n2" text="Ideas" action="none" background="#EAE0D0" color="#1C1917" radius="10" height="40" component="list_row"/>
+      <button id="n3" text="Travel plan" action="none" background="#EAE0D0" color="#1C1917" radius="10" height="40" component="list_row"/>
     </list>
-    <input id="note" text="Write a note..." max_len="120" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
-    <label id="note_status" text="Unsaved" fg="#57534E" w="100%" h="auto"/>
-  </vbox>
+    <input id="note" text="Write a note..." width="100%" height="56" background="#EAE0D0" color="#1C1917" radius="10" border-width="1" border-color="#D4C5B0" padding="8"/>
+    <label id="note_status" text="Unsaved" color="#57534E" width="100%" height="wrap"/>
+  </flex>
   <softkeys left="Save" center="OK" right="Back"
-            left_action="save_note" center_action="ok" right_action="route:pop"/>
+            left-action="save_note" center-action="ok" right-action="route:pop"/>
 </screen>

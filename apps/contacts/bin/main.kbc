@@ -1,0 +1,16 @@
+on_load
+  require ui
+  require contacts
+end
+
+on_soft left
+  contacts.call
+end
+
+on_soft center
+  contacts.open
+end
+
+on_soft right
+  ui.pop
+end

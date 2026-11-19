@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<component>
+  <label id="badge" class="pill" text="Status" value="2" width="auto" height="24" padding="4" radius="12"
+         background="#EA580C" color="#FFFFFF" text-align="center" overflow="ellipsis"
+         font-family="Inter" font-size="12" component="notification_pill"/>
+</component>

@@ -1,0 +1,13 @@
+on_load
+  require ui
+  require system.clock
+  clock.now clock_now
+end
+
+on_soft left
+  action sw_start
+end
+
+on_soft right
+  ui.pop
+end

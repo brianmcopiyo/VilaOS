@@ -26,19 +26,30 @@ unsigned pkg_cap_from_name(const char *name)
         return PKG_CAP_MESSAGES;
     if (str_eq(name, "contacts"))
         return PKG_CAP_CONTACTS;
-    if (str_eq(name, "storage"))
+    if (str_eq(name, "storage") || str_eq(name, "storage.app"))
         return PKG_CAP_STORAGE;
-    if (str_eq(name, "clock"))
+    if (str_eq(name, "storage.files"))
+        return PKG_CAP_STORAGE_FILES;
+    if (str_eq(name, "clock") || str_eq(name, "system.clock"))
         return PKG_CAP_CLOCK;
     if (str_eq(name, "display"))
         return PKG_CAP_DISPLAY;
     if (str_eq(name, "network"))
         return PKG_CAP_NETWORK;
+    if (str_eq(name, "audio") || str_eq(name, "media") || str_eq(name, "audio.bg"))
+        return PKG_CAP_AUDIO;
+    if (str_eq(name, "ui"))
+        return PKG_CAP_UI;
+    if (str_eq(name, "system.power"))
+        return PKG_CAP_SYSTEM_POWER;
+    if (str_eq(name, "system.device"))
+        return PKG_CAP_SYSTEM_DEVICE | PKG_CAP_DISPLAY;
     return 0;
 }
 
 typedef struct {
     PkgApp *app;
+    int bad_cap;
 } ManCtx;
 
 static void man_start(const XmlStart *el, void *user)
@@ -70,7 +81,11 @@ static void man_start(const XmlStart *el, void *user)
             str_copy(a->entry_script, sizeof(a->entry_script), script);
     } else if (str_eq(el->tag, "capability")) {
         const char *n = xml_attr(el, "name");
-        a->caps |= pkg_cap_from_name(n);
+        unsigned c = pkg_cap_from_name(n);
+        if (!n || !n[0] || c == 0)
+            ctx->bad_cap = 1;
+        else
+            a->caps |= c;
     } else if (str_eq(el->tag, "summary")) {
         const char *t = xml_attr(el, "text");
         if (t)
@@ -91,9 +106,9 @@ int pkg_parse_manifest(const char *path, PkgApp *out)
         return -1;
     memset(out, 0, sizeof(*out));
     str_copy(out->entry_screen, sizeof(out->entry_screen), "res/layout/main.xml");
-    str_copy(out->entry_script, sizeof(out->entry_script), "src/main.vsl");
+    str_copy(out->entry_script, sizeof(out->entry_script), "bin/main.kbc");
     str_copy(out->version, sizeof(out->version), "0.0.0");
-    ManCtx ctx = {out};
+    ManCtx ctx = {out, 0};
     XmlHandlers h;
     memset(&h, 0, sizeof(h));
     h.on_start = man_start;
@@ -101,7 +116,7 @@ int pkg_parse_manifest(const char *path, PkgApp *out)
     h.user = &ctx;
     if (xml_parse_file(path, &h) != 0)
         return -1;
-    if (!out->id[0])
+    if (!out->id[0] || ctx.bad_cap)
         return -1;
     out->installed = 1;
     return 0;

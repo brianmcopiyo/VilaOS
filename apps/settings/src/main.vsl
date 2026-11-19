@@ -1,7 +1,0 @@
-on_load
-  require display
-end
-
-on_soft right
-  pop_route
-end

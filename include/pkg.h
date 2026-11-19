@@ -4,20 +4,28 @@
 #include "types.h"
 
 #define PKG_MAX_APPS 32
-#define PKG_MAX_CAPS 8
+#define PKG_MAX_CAPS 16
 #define PKG_MAX_VER 16
 #define PKG_ID_LEN 32
 #define PKG_NAME_LEN 48
 #define PKG_APPS_ROOT "/apps"
 #define PKG_DATA_ROOT "/data/apps"
 #define PKG_REG_PATH "/var/lib/vilaos/registry.ini"
-#define PKG_CAP_TELEPHONY (1u << 0)
-#define PKG_CAP_MESSAGES  (1u << 1)
-#define PKG_CAP_CONTACTS  (1u << 2)
-#define PKG_CAP_STORAGE   (1u << 3)
-#define PKG_CAP_CLOCK     (1u << 4)
-#define PKG_CAP_DISPLAY   (1u << 5)
-#define PKG_CAP_NETWORK   (1u << 6)
+#define PKG_CAP_TELEPHONY     (1u << 0)
+#define PKG_CAP_MESSAGES      (1u << 1)
+#define PKG_CAP_CONTACTS      (1u << 2)
+#define PKG_CAP_STORAGE       (1u << 3)
+#define PKG_CAP_CLOCK         (1u << 4)
+#define PKG_CAP_DISPLAY       (1u << 5)
+#define PKG_CAP_NETWORK       (1u << 6)
+#define PKG_CAP_AUDIO         (1u << 7)
+#define PKG_CAP_UI            (1u << 8)
+#define PKG_CAP_STORAGE_FILES (1u << 9)
+#define PKG_CAP_SYSTEM_POWER  (1u << 10)
+#define PKG_CAP_SYSTEM_DEVICE (1u << 11)
+#define PKG_CAP_STORAGE_APP   PKG_CAP_STORAGE
+#define PKG_CAP_AUDIO_BG      PKG_CAP_AUDIO
+#define PKG_CAP_SYSTEM_CLOCK  PKG_CAP_CLOCK
 
 typedef struct {
     char id[PKG_ID_LEN];

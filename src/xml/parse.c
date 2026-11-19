@@ -2,6 +2,7 @@
 #include "util.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -104,8 +105,19 @@ int xml_parse_file(const char *path, const XmlHandlers *h)
     if (!f)
         return -1;
 
-    static char data[65536];
-    size_t n = fread(data, 1, sizeof(data) - 1, f);
+    long size = 0;
+    if (fseek(f, 0, SEEK_END) == 0)
+        size = ftell(f);
+    if (size < 0 || size > 1048576 || fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return -1;
+    }
+    char *data = (char *)malloc((size_t)size + 1);
+    if (!data) {
+        fclose(f);
+        return -1;
+    }
+    size_t n = fread(data, 1, (size_t)size, f);
     fclose(f);
     data[n] = 0;
 
@@ -149,5 +161,6 @@ int xml_parse_file(const char *path, const XmlHandlers *h)
             h->on_start(&el, h->user);
         p = q;
     }
+    free(data);
     return 0;
 }

@@ -104,15 +104,23 @@
 #define KEY_DOT 52
 #define KEY_SLASH 53
 #define BTN_LEFT 0x110
+#define BTN_TOUCH 0x14a
+#define BTN_TOOL_FINGER 0x145
 #define EV_KEY 1
 #define EV_REL 2
 #define EV_ABS 3
+#define EV_SYN 0
+#define SYN_REPORT 0
 #define REL_X 0
 #define REL_Y 1
 #define ABS_X 0x00
 #define ABS_Y 0x01
+#define ABS_MT_SLOT 0x2f
+#define ABS_MT_TOUCH_MAJOR 0x30
 #define ABS_MT_POSITION_X 0x35
 #define ABS_MT_POSITION_Y 0x36
+#define ABS_MT_TRACKING_ID 0x39
+#define ABS_PRESSURE 0x18
 #endif
 #endif
 
@@ -169,6 +177,112 @@ static int device_interesting(int fd)
     return test_evbit(evbits, EV_KEY) || test_evbit(evbits, EV_REL) || test_evbit(evbits, EV_ABS);
 }
 
+static int absinfo_valid(const struct input_absinfo *a)
+{
+    return a && a->maximum > a->minimum;
+}
+
+static void query_abs_caps(int fd, InputDevCaps *c)
+{
+    memset(c, 0, sizeof(*c));
+    unsigned long evbits[(EV_MAX / 8 / sizeof(long)) + 1];
+    unsigned long absbits[(ABS_MAX / 8 / sizeof(long)) + 1];
+    unsigned long keybits[(KEY_MAX / 8 / sizeof(long)) + 1];
+    memset(evbits, 0, sizeof(evbits));
+    memset(absbits, 0, sizeof(absbits));
+    memset(keybits, 0, sizeof(keybits));
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits) < 0)
+        return;
+    if (!test_evbit(evbits, EV_ABS))
+        return;
+    c->has_abs = 1;
+    c->abs_pointer = 1;
+    c->ignore_rel = 1;
+    if (ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbits)), absbits) == 0) {
+        if (test_evbit(absbits, ABS_MT_POSITION_X) || test_evbit(absbits, ABS_MT_SLOT) ||
+            test_evbit(absbits, ABS_MT_TRACKING_ID))
+            c->has_mt = 1;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits) == 0) {
+        if (test_evbit(keybits, BTN_TOUCH) || test_evbit(keybits, BTN_TOOL_FINGER))
+            c->is_touch = 1;
+    }
+    if (c->has_mt || c->is_touch)
+        c->is_touch = 1;
+
+    struct input_absinfo ax, ay, mtx, mty;
+    memset(&ax, 0, sizeof(ax));
+    memset(&ay, 0, sizeof(ay));
+    memset(&mtx, 0, sizeof(mtx));
+    memset(&mty, 0, sizeof(mty));
+    ioctl(fd, EVIOCGABS(ABS_X), &ax);
+    ioctl(fd, EVIOCGABS(ABS_Y), &ay);
+    ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &mtx);
+    ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &mty);
+
+    if (c->has_mt && absinfo_valid(&mtx) && absinfo_valid(&mty)) {
+        c->abs_x_min = mtx.minimum;
+        c->abs_x_max = mtx.maximum;
+        c->abs_y_min = mty.minimum;
+        c->abs_y_max = mty.maximum;
+    } else if (absinfo_valid(&ax) && absinfo_valid(&ay)) {
+        c->abs_x_min = ax.minimum;
+        c->abs_x_max = ax.maximum;
+        c->abs_y_min = ay.minimum;
+        c->abs_y_max = ay.maximum;
+    } else if (absinfo_valid(&mtx) && absinfo_valid(&mty)) {
+        c->abs_x_min = mtx.minimum;
+        c->abs_x_max = mtx.maximum;
+        c->abs_y_min = mty.minimum;
+        c->abs_y_max = mty.maximum;
+        c->has_mt = 1;
+    }
+    if (c->abs_x_max <= c->abs_x_min) {
+        c->abs_x_min = 0;
+        c->abs_x_max = 32767;
+    }
+    if (c->abs_y_max <= c->abs_y_min) {
+        c->abs_y_min = 0;
+        c->abs_y_max = 32767;
+    }
+}
+
+static int map_abs_axis(int raw, int amin, int amax, int screen)
+{
+    if (screen <= 1)
+        return 0;
+    if (amax <= amin)
+        return clamp_i(raw, 0, screen - 1);
+    long long span = (long long)amax - (long long)amin;
+    long long n = ((long long)raw - (long long)amin) * (long long)(screen - 1);
+    n /= span;
+    return clamp_i((int)n, 0, screen - 1);
+}
+
+static void apply_abs_xy(InputMux *m, const InputDevCaps *caps, int bw, int bh)
+{
+    if (!m || !caps)
+        return;
+    if (m->have_x)
+        m->pend_x = map_abs_axis(m->pend_x_raw, caps->abs_x_min, caps->abs_x_max, bw);
+    if (m->have_y)
+        m->pend_y = map_abs_axis(m->pend_y_raw, caps->abs_y_min, caps->abs_y_max, bh);
+    if (m->have_x) {
+        m->touch_x = m->pend_x;
+        m->state.cursor_x = m->touch_x;
+    }
+    if (m->have_y) {
+        m->touch_y = m->pend_y;
+        m->state.cursor_y = m->touch_y;
+    }
+    if (m->cur_slot >= 0 && m->cur_slot < INPUT_MAX_TOUCH_SLOTS) {
+        if (m->have_x)
+            m->slots[m->cur_slot].x = m->pend_x;
+        if (m->have_y)
+            m->slots[m->cur_slot].y = m->pend_y;
+    }
+}
+
 static int add_device(InputMux *m, const char *path)
 {
     if (m->fd_count >= MAX_INPUT_DEVS || m->epfd < 0)
@@ -203,6 +317,7 @@ static int add_device(InputMux *m, const char *path)
         m->grabbed[m->fd_count] = 1;
     else
         m->grabbed[m->fd_count] = 0;
+    query_abs_caps(fd, &m->caps[m->fd_count]);
     m->fds[m->fd_count++] = fd;
     return 0;
 }
@@ -219,6 +334,7 @@ static void remove_fd(InputMux *m, int fd)
         close(fd);
         m->fds[i] = m->fds[m->fd_count - 1];
         m->grabbed[i] = m->grabbed[m->fd_count - 1];
+        m->caps[i] = m->caps[m->fd_count - 1];
         m->fd_count--;
         break;
     }
@@ -367,6 +483,17 @@ void input_set_dialer_mode(InputMux *m, int enabled)
     m->dialer_mode = enabled;
     m->state.last_qwerty = 0;
     t9_reset(&m->t9);
+}
+
+int input_tap_slop(const InputMux *m)
+{
+    int short_edge = 240;
+    if (m) {
+        int w = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
+        int h = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+        short_edge = w < h ? w : h;
+    }
+    return clamp_i(short_edge / 40, 8, 28);
 }
 
 static void show_cursor(InputMux *m)
@@ -828,38 +955,171 @@ int input_poll(InputMux *m, InputEvent *out, int timeout_ms)
             continue;
         }
 
+        int di = -1;
+        for (int d = 0; d < m->fd_count; d++) {
+            if (m->fds[d] == fd) {
+                di = d;
+                break;
+            }
+        }
+        InputDevCaps caps;
+        memset(&caps, 0, sizeof(caps));
+        if (di >= 0)
+            caps = m->caps[di];
+
         struct input_event iev;
         while (read(fd, &iev, sizeof(iev)) == (ssize_t)sizeof(iev)) {
+            int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
+            int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
             if (iev.type == EV_KEY) {
                 if (iev.code == KEY_LEFTSHIFT || iev.code == KEY_RIGHTSHIFT) {
                     if (iev.value == 0)
                         m->state.shift = 0;
                 }
-                if (iev.code == BTN_LEFT && iev.value == 1) {
-                    show_cursor(m);
-                    out->kind = IE_CLICK;
-                    out->x = m->state.cursor_x;
-                    out->y = m->state.cursor_y;
-                    return 1;
+                if (iev.code == BTN_TOUCH || iev.code == BTN_TOOL_FINGER) {
+                    m->btn_touch = iev.value ? 1 : 0;
+                    continue;
+                }
+                if (iev.code == BTN_LEFT) {
+                    if (caps.has_abs || caps.abs_pointer || caps.is_touch || caps.has_mt) {
+                        m->btn_left = iev.value ? 1 : 0;
+                        if (iev.value)
+                            m->btn_touch = 1;
+                        else if (!caps.has_mt)
+                            m->btn_touch = 0;
+                        continue;
+                    }
+                    if (iev.value == 1) {
+                        show_cursor(m);
+                        out->kind = IE_CLICK;
+                        out->x = m->state.cursor_x;
+                        out->y = m->state.cursor_y;
+                        out->id = 0;
+                        return 1;
+                    }
+                    continue;
                 }
                 if (handle_key(m, (int)iev.code, (int)iev.value, out))
                     return 1;
             } else if (iev.type == EV_REL) {
-                int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-                int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+                if (caps.has_abs || caps.ignore_rel || caps.abs_pointer)
+                    continue;
                 if (iev.code == REL_X)
                     m->state.cursor_x = clamp_i(m->state.cursor_x + (int)iev.value, 0, bw - 1);
                 else if (iev.code == REL_Y)
                     m->state.cursor_y = clamp_i(m->state.cursor_y + (int)iev.value, 0, bh - 1);
                 show_cursor(m);
             } else if (iev.type == EV_ABS) {
-                int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-                int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
-                if (iev.code == ABS_X || iev.code == ABS_MT_POSITION_X)
-                    m->state.cursor_x = clamp_i((int)iev.value, 0, bw - 1);
-                else if (iev.code == ABS_Y || iev.code == ABS_MT_POSITION_Y)
-                    m->state.cursor_y = clamp_i((int)iev.value, 0, bh - 1);
-                show_cursor(m);
+                if (iev.code == ABS_MT_SLOT) {
+                    m->cur_slot = clamp_i((int)iev.value, 0, INPUT_MAX_TOUCH_SLOTS - 1);
+                } else if (iev.code == ABS_MT_TRACKING_ID) {
+                    m->mt_tracking = (int)iev.value;
+                    if (m->cur_slot >= 0 && m->cur_slot < INPUT_MAX_TOUCH_SLOTS) {
+                        if (iev.value < 0) {
+                            m->slots[m->cur_slot].active = 0;
+                            m->slots[m->cur_slot].id = -1;
+                        } else {
+                            m->slots[m->cur_slot].active = 1;
+                            m->slots[m->cur_slot].id = (int)iev.value;
+                        }
+                    }
+                    if (iev.value < 0)
+                        m->btn_touch = 0;
+                    else
+                        m->btn_touch = 1;
+                } else if (iev.code == ABS_X || iev.code == ABS_MT_POSITION_X) {
+                    m->pend_x_raw = (int)iev.value;
+                    m->have_x = 1;
+                    if (caps.has_abs)
+                        m->pend_x = map_abs_axis((int)iev.value, caps.abs_x_min, caps.abs_x_max, bw);
+                    else
+                        m->pend_x = clamp_i((int)iev.value, 0, bw - 1);
+                } else if (iev.code == ABS_Y || iev.code == ABS_MT_POSITION_Y) {
+                    m->pend_y_raw = (int)iev.value;
+                    m->have_y = 1;
+                    if (caps.has_abs)
+                        m->pend_y = map_abs_axis((int)iev.value, caps.abs_y_min, caps.abs_y_max, bh);
+                    else
+                        m->pend_y = clamp_i((int)iev.value, 0, bh - 1);
+                } else if (iev.code == ABS_PRESSURE) {
+                    if (iev.value > 0)
+                        m->btn_touch = 1;
+                    else if (!caps.has_mt && !m->btn_left)
+                        m->btn_touch = 0;
+                }
+            } else if (iev.type == EV_SYN && iev.code == SYN_REPORT) {
+                apply_abs_xy(m, &caps, bw, bh);
+                int touching = m->btn_touch || m->btn_left;
+                if (caps.has_mt) {
+                    int mt_on = 0;
+                    for (int s = 0; s < INPUT_MAX_TOUCH_SLOTS; s++) {
+                        if (m->slots[s].active) {
+                            mt_on = 1;
+                            m->touch_id = m->slots[s].id;
+                            if (m->have_x)
+                                m->slots[s].x = m->pend_x;
+                            if (m->have_y)
+                                m->slots[s].y = m->pend_y;
+                            break;
+                        }
+                    }
+                    if (mt_on)
+                        touching = 1;
+                    else if (!m->btn_left && !m->btn_touch)
+                        touching = 0;
+                } else if (touching) {
+                    m->touch_id = 1;
+                }
+                if (caps.is_touch || caps.has_mt || caps.has_abs || caps.abs_pointer) {
+                    if (touching && !m->touch_down) {
+                        m->touch_down = 1;
+                        show_cursor(m);
+                        out->kind = IE_TOUCH_DOWN;
+                        out->x = clamp_i(m->touch_x, 0, bw - 1);
+                        out->y = clamp_i(m->touch_y, 0, bh - 1);
+                        m->touch_x = out->x;
+                        m->touch_y = out->y;
+                        m->state.cursor_x = out->x;
+                        m->state.cursor_y = out->y;
+                        out->id = m->touch_id;
+                        out->slot = m->cur_slot;
+                        m->have_x = m->have_y = 0;
+                        return 1;
+                    }
+                    if (touching && m->touch_down && (m->have_x || m->have_y)) {
+                        show_cursor(m);
+                        out->kind = IE_TOUCH_MOVE;
+                        out->x = clamp_i(m->touch_x, 0, bw - 1);
+                        out->y = clamp_i(m->touch_y, 0, bh - 1);
+                        m->touch_x = out->x;
+                        m->touch_y = out->y;
+                        m->state.cursor_x = out->x;
+                        m->state.cursor_y = out->y;
+                        out->id = m->touch_id;
+                        out->slot = m->cur_slot;
+                        m->have_x = m->have_y = 0;
+                        return 1;
+                    }
+                    if (!touching && m->touch_down) {
+                        m->touch_down = 0;
+                        out->kind = IE_TOUCH_UP;
+                        out->x = clamp_i(m->touch_x, 0, bw - 1);
+                        out->y = clamp_i(m->touch_y, 0, bh - 1);
+                        m->touch_x = out->x;
+                        m->touch_y = out->y;
+                        m->state.cursor_x = out->x;
+                        m->state.cursor_y = out->y;
+                        out->id = m->touch_id;
+                        out->slot = m->cur_slot;
+                        m->have_x = m->have_y = 0;
+                        return 1;
+                    }
+                    if (m->have_x || m->have_y)
+                        show_cursor(m);
+                } else if (m->have_x || m->have_y) {
+                    show_cursor(m);
+                }
+                m->have_x = m->have_y = 0;
             }
         }
         if (errno == ENODEV)

@@ -1,0 +1,13 @@
+on_load
+  require ui
+  require storage.files
+  storage.files.list . file_preview
+end
+
+on_soft left
+  action preview
+end
+
+on_soft right
+  ui.pop
+end

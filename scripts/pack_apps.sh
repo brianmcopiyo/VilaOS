@@ -7,7 +7,7 @@ SDK="${ROOT}/sdk/vilaos-sdk"
 mkdir -p "${OUT}"
 chmod +x "${SDK}" 2>/dev/null || true
 
-for app in dialer messages contacts notes calculator clock files browser settings; do
+for app in dialer messages contacts notes calculator clock files browser settings music; do
   dir="${ROOT}/apps/${app}"
   [[ -d "${dir}" ]] || continue
   bash "${SDK}" validate "${dir}"

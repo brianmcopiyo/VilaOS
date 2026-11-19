@@ -5,7 +5,7 @@ HOST="/mnt/c/Users/HP/Desktop/OS"
 WORK="/root/vilaos-work/src"
 OLD="/root/phoneos-work/src"
 
-find "${HOST}/src" "${HOST}/include" "${HOST}/assets" "${HOST}/apps" "${HOST}/sdk" "${HOST}/scripts" -type f \( -name "*.c" -o -name "*.h" -o -name "*.xml" -o -name "*.sh" -o -name "*.vsl" -o -name "Makefile" -o -name "vilaos-sdk" \) -exec sed -i "s/\r$//" {} + 2>/dev/null || true
+find "${HOST}/src" "${HOST}/include" "${HOST}/assets" "${HOST}/apps" "${HOST}/sdk" "${HOST}/scripts" -type f \( -name "*.c" -o -name "*.h" -o -name "*.xml" -o -name "*.sh" -o -name "*.kt" -o -name "*.kbc" -o -name "Makefile" -o -name "vilaos-sdk" -o -name "ktc" \) -exec sed -i "s/\r$//" {} + 2>/dev/null || true
 
 mkdir -p "${WORK}/build"
 rsync -a --delete \
@@ -39,7 +39,7 @@ ln -sfn /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm
 cd "${WORK}"
 make clean
 make musl
-strip --strip-unneeded vilaos-musl vilaos-pkg-musl
+strip --strip-unneeded vilaos-musl vilaos-pkg-musl vilaos-musicd-musl
 bash scripts/pack_apps.sh
 bash scripts/pack_gfx_driver.sh
 
@@ -81,14 +81,15 @@ install_musl_runtime() {
 
 ROOTFS="${WORK}/build/rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,assets/screens,apps,data/apps,var/lib/vilaos,packages,drivers/gfx/builtin}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,assets/ui,assets/fonts,fonts,res/fonts,sdk/ui,apps,data/apps,var/lib/vilaos,packages,drivers/gfx/builtin}
 cp -f "${BB}" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
 done
 cp -f vilaos-musl "${ROOTFS}/bin/vilaos"
 cp -f vilaos-pkg-musl "${ROOTFS}/bin/vilaos-pkg"
-chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
+cp -f vilaos-musicd-musl "${ROOTFS}/bin/vilaos-musicd"
+chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg" "${ROOTFS}/bin/vilaos-musicd"
 install_musl_runtime "${ROOTFS}"
 echo "builtin" > "${ROOTFS}/drivers/gfx/active"
 cat > "${ROOTFS}/drivers/gfx/builtin/manifest.xml" << EOF
@@ -106,6 +107,13 @@ if [[ -f build/libvilaos_gfx.so ]]; then
   cp -f build/libvilaos_gfx.so "${ROOTFS}/lib/libvilaos_gfx.so"
 fi
 cp -a assets/screens/. "${ROOTFS}/assets/screens/"
+if [[ -d assets/values ]]; then cp -a assets/values/. "${ROOTFS}/assets/values/"; fi
+if [[ -d assets/components ]]; then cp -a assets/components/. "${ROOTFS}/assets/components/"; fi
+if [[ -d assets/ui ]]; then cp -a assets/ui/. "${ROOTFS}/assets/ui/"; fi
+if [[ -d sdk/ui ]]; then cp -a sdk/ui/. "${ROOTFS}/sdk/ui/"; cp -a sdk/ui/. "${ROOTFS}/assets/ui/"; fi
+if [[ -d assets/fonts ]]; then cp -a assets/fonts/. "${ROOTFS}/assets/fonts/"; fi
+if [[ -d fonts ]]; then cp -a fonts/. "${ROOTFS}/fonts/"; cp -a fonts/. "${ROOTFS}/assets/fonts/" 2>/dev/null || true; fi
+if [[ -d res/fonts ]]; then cp -a res/fonts/. "${ROOTFS}/res/fonts/"; fi
 cp -a apps/. "${ROOTFS}/apps/"
 cp -a build/packages/. "${ROOTFS}/packages/" 2>/dev/null || true
 
@@ -119,7 +127,9 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib /run/vilaos
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mkdir -p /run/vilaos
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
 export LD_LIBRARY_PATH=/lib:/drivers/gfx/builtin

@@ -1,0 +1,49 @@
+on_click btn_play
+  audio.play
+  service.status musicd svc_state
+end
+
+on_click btn_pause
+  audio.pause
+  service.status musicd svc_state
+end
+
+on_load
+  require ui
+  require audio.bg
+  service.start musicd
+  service.status musicd svc_state
+  service.cmd musicd STATUS now_playing
+end
+
+on_tick
+  service.status musicd svc_state
+  service.cmd musicd STATUS now_playing
+end
+
+on_action music_play
+  audio.play
+  service.status musicd svc_state
+end
+
+on_action music_pause
+  audio.pause
+  service.status musicd svc_state
+end
+
+on_action music_skip
+  audio.skip
+  service.status musicd svc_state
+end
+
+on_action music_stop_svc
+  audio.stop now_playing svc_state
+end
+
+on_soft left
+  action music_play
+end
+
+on_soft right
+  ui.pop
+end

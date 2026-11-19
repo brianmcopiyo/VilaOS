@@ -95,41 +95,56 @@ static int exec_line(VslRuntime *rt, char *line)
             str_copy(v->value, sizeof(v->value), val);
         return 0;
     }
+    if (strchr(cmd, '.')) {
+        char val1[MAX_TEXT];
+        char val2[MAX_TEXT];
+        const char *arg1 = a1;
+        const char *arg2 = a2;
+        if (a1) {
+            resolve_token(rt, a1, val1, sizeof(val1));
+            arg1 = val1;
+        }
+        if (a2) {
+            resolve_token(rt, a2, val2, sizeof(val2));
+            arg2 = val2;
+        }
+        return bridge_exec_cmd(rt, cmd, arg1, arg2);
+    }
     if (str_eq(cmd, "set_text") && a1 && a2) {
         char val[MAX_TEXT];
         resolve_token(rt, a2, val, sizeof(val));
-        return bridge_set_text(rt, a1, val);
+        return bridge_exec_cmd(rt, "ui.set_text", a1, val);
     }
     if (str_eq(cmd, "append_text") && a1 && a2) {
         char val[MAX_TEXT];
         resolve_token(rt, a2, val, sizeof(val));
-        return bridge_append_text(rt, a1, val);
+        return bridge_exec_cmd(rt, "ui.append_text", a1, val);
     }
     if (str_eq(cmd, "clear_text") && a1)
-        return bridge_clear_text(rt, a1);
+        return bridge_exec_cmd(rt, "ui.clear_text", a1, NULL);
     if (str_eq(cmd, "nav") && a1)
         return bridge_nav(rt, a1);
     if (str_eq(cmd, "push_route") && a1)
-        return bridge_exec_cmd(rt, "push_route", a1, NULL);
+        return bridge_exec_cmd(rt, "ui.push", a1, NULL);
     if (str_eq(cmd, "replace_route") && a1)
-        return bridge_exec_cmd(rt, "replace_route", a1, NULL);
+        return bridge_exec_cmd(rt, "ui.replace", a1, NULL);
     if (str_eq(cmd, "pop_route") || str_eq(cmd, "back"))
-        return bridge_exec_cmd(rt, "back", NULL, NULL);
+        return bridge_exec_cmd(rt, "ui.pop", NULL, NULL);
     if (str_eq(cmd, "go_home") || str_eq(cmd, "home"))
-        return bridge_exec_cmd(rt, "home", NULL, NULL);
+        return bridge_exec_cmd(rt, "ui.home", NULL, NULL);
     if (str_eq(cmd, "call"))
-        return bridge_exec_cmd(rt, "call", NULL, NULL);
+        return bridge_exec_cmd(rt, "telephony.call", NULL, NULL);
     if (str_eq(cmd, "require") && a1)
         return bridge_exec_cmd(rt, "require", a1, NULL);
     if (str_eq(cmd, "storage_set") && a1 && a2) {
         char val[MAX_TEXT];
         resolve_token(rt, a2, val, sizeof(val));
-        return bridge_storage_set(rt, a1, val);
+        return bridge_exec_cmd(rt, "storage.app.set", a1, val);
     }
     if (str_eq(cmd, "storage_get") && a1 && a2)
-        return bridge_exec_cmd(rt, "storage_get", a1, a2);
+        return bridge_exec_cmd(rt, "storage.app.get", a1, a2);
     if (str_eq(cmd, "digit") && a1)
-        return bridge_append_text(rt, "number", a1);
+        return bridge_exec_cmd(rt, "telephony.digit", a1, NULL);
     if (str_eq(cmd, "action") && a1) {
         char nav[MAX_PATH];
         nav[0] = 0;
@@ -155,8 +170,21 @@ static int run_range(VslRuntime *rt, int start, int end)
     return 0;
 }
 
+static int ends_with(const char *s, const char *suf)
+{
+    size_t n, m;
+    if (!s || !suf)
+        return 0;
+    n = strlen(s);
+    m = strlen(suf);
+    if (m > n)
+        return 0;
+    return str_eq(s + (n - m), suf);
+}
+
 int vsl_load(VslRuntime *rt, const PkgApp *app, Screen *screen, const char *script_path)
 {
+    char resolved[MAX_PATH];
     if (!rt || !app || !screen)
         return -1;
     vsl_reset(rt);
@@ -166,7 +194,24 @@ int vsl_load(VslRuntime *rt, const PkgApp *app, Screen *screen, const char *scri
         rt->loaded = 1;
         return 0;
     }
-    FILE *f = fopen(script_path, "r");
+    str_copy(resolved, sizeof(resolved), script_path);
+    if (ends_with(resolved, ".kt")) {
+        char alt[MAX_PATH];
+        str_copy(alt, sizeof(alt), resolved);
+        char *slash = strrchr(alt, '/');
+        if (slash) {
+            slash[1] = 0;
+            str_cat(alt, sizeof(alt), "../bin/main.kbc");
+        } else {
+            str_copy(alt, sizeof(alt), "bin/main.kbc");
+        }
+        FILE *altf = fopen(alt, "r");
+        if (altf) {
+            fclose(altf);
+            str_copy(resolved, sizeof(resolved), alt);
+        }
+    }
+    FILE *f = fopen(resolved, "r");
     if (!f) {
         rt->loaded = 1;
         return 0;
@@ -227,6 +272,17 @@ int vsl_fire(VslRuntime *rt, const char *event, const char *target)
 {
     if (!rt || !rt->loaded || !event)
         return 0;
+    if (target) {
+        VslVar *v = var_get(rt, "key", 1);
+        if (v)
+            str_copy(v->value, sizeof(v->value), target);
+        v = var_get(rt, "target", 1);
+        if (v)
+            str_copy(v->value, sizeof(v->value), target);
+        v = var_get(rt, "event", 1);
+        if (v)
+            str_copy(v->value, sizeof(v->value), event);
+    }
     int matched = 0;
     for (int i = 0; i < rt->handler_count; i++) {
         VslHandler *h = &rt->handlers[i];
