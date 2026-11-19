@@ -1,30 +1,30 @@
 <?xml version="1.0"?>
-<screen id="clock" bg="#0B0F17">
+<screen id="clock" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Clock" fg="#F1F5F9" w="100%" h="auto"/>
-    <label id="clock_now" text="00:00:00" fg="#F1F5F9" w="100%" h="12%" value="1"/>
-    <label id="alarms_hdr" text="Alarms" fg="#94A3B8" w="100%" h="auto"/>
-    <list id="alarms" w="100%" h="22%" bg="#151C28">
-      <button id="a1" text="07:00  Weekdays  On" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="a2" text="08:30  Weekend  Off" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    <label id="title" text="Clock" fg="#1C1917" w="100%" h="auto"/>
+    <label id="clock_now" text="00:00:00" fg="#1C1917" w="100%" h="12%" value="1"/>
+    <label id="alarms_hdr" text="Alarms" fg="#57534E" w="100%" h="auto"/>
+    <list id="alarms" w="100%" h="22%" bg="#EAE0D0">
+      <button id="a1" text="07:00  Weekdays  On" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="a2" text="08:30  Weekend  Off" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
     </list>
-    <label id="sw_hdr" text="Stopwatch" fg="#94A3B8" w="100%" h="auto"/>
-    <label id="stopwatch_time" text="00:00.00" fg="#F1F5F9" w="100%" h="auto" value="1"/>
+    <label id="sw_hdr" text="Stopwatch" fg="#57534E" w="100%" h="auto"/>
+    <label id="stopwatch_time" text="00:00.00" fg="#1C1917" w="100%" h="auto" value="1"/>
     <hbox id="sw_btns" w="100%" h="auto">
-      <button id="sw_go" text="Start" action="sw_start" bg="#16A34A" fg="#F1F5F9" focus_bg="#15803D" w="auto" h="auto"/>
-      <button id="sw_stop" text="Stop" action="sw_stop" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
-      <button id="sw_rst" text="Reset" action="sw_reset" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="sw_go" text="Start" action="sw_start" bg="#15803D" fg="#1C1917" focus_bg="#15803D" w="auto" h="auto"/>
+      <button id="sw_stop" text="Stop" action="sw_stop" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
+      <button id="sw_rst" text="Reset" action="sw_reset" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
     </hbox>
-    <label id="tm_hdr" text="Timer" fg="#94A3B8" w="100%" h="auto"/>
-    <label id="timer_time" text="01:00" fg="#F1F5F9" w="100%" h="auto" value="1"/>
+    <label id="tm_hdr" text="Timer" fg="#57534E" w="100%" h="auto"/>
+    <label id="timer_time" text="01:00" fg="#1C1917" w="100%" h="auto" value="1"/>
     <hbox id="tm_btns" w="100%" h="auto">
-      <button id="tm_go" text="Start" action="tm_start" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
-      <button id="tm_stop" text="Stop" action="tm_stop" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
-      <button id="tm_plus" text="+30s" action="tm_plus" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
-      <button id="tm_rst" text="Reset" action="tm_reset" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="tm_go" text="Start" action="tm_start" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="auto" h="auto"/>
+      <button id="tm_stop" text="Stop" action="tm_stop" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
+      <button id="tm_plus" text="+30s" action="tm_plus" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
+      <button id="tm_rst" text="Reset" action="tm_reset" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
     </hbox>
   </vbox>
   <softkeys left="Start" center="OK" right="Back"
-            left_action="sw_start" center_action="ok" right_action="back"/>
+            left_action="sw_start" center_action="ok" right_action="route:pop"/>
 </screen>

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<screen id="contacts" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Contacts" fg="#1C1917" w="100%" h="auto"/>
+    <input id="filter" text="" max_len="24" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    <list id="people" w="100%" h="auto" bg="#EAE0D0">
+      <button id="c1" text="Alice Chen" action="route:push:res/layout/detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="65"/>
+      <button id="c2" text="Bob Okonkwo" action="route:push:res/layout/detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="66"/>
+      <button id="c3" text="Carol Diaz" action="route:push:res/layout/detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="67"/>
+      <button id="c4" text="Dave Park" action="route:push:res/layout/detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="68"/>
+      <button id="c5" text="Elena Rossi" action="route:push:res/layout/detail.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="69"/>
+    </list>
+  </vbox>
+  <softkeys left="Call" center="Open" right="Back"
+            left_action="call" center_action="ok" right_action="route:pop"/>
+</screen>

@@ -109,9 +109,13 @@ static int exec_line(VslRuntime *rt, char *line)
         return bridge_clear_text(rt, a1);
     if (str_eq(cmd, "nav") && a1)
         return bridge_nav(rt, a1);
-    if (str_eq(cmd, "back"))
+    if (str_eq(cmd, "push_route") && a1)
+        return bridge_exec_cmd(rt, "push_route", a1, NULL);
+    if (str_eq(cmd, "replace_route") && a1)
+        return bridge_exec_cmd(rt, "replace_route", a1, NULL);
+    if (str_eq(cmd, "pop_route") || str_eq(cmd, "back"))
         return bridge_exec_cmd(rt, "back", NULL, NULL);
-    if (str_eq(cmd, "home"))
+    if (str_eq(cmd, "go_home") || str_eq(cmd, "home"))
         return bridge_exec_cmd(rt, "home", NULL, NULL);
     if (str_eq(cmd, "call"))
         return bridge_exec_cmd(rt, "call", NULL, NULL);
@@ -248,4 +252,16 @@ const char *vsl_take_nav(VslRuntime *rt)
     if (!rt || !rt->nav[0])
         return "";
     return rt->nav;
+}
+
+int vsl_consume_nav(VslRuntime *rt, char *out, size_t out_sz)
+{
+    if (!out || out_sz == 0)
+        return 0;
+    out[0] = 0;
+    if (!rt || !rt->nav[0])
+        return 0;
+    str_copy(out, out_sz, rt->nav);
+    rt->nav[0] = 0;
+    return 1;
 }

@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
-<screen id="idle" bg="#0B0F17">
+<screen id="idle" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="idle_clock" text="00:00" fg="#F1F5F9" w="100%" h="28%" value="1"/>
-    <label id="idle_date" text="Today" fg="#94A3B8" w="100%" h="auto"/>
-    <label id="pill1" text="2 messages" fg="#F1F5F9" w="100%" h="auto" value="2"/>
-    <label id="pill2" text="1 missed call" fg="#F1F5F9" w="100%" h="auto" value="2"/>
-    <label id="idle_hint" text="Press Unlock to open VilaOS" fg="#94A3B8" w="100%" h="auto"/>
+    <label id="idle_clock" text="00:00" fg="#1C1917" w="100%" h="28%" value="1"/>
+    <label id="idle_date" text="Today" fg="#57534E" w="100%" h="auto"/>
+    <label id="pill1" text="2 messages" fg="#1C1917" w="100%" h="auto" value="2"/>
+    <label id="pill2" text="1 missed call" fg="#1C1917" w="100%" h="auto" value="2"/>
+    <label id="idle_hint" text="Press Unlock to open VilaOS" fg="#57534E" w="100%" h="auto"/>
   </vbox>
   <softkeys left="Menu" center="Unlock" right="Dial"
             left_action="menu" center_action="unlock" right_action="nav:assets/screens/dialer.xml"/>

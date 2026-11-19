@@ -11,5 +11,5 @@ on_soft center
 end
 
 on_soft right
-  back
+  pop_route
 end

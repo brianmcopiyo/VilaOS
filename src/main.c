@@ -25,28 +25,21 @@ static void on_signal(int sig)
     g_run = 0;
 }
 
-static void activate_focus(Screen *s, char *nav, size_t nav_sz)
+static void activate_focus(Screen *s, Gfx *g, char *nav, size_t nav_sz)
 {
     if (s->focus < 0)
         return;
     Widget *w = &s->widgets[s->focus];
     if (g_host.in_app) {
         apphost_fire_event(&g_host, "click", w->id);
-        if (vsl_has_nav(&g_host.vsl)) {
-            const char *n = vsl_take_nav(&g_host.vsl);
-            if (str_eq(n, "shell:back")) {
-                str_copy(nav, nav_sz, "assets/screens/home.xml");
-                g_host.in_app = 0;
-                vsl_reset(&g_host.vsl);
-            } else {
-                str_copy(nav, nav_sz, n);
-            }
-            g_host.vsl.nav[0] = 0;
+        char taken[MAX_PATH];
+        if (vsl_consume_nav(&g_host.vsl, taken, sizeof(taken))) {
+            apphost_handle_action(&g_host, s, g, taken, nav, nav_sz);
             return;
         }
     }
-    if (w->action[0])
-        apphost_handle_action(&g_host, s, NULL, w->action, nav, nav_sz);
+    if (w->action[0] && !str_eq(w->action, "none"))
+        apphost_handle_action(&g_host, s, g, w->action, nav, nav_sz);
 }
 
 static Widget *focused_input(Screen *s)
@@ -82,6 +75,7 @@ static void apply_text(Screen *s, InputMux *mux, InputEvent *ev)
     input_apply_char(w, ev->ch);
     if (g_host.in_app)
         apphost_fire_event(&g_host, "change", w->id);
+    apphost_update_softkeys(&g_host, s);
 }
 
 static int path_is_dialer(const char *path)
@@ -101,10 +95,18 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
 {
     if (!nav[0])
         return 0;
-    if (str_eq(nav, "back") || str_eq(nav, "shell:back")) {
-        g_host.in_app = 0;
-        vsl_reset(&g_host.vsl);
-        str_copy(nav, MAX_PATH, "assets/screens/home.xml");
+    if (str_starts(nav, "route:") || str_eq(nav, "back") || str_eq(nav, "home") ||
+        str_eq(nav, "go_home") || str_eq(nav, "pop_route")) {
+        char next[MAX_PATH];
+        next[0] = 0;
+        int rc = apphost_handle_action(&g_host, s, g, nav, next, sizeof(next));
+        if (rc == 1 && next[0]) {
+            str_copy(nav, MAX_PATH, next);
+        } else {
+            input_set_dialer_mode(input, path_is_dialer(s->path));
+            nav[0] = 0;
+            return rc >= 0 ? 1 : -1;
+        }
     }
     if (str_starts(nav, "app:")) {
         if (apphost_open_app(&g_host, s, g, nav + 4) == 0) {
@@ -114,7 +116,7 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
         }
         return -1;
     }
-    if (str_starts(nav, "/apps/") || (g_host.in_app && !str_starts(nav, "assets/"))) {
+    if (str_starts(nav, "/apps/")) {
         if (apphost_open_screen(&g_host, s, g, nav) == 0) {
             input_set_dialer_mode(input, path_is_dialer(s->path));
             nav[0] = 0;
@@ -125,12 +127,10 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
     if (screen_load(s, nav) != 0)
         return -1;
     if (strstr(nav, "home.xml")) {
-        g_host.in_app = 0;
-        vsl_reset(&g_host.vsl);
+        apphost_route_home(&g_host, s, g, NULL, 0);
         apphost_refresh_launcher(&g_host, s);
     } else if (strstr(nav, "idle.xml")) {
-        g_host.in_app = 0;
-        vsl_reset(&g_host.vsl);
+        apphost_route_home(&g_host, s, g, NULL, 0);
     }
     screen_layout(s, g);
     input_set_dialer_mode(input, path_is_dialer(s->path));
@@ -138,26 +138,23 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
     return 1;
 }
 
-static int run_soft(Screen *s, Gfx *g, const char *act, char *nav, size_t nav_sz)
+/* side: 1=left, 2=center, 3=right */
+static int run_soft(Screen *s, Gfx *g, int side, const char *act, char *nav, size_t nav_sz)
 {
     if (!act || !act[0])
         return 0;
+    char taken[MAX_PATH];
+    taken[0] = 0;
     if (g_host.in_app) {
-        if (str_eq(act, s->soft_left_act) || str_eq(act, "ok"))
-            apphost_fire_event(&g_host, "soft", "left");
-        else if (str_eq(act, s->soft_center_act))
-            apphost_fire_event(&g_host, "soft", "center");
-        else if (str_eq(act, s->soft_right_act) || str_eq(act, "back"))
-            apphost_fire_event(&g_host, "soft", "right");
-        if (vsl_has_nav(&g_host.vsl)) {
-            const char *n = vsl_take_nav(&g_host.vsl);
-            str_copy(nav, nav_sz, n);
-            g_host.vsl.nav[0] = 0;
-            if (str_eq(nav, "shell:back"))
-                str_copy(nav, nav_sz, "assets/screens/home.xml");
-            return 1;
-        }
+        const char *tgt = side == 1 ? "left" : (side == 2 ? "center" : "right");
+        apphost_fire_event(&g_host, "soft", tgt);
+        vsl_consume_nav(&g_host.vsl, taken, sizeof(taken));
     }
+    /* Softkey Clear must clear text even if VSL on_soft right always pops. */
+    if (str_eq(act, "clear"))
+        return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
+    if (taken[0])
+        return apphost_handle_action(&g_host, s, g, taken, nav, nav_sz);
     return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
 }
 
@@ -217,6 +214,7 @@ int main(int argc, char **argv)
         if (t - last_tick > 200) {
             screen_tick(&screen, &gfx);
             apphost_on_tick(&g_host);
+            apphost_update_softkeys(&g_host, &screen);
             char mode[24];
             input_mode_label(&input, mode, sizeof(mode));
             screen_set_mode_badge(&screen, mode);
@@ -233,40 +231,56 @@ int main(int argc, char **argv)
             case IE_QUIT:
                 g_run = 0;
                 break;
+            case IE_HOME:
+                apphost_route_home(&g_host, &screen, &gfx, nav, sizeof(nav));
+                break;
             case IE_NAV_UP:
                 screen_focus_next(&screen, -1);
                 if (screen.focus >= 0)
                     apphost_fire_event(&g_host, "focus", screen.widgets[screen.focus].id);
+                apphost_update_softkeys(&g_host, &screen);
                 break;
             case IE_NAV_DOWN:
                 screen_focus_next(&screen, 1);
                 if (screen.focus >= 0)
                     apphost_fire_event(&g_host, "focus", screen.widgets[screen.focus].id);
+                apphost_update_softkeys(&g_host, &screen);
                 break;
             case IE_NAV_LEFT:
                 screen_focus_next(&screen, -1);
+                apphost_update_softkeys(&g_host, &screen);
                 break;
             case IE_NAV_RIGHT:
                 screen_focus_next(&screen, 1);
+                apphost_update_softkeys(&g_host, &screen);
                 break;
             case IE_OK: {
-                activate_focus(&screen, nav, sizeof(nav));
+                activate_focus(&screen, &gfx, nav, sizeof(nav));
                 if (!nav[0] && screen.soft_center_act[0])
-                    run_soft(&screen, &gfx, screen.soft_center_act, nav, sizeof(nav));
+                    run_soft(&screen, &gfx, 2, screen.soft_center_act, nav, sizeof(nav));
                 else if (!nav[0])
-                    run_soft(&screen, &gfx, "ok", nav, sizeof(nav));
+                    run_soft(&screen, &gfx, 2, "ok", nav, sizeof(nav));
                 break;
             }
             case IE_BACK:
-                run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
-                if (strstr(screen.path, "idle.xml") && !nav[0])
+                if (g_host.in_app)
+                    apphost_route_pop(&g_host, &screen, &gfx, nav, sizeof(nav));
+                else if (strstr(screen.path, "home.xml"))
+                    str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
+                else if (strstr(screen.path, "idle.xml"))
                     g_run = 0;
+                else
+                    str_copy(nav, sizeof(nav), "assets/screens/home.xml");
                 break;
             case IE_SOFT_RIGHT:
-                run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
+                run_soft(&screen, &gfx, 3,
+                         screen.soft_right_act[0] ? screen.soft_right_act : "route:pop",
+                         nav, sizeof(nav));
                 break;
             case IE_SOFT_LEFT:
-                run_soft(&screen, &gfx, screen.soft_left_act[0] ? screen.soft_left_act : "ok", nav, sizeof(nav));
+                run_soft(&screen, &gfx, 1,
+                         screen.soft_left_act[0] ? screen.soft_left_act : "ok",
+                         nav, sizeof(nav));
                 break;
             case IE_BACKSPACE:
                 if (screen.focus >= 0)
@@ -278,6 +292,7 @@ int main(int argc, char **argv)
                 }
                 if (g_host.in_app && screen.focus >= 0)
                     apphost_fire_event(&g_host, "key", "backspace");
+                apphost_update_softkeys(&g_host, &screen);
                 break;
             case IE_CHAR:
                 apply_text(&screen, &input, &ev);
@@ -287,15 +302,23 @@ int main(int argc, char **argv)
             case IE_CLICK: {
                 int sk = screen_hit_softkey(&screen, &gfx, ev.x, ev.y);
                 if (sk == 1)
-                    run_soft(&screen, &gfx, screen.soft_left_act[0] ? screen.soft_left_act : "ok", nav, sizeof(nav));
+                    run_soft(&screen, &gfx, 1,
+                             screen.soft_left_act[0] ? screen.soft_left_act : "ok",
+                             nav, sizeof(nav));
                 else if (sk == 2) {
-                    activate_focus(&screen, nav, sizeof(nav));
+                    activate_focus(&screen, &gfx, nav, sizeof(nav));
                     if (!nav[0])
-                        run_soft(&screen, &gfx, screen.soft_center_act[0] ? screen.soft_center_act : "ok", nav, sizeof(nav));
+                        run_soft(&screen, &gfx, 2,
+                                 screen.soft_center_act[0] ? screen.soft_center_act : "ok",
+                                 nav, sizeof(nav));
                 } else if (sk == 3)
-                    run_soft(&screen, &gfx, screen.soft_right_act[0] ? screen.soft_right_act : "back", nav, sizeof(nav));
-                else if (screen_focus_at(&screen, ev.x, ev.y) >= 0)
-                    activate_focus(&screen, nav, sizeof(nav));
+                    run_soft(&screen, &gfx, 3,
+                             screen.soft_right_act[0] ? screen.soft_right_act : "route:pop",
+                             nav, sizeof(nav));
+                else if (screen_focus_at(&screen, ev.x, ev.y) >= 0) {
+                    activate_focus(&screen, &gfx, nav, sizeof(nav));
+                    apphost_update_softkeys(&g_host, &screen);
+                }
                 break;
             }
             default:

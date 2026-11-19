@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<screen id="contact_detail" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="name" text="Alice Chen" fg="#1C1917" w="100%" h="16%" value="1"/>
+    <label id="role" text="Mobile" fg="#57534E" w="100%" h="auto"/>
+    <label id="number" text="555-0101" fg="#1C1917" w="100%" h="auto"/>
+    <label id="email" text="alice@vila.os" fg="#57534E" w="100%" h="auto"/>
+    <button id="act_call" text="Call" action="call" bg="#15803D" fg="#1C1917" focus_bg="#15803D" w="100%" h="auto"/>
+    <button id="act_msg" text="Message" action="route:push:res/layout/compose.xml" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Call" center="Message" right="Back"
+            left_action="call"
+            center_action="route:push:res/layout/compose.xml"
+            right_action="route:pop"/>
+</screen>

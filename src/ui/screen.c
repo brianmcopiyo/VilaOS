@@ -604,7 +604,13 @@ int screen_focus_at(Screen *s, int x, int y)
 int screen_hit_softkey(const Screen *s, const Gfx *g, int x, int y)
 {
     (void)s;
-    if (!g || y < g->h - g->softkey_h)
+    if (!g)
+        return 0;
+    /* A few pixels of slack so mouse clicks near the bar still register. */
+    int top = g->h - g->softkey_h - 4;
+    if (top < 0)
+        top = 0;
+    if (y < top)
         return 0;
     int third = g->w / 3;
     if (x < third)
@@ -637,6 +643,7 @@ static void draw_battery(Gfx *g, int x, int y, int pct)
 static void draw_statusbar(Gfx *g, Widget *w)
 {
     draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
+    draw_hline(g, 0, w->y + w->h - 1, g->w, COL_BORDER);
     draw_hline(g, 0, w->h - 1, g->w, COL_BORDER);
     int s = clamp_i(g->font_scale, 1, 3);
     draw_signal(g, g->pad, (w->h - 12 * s) / 2, 4);
@@ -743,7 +750,9 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             int tw = font_text_w_scaled(g, FONT_8X12, w->text) + g->pad * 2;
             if (tw > w->w)
                 tw = w->w;
-            draw_round_rect(g, w->x, w->y + (w->h - fh - 6) / 2, tw, fh + 6, radius, COL_PILL, 1);
+            int py = w->y + (w->h - fh - 6) / 2;
+            draw_round_rect(g, w->x, py, tw, fh + 6, radius, COL_PILL, 1);
+            draw_round_rect(g, w->x, py, tw, fh + 6, radius, COL_BORDER, 0);
             font_draw_text_clip(g, FONT_8X12, w->x + g->pad, w->y + (w->h - fh) / 2, tw - g->pad, w->text, COL_TEXT, COL_PILL, 1);
         } else {
             font_draw_text_clip(g, fid, w->x, ty, w->w > 0 ? w->w : g->w, w->text, w->fg, COL_BG, 0);
@@ -752,15 +761,16 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     }
     case W_BUTTON: {
         uint16_t bg = w->focused ? w->focus_bg : w->bg;
+        uint16_t fg = w->focused ? COL_ON_ACCENT : w->fg;
         draw_round_rect(g, w->x, w->y, w->w, w->h, radius, bg, 1);
         draw_round_rect(g, w->x, w->y, w->w, w->h, radius, w->focused ? COL_ACCENT : COL_BORDER, 0);
         if (w->icon[0]) {
             int icon_size = clamp_i(w->h / 2, 16, 40);
-            draw_app_icon(g, w->x + w->w / 2, w->y + w->h / 3, icon_size, w->icon, w->fg);
+            draw_app_icon(g, w->x + w->w / 2, w->y + w->h / 3, icon_size, w->icon, fg);
             int tw = font_text_w_scaled(g, FONT_8X12, w->text);
             int tx = w->x + (w->w - tw) / 2;
             int ty = w->y + (2 * w->h) / 3;
-            font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, w->fg, bg, 1);
+            font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, fg, bg, 1);
         } else {
             int tw = font_text_w_scaled(g, FONT_8X12, w->text);
             int tx = w->x + (w->w - tw) / 2;
@@ -769,23 +779,24 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
                 char badge[8];
                 snprintf(badge, sizeof(badge), "%c", (char)w->value);
                 draw_round_rect(g, w->x + g->pad, w->y + (w->h - fh - 4) / 2, fh + 8, fh + 4, radius, COL_ACCENT, 1);
-                font_draw_text(g, FONT_8X12, w->x + g->pad + 4, ty, badge, COL_TEXT, COL_ACCENT, 1);
-                font_draw_text_clip(g, FONT_8X12, w->x + g->pad + fh + 14, ty, w->w - fh - 20, w->text, w->fg, bg, 1);
+                font_draw_text(g, FONT_8X12, w->x + g->pad + 4, ty, badge, COL_ON_ACCENT, COL_ACCENT, 1);
+                font_draw_text_clip(g, FONT_8X12, w->x + g->pad + fh + 14, ty, w->w - fh - 20, w->text, fg, bg, 1);
             } else {
-                font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, w->fg, bg, 1);
+                font_draw_text_clip(g, FONT_8X12, tx, ty, w->w - 4, w->text, fg, bg, 1);
             }
         }
         break;
     }
     case W_INPUT: {
         uint16_t bg = w->focused ? w->focus_bg : w->bg;
+        uint16_t fg = w->focused ? COL_ON_ACCENT : w->fg;
         int ih = font_char_h_scaled(g, FONT_8X16);
         draw_round_rect(g, w->x, w->y, w->w, w->h, radius, bg, 1);
         draw_round_rect(g, w->x, w->y, w->w, w->h, radius, w->focused ? COL_ACCENT : COL_BORDER, 0);
-        font_draw_text_clip(g, FONT_8X16, w->x + g->pad, w->y + (w->h - ih) / 2, w->w - g->pad * 2, w->text, w->fg, bg, 1);
+        font_draw_text_clip(g, FONT_8X16, w->x + g->pad, w->y + (w->h - ih) / 2, w->w - g->pad * 2, w->text, fg, bg, 1);
         if (w->focused) {
             int tw = font_text_w_scaled(g, FONT_8X16, w->text);
-            draw_vline(g, w->x + g->pad + tw + 1, w->y + 4, w->h - 8, COL_ACCENT);
+            draw_vline(g, w->x + g->pad + tw + 1, w->y + 4, w->h - 8, COL_ON_ACCENT);
         }
         break;
     }
@@ -817,11 +828,15 @@ static void draw_cursor(Gfx *g, const InputState *in)
     int x = in->cursor_x;
     int y = in->cursor_y;
     int s = clamp_i(g->font_scale, 1, 3);
-    draw_line(g, x, y, x + 8 * s, y + 8 * s, COL_TEXT);
-    draw_line(g, x, y, x, y + 12 * s, COL_TEXT);
-    draw_line(g, x, y + 12 * s, x + 4 * s, y + 9 * s, COL_TEXT);
-    draw_line(g, x + 4 * s, y + 9 * s, x + 8 * s, y + 8 * s, COL_TEXT);
-    draw_pixel(g, x + s, y + s, COL_ACCENT);
+    draw_line(g, x + 1, y + 1, x + 8 * s + 1, y + 8 * s + 1, COL_ON_ACCENT);
+    draw_line(g, x + 1, y + 1, x + 1, y + 12 * s + 1, COL_ON_ACCENT);
+    draw_line(g, x + 1, y + 12 * s + 1, x + 4 * s + 1, y + 9 * s + 1, COL_ON_ACCENT);
+    draw_line(g, x + 4 * s + 1, y + 9 * s + 1, x + 8 * s + 1, y + 8 * s + 1, COL_ON_ACCENT);
+    draw_line(g, x, y, x + 8 * s, y + 8 * s, COL_ACCENT);
+    draw_line(g, x, y, x, y + 12 * s, COL_ACCENT);
+    draw_line(g, x, y + 12 * s, x + 4 * s, y + 9 * s, COL_ACCENT);
+    draw_line(g, x + 4 * s, y + 9 * s, x + 8 * s, y + 8 * s, COL_ACCENT);
+    draw_pixel(g, x + s, y + s, COL_TEXT);
 }
 
 void screen_render(Screen *s, Gfx *g, const InputState *in)
@@ -1085,6 +1100,12 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
         Widget *num = screen_find(s, "number");
         if (num)
             num->text[0] = 0;
+        Widget *note = screen_find(s, "note");
+        if (note && (!num || s->focus == (int)(note - s->widgets)))
+            note->text[0] = 0;
+        Widget *msg = screen_find(s, "msg");
+        if (msg && s->focus >= 0 && &s->widgets[s->focus] == msg)
+            msg->text[0] = 0;
         Widget *match = screen_find(s, "contact_match");
         if (match)
             str_copy(match->text, sizeof(match->text), "Enter a number");
@@ -1112,13 +1133,13 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
         g_app.call_muted = 0;
         g_app.call_speaker = 0;
         if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/call_active.xml");
+            str_copy(out_nav, out_sz, "route:replace:res/layout/call_active.xml");
         return 1;
     }
     if (str_eq(action, "end_call")) {
         g_app.call_start = 0;
         if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/dialer.xml");
+            str_copy(out_nav, out_sz, "route:pop");
         return 1;
     }
     if (str_eq(action, "mute")) {

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<screen id="notes" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Notes" fg="#1C1917" w="100%" h="auto"/>
+    <label id="mode_badge" text="[T9: abc]" fg="#57534E" w="100%" h="auto"/>
+    <list id="note_list" w="100%" h="30%" bg="#EAE0D0">
+      <button id="n1" text="Shopping list" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="n2" text="Ideas" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="n3" text="Travel plan" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    </list>
+    <input id="note" text="Write a note..." max_len="120" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    <label id="note_status" text="Unsaved" fg="#57534E" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Save" center="OK" right="Back"
+            left_action="save_note" center_action="ok" right_action="route:pop"/>
+</screen>

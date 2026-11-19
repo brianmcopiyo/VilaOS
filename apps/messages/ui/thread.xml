@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<screen id="message_thread" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Mom" fg="#1C1917" w="100%" h="auto"/>
+    <label id="mode_badge" text="[T9: abc]" fg="#57534E" w="100%" h="auto"/>
+    <list id="thread" w="100%" h="auto" bg="#EAE0D0">
+      <button id="b1" text="Hey, are you free later?" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" action="none"/>
+      <button id="b2" text="Yes, after 5 works" bg="#F0C4A0" fg="#1C1917" focus_bg="#EA580C" action="none"/>
+      <button id="b3" text="Call me later" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" action="none"/>
+    </list>
+    <input id="msg" text="" max_len="100" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    <label id="msgstatus" text="Type a reply" fg="#57534E" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Send" center="OK" right="Back"
+            left_action="send" center_action="send" right_action="route:pop"/>
+</screen>

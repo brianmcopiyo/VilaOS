@@ -11,6 +11,7 @@ typedef enum {
     IE_NAV_RIGHT,
     IE_OK,
     IE_BACK,
+    IE_HOME,
     IE_SOFT_LEFT,
     IE_SOFT_RIGHT,
     IE_CHAR,

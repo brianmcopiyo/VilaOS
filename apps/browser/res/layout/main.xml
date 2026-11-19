@@ -1,16 +1,16 @@
 <?xml version="1.0"?>
-<screen id="browser" bg="#0B0F17">
+<screen id="browser" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Browser" fg="#F1F5F9" w="100%" h="auto"/>
-    <input id="url" text="file:///apps/browser/res/layout/main.xml" max_len="96" w="100%" h="auto" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-    <list id="pages" w="100%" h="auto" bg="#151C28">
-      <button id="p1" text="VilaOS Welcome" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="p2" text="App Manifest Spec" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="p3" text="VSL Quick Reference" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    <label id="title" text="Browser" fg="#1C1917" w="100%" h="auto"/>
+    <input id="url" text="file:///apps/browser/res/layout/main.xml" max_len="96" w="100%" h="auto" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    <list id="pages" w="100%" h="auto" bg="#EAE0D0">
+      <button id="p1" text="VilaOS Welcome" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="p2" text="App Manifest Spec" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="p3" text="VSL Quick Reference" action="none" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
     </list>
-    <label id="page_view" text="Select a page to read" fg="#94A3B8" w="100%" h="auto"/>
+    <label id="page_view" text="Select a page to read" fg="#57534E" w="100%" h="auto"/>
   </vbox>
   <softkeys left="Open" center="OK" right="Back"
-            left_action="ok" center_action="ok" right_action="back"/>
+            left_action="ok" center_action="ok" right_action="route:pop"/>
 </screen>

@@ -25,18 +25,19 @@
 
 #define RGB565(r, g, b) ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | (((b) & 0xF8) >> 3)))
 
-#define COL_BG       RGB565(11, 15, 23)
-#define COL_PANEL    RGB565(21, 28, 40)
-#define COL_BORDER   RGB565(40, 52, 72)
-#define COL_TEXT     RGB565(241, 245, 249)
-#define COL_DIM      RGB565(148, 163, 184)
-#define COL_ACCENT   RGB565(37, 99, 235)
-#define COL_FOCUS    RGB565(30, 64, 175)
-#define COL_SOFTKEY  RGB565(15, 20, 30)
-#define COL_WARN     RGB565(220, 160, 40)
-#define COL_OK       RGB565(22, 163, 74)
-#define COL_DANGER   RGB565(220, 38, 38)
-#define COL_PILL     RGB565(30, 41, 59)
+#define COL_BG       RGB565(245, 239, 230)
+#define COL_PANEL    RGB565(234, 224, 208)
+#define COL_BORDER   RGB565(212, 197, 176)
+#define COL_TEXT     RGB565(28, 25, 23)
+#define COL_DIM      RGB565(87, 83, 78)
+#define COL_ACCENT   RGB565(234, 88, 12)
+#define COL_FOCUS    RGB565(234, 88, 12)
+#define COL_ON_ACCENT RGB565(255, 255, 255)
+#define COL_SOFTKEY  RGB565(227, 214, 195)
+#define COL_WARN     RGB565(180, 83, 9)
+#define COL_OK       RGB565(21, 128, 61)
+#define COL_DANGER   RGB565(185, 28, 28)
+#define COL_PILL     RGB565(234, 224, 208)
 
 typedef enum {
     W_SCREEN = 0,
@@ -137,6 +138,7 @@ typedef struct {
     uint64_t last_key_ms;
     int shift;
     int caps;
+    int ctrl;
     int bound_w, bound_h;
     int last_qwerty;
 } InputState;

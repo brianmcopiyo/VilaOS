@@ -3,5 +3,5 @@ on_load
 end
 
 on_soft right
-  back
+  pop_route
 end

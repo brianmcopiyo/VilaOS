@@ -1,16 +1,16 @@
 <?xml version="1.0"?>
-<screen id="call_active" bg="#0B0F17">
+<screen id="call_active" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="call_title" text="Active call" fg="#94A3B8" w="100%" h="auto"/>
-    <label id="call_name" text="Calling..." fg="#F1F5F9" w="100%" h="18%" value="1"/>
-    <label id="call_number" text="" fg="#94A3B8" w="100%" h="auto"/>
-    <label id="call_timer" text="00:00" fg="#16A34A" w="100%" h="auto" value="1"/>
+    <label id="call_title" text="Active call" fg="#57534E" w="100%" h="auto"/>
+    <label id="call_name" text="Calling..." fg="#1C1917" w="100%" h="18%" value="1"/>
+    <label id="call_number" text="" fg="#57534E" w="100%" h="auto"/>
+    <label id="call_timer" text="00:00" fg="#15803D" w="100%" h="auto" value="1"/>
     <hbox id="call_actions" w="100%" h="auto">
-      <button id="btn_mute" text="Mute" action="mute" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
-      <button id="btn_speaker" text="Speaker" action="speaker" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" w="auto" h="auto"/>
+      <button id="btn_mute" text="Mute" action="mute" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
+      <button id="btn_speaker" text="Speaker" action="speaker" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="auto" h="auto"/>
     </hbox>
-    <button id="btn_end" text="End Call" action="end_call" bg="#DC2626" fg="#F1F5F9" focus_bg="#B91C1C" w="100%" h="auto"/>
+    <button id="btn_end" text="End Call" action="end_call" bg="#B91C1C" fg="#FFFFFF" focus_bg="#B91C1C" w="100%" h="auto"/>
   </vbox>
   <softkeys left="Mute" center="Speaker" right="End"
             left_action="mute" center_action="speaker" right_action="end_call"/>

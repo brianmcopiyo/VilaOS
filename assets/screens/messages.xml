@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
-<screen id="messages" bg="#0B0F17">
+<screen id="messages" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Messages" fg="#F1F5F9" w="100%" h="auto"/>
-    <list id="inbox" w="100%" h="auto" bg="#151C28">
-      <button id="m1" text="Mom  Call me later" action="nav:assets/screens/message_thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" value="50"/>
-      <button id="m2" text="Work  Meeting at 3" action="nav:assets/screens/message_thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF" value="50"/>
-      <button id="m3" text="Sam  Lunch tomorrow?" action="nav:assets/screens/message_thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="m4" text="Ada  Designs look great" action="nav:assets/screens/message_thread.xml" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    <label id="title" text="Messages" fg="#1C1917" w="100%" h="auto"/>
+    <list id="inbox" w="100%" h="auto" bg="#EAE0D0">
+      <button id="m1" text="Mom  Call me later" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
+      <button id="m2" text="Work  Meeting at 3" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
+      <button id="m3" text="Sam  Lunch tomorrow?" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="m4" text="Ada  Designs look great" action="nav:assets/screens/message_thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
     </list>
-    <button id="newmsg" text="New message" action="nav:assets/screens/compose.xml" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="100%" h="auto"/>
+    <button id="newmsg" text="New message" action="nav:assets/screens/compose.xml" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
   </vbox>
   <softkeys left="New" center="Open" right="Back"
             left_action="nav:assets/screens/compose.xml"

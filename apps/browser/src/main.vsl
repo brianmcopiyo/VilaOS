@@ -10,9 +10,9 @@ on_click p2
   set_text page_view "manifest.xml declares id, version, entry UI/script, capabilities."
 end
 on_click p3
-  set_text page_view "VSL: on_click, on_soft, set_text, nav, storage_get/set, require."
+  set_text page_view "VSL: on_click, on_soft, set_text, push_route, pop_route, require."
 end
 
 on_soft right
-  back
+  pop_route
 end

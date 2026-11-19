@@ -40,5 +40,7 @@ void vsl_reset(VslRuntime *rt);
 int vsl_fire(VslRuntime *rt, const char *event, const char *target);
 int vsl_has_nav(const VslRuntime *rt);
 const char *vsl_take_nav(VslRuntime *rt);
+/* Copy pending nav into out and clear the runtime buffer. Returns 1 if present. */
+int vsl_consume_nav(VslRuntime *rt, char *out, size_t out_sz);
 
 #endif

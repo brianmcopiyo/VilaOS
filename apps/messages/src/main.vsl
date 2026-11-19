@@ -3,25 +3,25 @@ on_load
 end
 
 on_click m1
-  nav res/layout/thread.xml
+  push_route res/layout/thread.xml
 end
 on_click m2
-  nav res/layout/thread.xml
+  push_route res/layout/thread.xml
 end
 on_click m3
-  nav res/layout/thread.xml
+  push_route res/layout/thread.xml
 end
 on_click m4
-  nav res/layout/thread.xml
+  push_route res/layout/thread.xml
 end
 on_click newmsg
-  nav res/layout/compose.xml
+  push_route res/layout/compose.xml
 end
 
 on_soft left
-  nav res/layout/compose.xml
+  push_route res/layout/compose.xml
 end
 
 on_soft right
-  back
+  pop_route
 end

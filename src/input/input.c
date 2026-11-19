@@ -30,9 +30,15 @@
 #define KEY_F1 59
 #define KEY_F2 60
 #define KEY_F3 61
+#define KEY_LEFTCTRL 29
+#define KEY_RIGHTCTRL 97
 #define KEY_LEFTSHIFT 42
 #define KEY_RIGHTSHIFT 54
 #define KEY_CAPSLOCK 58
+#define KEY_HOME 102
+#define KEY_LEFTMETA 125
+#define KEY_RIGHTMETA 126
+#define KEY_BACK 158
 #define KEY_SPACE 57
 #define KEY_1 2
 #define KEY_2 3
@@ -460,13 +466,18 @@ static char key_to_char(InputMux *m, int code)
 
 static int handle_key(InputMux *m, int code, int value, InputEvent *out)
 {
+    if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) {
+        m->state.ctrl = (value != 0);
+        return 0;
+    }
+    if (code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT) {
+        m->state.shift = (value != 0);
+        if (value == 0)
+            return 0;
+    }
     if (value != 1 && value != 2)
         return 0;
 
-    if (code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT) {
-        m->state.shift = 1;
-        return 0;
-    }
     if (code == KEY_CAPSLOCK && value == 1) {
         m->state.caps = !m->state.caps;
         return 0;
@@ -476,6 +487,11 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
     if (now_ms() - m->state.last_pointer_ms > 100)
         m->state.cursor_visible = 0;
 
+    if (code == KEY_HOME || code == KEY_LEFTMETA || code == KEY_RIGHTMETA ||
+        (code == KEY_H && m->state.ctrl)) {
+        out->kind = IE_HOME;
+        return 1;
+    }
     if (code == KEY_UP) {
         out->kind = IE_NAV_UP;
         return 1;
@@ -496,7 +512,7 @@ static int handle_key(InputMux *m, int code, int value, InputEvent *out)
         out->kind = IE_OK;
         return 1;
     }
-    if (code == KEY_ESC) {
+    if (code == KEY_ESC || code == KEY_BACK) {
         out->kind = IE_BACK;
         return 1;
     }
@@ -606,6 +622,9 @@ static int poll_sdl(InputMux *m, InputEvent *out)
             else if (k == SDLK_RETURN) code = KEY_ENTER;
             else if (k == SDLK_ESCAPE) code = KEY_ESC;
             else if (k == SDLK_BACKSPACE) code = KEY_BACKSPACE;
+            else if (k == SDLK_HOME) code = KEY_HOME;
+            else if (k == SDLK_LGUI || k == SDLK_RGUI) code = KEY_LEFTMETA;
+            else if (k == SDLK_LCTRL || k == SDLK_RCTRL) code = KEY_LEFTCTRL;
             else if (k == SDLK_F1) code = KEY_F1;
             else if (k == SDLK_F2) code = KEY_F2;
             else if (k == SDLK_SPACE) code = KEY_SPACE;

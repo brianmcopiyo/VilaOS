@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<screen id="messages" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Messages" fg="#1C1917" w="100%" h="auto"/>
+    <list id="inbox" w="100%" h="auto" bg="#EAE0D0">
+      <button id="m1" text="Mom  Call me later" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
+      <button id="m2" text="Work  Meeting at 3" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" value="50"/>
+      <button id="m3" text="Sam  Lunch tomorrow?" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="m4" text="Ada  Designs look great" action="route:push:res/layout/thread.xml" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+    </list>
+    <button id="newmsg" text="New message" action="route:push:res/layout/compose.xml" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="New" center="Open" right="Back"
+            left_action="route:push:res/layout/compose.xml"
+            center_action="ok"
+            right_action="route:pop"/>
+</screen>

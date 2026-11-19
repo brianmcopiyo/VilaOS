@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
-<screen id="example" bg="#0B0F17">
+<screen id="example" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="Example" fg="#F1F5F9" w="100%" h="auto"/>
-    <label id="hint" text="Edit res/layout and src" fg="#94A3B8" w="100%" h="auto"/>
-    <button id="ok_btn" text="OK" action="none" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="100%" h="auto"/>
+    <label id="title" text="Example" fg="#1C1917" w="100%" h="auto"/>
+    <label id="hint" text="Edit res/layout and src" fg="#57534E" w="100%" h="auto"/>
+    <button id="ok_btn" text="OK" action="none" bg="#EA580C" fg="#FFFFFF" focus_bg="#EA580C" w="100%" h="auto"/>
   </vbox>
   <softkeys left="Menu" center="OK" right="Back"
             left_action="ok" center_action="ok" right_action="back"/>

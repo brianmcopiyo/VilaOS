@@ -14,6 +14,7 @@ SRC := \
 	src/gfx/font.c \
 	src/xml/parse.c \
 	src/ui/screen.c \
+	src/ui/route.c \
 	src/input/input.c \
 	src/input/t9.c \
 	src/pkg/pkg.c \

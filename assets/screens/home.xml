@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
-<screen id="home" bg="#0B0F17">
+<screen id="home" bg="#F5EFE6">
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
-    <label id="title" text="VilaOS" fg="#F1F5F9" w="100%" h="auto"/>
-    <label id="subtitle" text="Apps" fg="#94A3B8" w="100%" h="auto"/>
+    <label id="title" text="VilaOS" fg="#1C1917" w="100%" h="auto"/>
+    <label id="subtitle" text="Apps" fg="#57534E" w="100%" h="auto"/>
     <grid id="launcher" w="100%" h="auto">
-      <button id="app_dialer" text="Dialer" icon="dialer" action="app:dialer" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_messages" text="Messages" icon="messages" action="app:messages" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_contacts" text="Contacts" icon="contacts" action="app:contacts" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_notes" text="Notes" icon="notes" action="app:notes" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_calc" text="Calculator" icon="calculator" action="app:calculator" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_clock" text="Clock" icon="clock" action="app:clock" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_files" text="Files" icon="files" action="app:files" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_browser" text="Browser" icon="files" action="app:browser" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
-      <button id="app_settings" text="Settings" icon="settings" action="app:settings" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+      <button id="app_dialer" text="Dialer" icon="dialer" action="app:dialer" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_messages" text="Messages" icon="messages" action="app:messages" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_contacts" text="Contacts" icon="contacts" action="app:contacts" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_notes" text="Notes" icon="notes" action="app:notes" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_calc" text="Calculator" icon="calculator" action="app:calculator" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_clock" text="Clock" icon="clock" action="app:clock" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_files" text="Files" icon="files" action="app:files" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_browser" text="Browser" icon="files" action="app:browser" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
+      <button id="app_settings" text="Settings" icon="settings" action="app:settings" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C"/>
     </grid>
   </vbox>
   <softkeys left="Open" center="OK" right="Lock"

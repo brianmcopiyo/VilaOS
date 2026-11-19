@@ -135,19 +135,14 @@ int bridge_nav(VslRuntime *rt, const char *screen_rel)
 {
     if (!rt || !screen_rel)
         return -1;
-    if (str_starts(screen_rel, "assets/screens/") || str_starts(screen_rel, "/")) {
-        str_copy(rt->nav, sizeof(rt->nav), screen_rel);
-        return 0;
-    }
-    if (str_starts(screen_rel, "app:")) {
+    if (str_starts(screen_rel, "route:") || str_starts(screen_rel, "app:") ||
+        str_starts(screen_rel, "assets/screens/")) {
         str_copy(rt->nav, sizeof(rt->nav), screen_rel);
         return 0;
     }
     char rel[MAX_PATH];
     normalize_app_rel(screen_rel, rel, sizeof(rel));
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s/%s/%s", PKG_APPS_ROOT, rt->app.id, rel);
-    str_copy(rt->nav, sizeof(rt->nav), path);
+    snprintf(rt->nav, sizeof(rt->nav), "route:push:%s", rel);
     return 0;
 }
 
@@ -163,12 +158,24 @@ int bridge_exec_cmd(VslRuntime *rt, const char *cmd, const char *a1, const char 
         return bridge_clear_text(rt, a1);
     if (str_eq(cmd, "nav"))
         return bridge_nav(rt, a1);
-    if (str_eq(cmd, "back")) {
-        str_copy(rt->nav, sizeof(rt->nav), "shell:back");
+    if (str_eq(cmd, "back") || str_eq(cmd, "pop_route")) {
+        str_copy(rt->nav, sizeof(rt->nav), "route:pop");
         return 0;
     }
-    if (str_eq(cmd, "home")) {
-        str_copy(rt->nav, sizeof(rt->nav), "assets/screens/home.xml");
+    if (str_eq(cmd, "home") || str_eq(cmd, "go_home")) {
+        str_copy(rt->nav, sizeof(rt->nav), "route:home");
+        return 0;
+    }
+    if (str_eq(cmd, "push_route") && a1) {
+        char rel[MAX_PATH];
+        normalize_app_rel(a1, rel, sizeof(rel));
+        snprintf(rt->nav, sizeof(rt->nav), "route:push:%s", rel);
+        return 0;
+    }
+    if (str_eq(cmd, "replace_route") && a1) {
+        char rel[MAX_PATH];
+        normalize_app_rel(a1, rel, sizeof(rel));
+        snprintf(rt->nav, sizeof(rt->nav), "route:replace:%s", rel);
         return 0;
     }
     if (str_eq(cmd, "require")) {
@@ -186,7 +193,8 @@ int bridge_exec_cmd(VslRuntime *rt, const char *cmd, const char *a1, const char 
     if (str_eq(cmd, "call")) {
         if (!bridge_check_cap(rt, PKG_CAP_TELEPHONY))
             return -1;
-        return bridge_nav(rt, "res/layout/call_active.xml");
+        str_copy(rt->nav, sizeof(rt->nav), "route:replace:res/layout/call_active.xml");
+        return 0;
     }
     return -1;
 }

@@ -9,5 +9,5 @@ on_soft left
 end
 
 on_soft right
-  back
+  pop_route
 end

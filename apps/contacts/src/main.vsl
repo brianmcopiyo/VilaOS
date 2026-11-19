@@ -3,19 +3,19 @@ on_load
 end
 
 on_click c1
-  nav res/layout/detail.xml
+  push_route res/layout/detail.xml
 end
 on_click c2
-  nav res/layout/detail.xml
+  push_route res/layout/detail.xml
 end
 on_click c3
-  nav res/layout/detail.xml
+  push_route res/layout/detail.xml
 end
 on_click c4
-  nav res/layout/detail.xml
+  push_route res/layout/detail.xml
 end
 on_click c5
-  nav res/layout/detail.xml
+  push_route res/layout/detail.xml
 end
 
 on_soft left
@@ -23,5 +23,5 @@ on_soft left
 end
 
 on_soft right
-  back
+  pop_route
 end

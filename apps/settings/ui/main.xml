@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<screen id="settings" bg="#F5EFE6">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Settings" fg="#1C1917" w="100%" h="auto"/>
+    <label id="sec_display" text="Display" fg="#57534E" w="100%" h="auto"/>
+    <button id="toggle_text" text="Large text: Off" action="toggle_text" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+    <label id="sec_input" text="Input and keypad" fg="#57534E" w="100%" h="auto"/>
+    <label id="input_help" text="T9, 123, and QWERTY supported" fg="#1C1917" w="100%" h="auto"/>
+    <label id="sec_sound" text="Sound and profiles" fg="#57534E" w="100%" h="auto"/>
+    <button id="toggle_sound" text="Sound: On" action="toggle_sound" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+    <button id="toggle_vibrate" text="Vibrate: On" action="toggle_vibrate" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+    <button id="toggle_profile" text="Profile: General" action="cycle_profile" bg="#EAE0D0" fg="#1C1917" focus_bg="#EA580C" w="100%" h="auto"/>
+    <label id="sec_time" text="Date and time" fg="#57534E" w="100%" h="auto"/>
+    <label id="time_help" text="Uses device clock automatically" fg="#1C1917" w="100%" h="auto"/>
+    <label id="sec_about" text="About VilaOS" fg="#57534E" w="100%" h="auto"/>
+    <label id="about1" text="VilaOS Feature Phone" fg="#1C1917" w="100%" h="auto"/>
+    <label id="about2" text="Version 1.0" fg="#57534E" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Toggle" center="OK" right="Back"
+            left_action="ok" center_action="ok" right_action="route:pop"/>
+</screen>
