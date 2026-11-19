@@ -318,10 +318,7 @@ mkdir -p /run/vilaos
 export LD_LIBRARY_PATH=/lib:/drivers/gfx/builtin
 cd /
 export HOME=/
-while true; do
-  /bin/vilaos
-  sleep 1
-done
+exec /bin/vilaos
 EOF
 chmod 755 "${ROOTFS}/init"
 ln -sf /init "${ROOTFS}/sbin/init"

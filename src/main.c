@@ -12,6 +12,7 @@
 #include "procman.h"
 #include "touch.h"
 #include "vapi.h"
+#include "compositor.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@
 
 static volatile int g_run = 1;
 static AppHost g_host;
+static DisplayCompositor g_comp;
 static int g_pid1;
 static char g_pwr_ret_app[MAX_ID];
 static char g_pwr_ret_path[MAX_PATH];
@@ -45,7 +47,6 @@ static void request_stop(void)
 static void on_signal(int sig)
 {
     (void)sig;
-    request_stop();
 }
 
 static void hang_forever(void)
@@ -72,11 +73,11 @@ static void boot_set_stage(Screen *s, Gfx *g, InputMux *input, const char *statu
 {
     Widget *st = screen_find(s, "boot_status");
     Widget *bar = screen_find(s, "boot_bar");
+    screen_layout(s, g);
     if (st && status)
         str_copy(st->text, sizeof(st->text), status);
     if (bar)
         bar->value = clamp_i(pct, 0, 100);
-    screen_layout(s, g);
     screen_render(s, g, &input->state);
     gfx_present(g);
 }
@@ -241,7 +242,9 @@ static int soft_act_is_os(const char *act)
 {
     return str_starts(act, "route:") || str_starts(act, "app:") || str_starts(act, "power") ||
            str_eq(act, "back") || str_eq(act, "home") || str_eq(act, "go_home") ||
-           str_eq(act, "pop_route") || str_eq(act, "clear") || str_eq(act, "options");
+           str_eq(act, "pop_route") || str_eq(act, "clear") || str_eq(act, "options") ||
+           str_eq(act, "unlock") || str_eq(act, "power_menu") || str_eq(act, "search") ||
+           str_eq(act, "shade");
 }
 
 static int run_soft(Screen *s, Gfx *g, int side, const char *act, char *nav, size_t nav_sz)
@@ -290,7 +293,7 @@ static void cancel_power_menu(Screen *s, Gfx *g, InputMux *input, char *nav, siz
         !strstr(g_pwr_ret_path, "boot.xml") && !strstr(g_pwr_ret_path, "shutdown.xml")) {
         str_copy(nav, nav_sz, g_pwr_ret_path);
     } else {
-        str_copy(nav, nav_sz, "assets/screens/home.xml");
+        str_copy(nav, nav_sz, "app:launcher");
     }
     g_pwr_ret_app[0] = 0;
     g_pwr_ret_path[0] = 0;
@@ -301,22 +304,16 @@ static int run_boot_sequence(Gfx *g, InputMux *input, Screen *s)
     if (screen_load(s, "assets/screens/boot.xml") != 0)
         return -1;
     screen_layout(s, g);
-    boot_set_stage(s, g, input, "Starting VilaOS...", 12);
-    boot_sleep_ms(350);
-
-    boot_set_stage(s, g, input, "Starting VilaOS...", 28);
-    boot_sleep_ms(250);
+    boot_set_stage(s, g, input, "Starting VilaOS...", 20);
+    boot_sleep_ms(200);
 
     boot_set_stage(s, g, input, "Loading apps...", 55);
     apphost_init(&g_host);
     procman_init(&g_procman);
-    boot_sleep_ms(400);
+    boot_sleep_ms(200);
 
-    boot_set_stage(s, g, input, "Loading apps...", 78);
-    boot_sleep_ms(250);
-
-    boot_set_stage(s, g, input, "Ready", 100);
-    boot_sleep_ms(350);
+    boot_set_stage(s, g, input, "Starting shell...", 85);
+    boot_sleep_ms(150);
     return 0;
 }
 
@@ -343,12 +340,10 @@ int main(int argc, char **argv)
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
 #ifndef _WIN32
-    if (g_pid1) {
-        signal(SIGINT, SIG_IGN);
-        signal(SIGTERM, SIG_IGN);
-        signal(SIGQUIT, SIG_IGN);
-        signal(SIGHUP, SIG_IGN);
-    }
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTERM, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
 #endif
 
     Gfx gfx;
@@ -379,24 +374,40 @@ int main(int argc, char **argv)
             if (!g_procman.ready)
                 procman_init(&g_procman);
         }
-        start = "assets/screens/idle.xml";
+        start = "app:launcher";
     } else {
         apphost_init(&g_host);
         procman_init(&g_procman);
     }
 
-    if (screen_load(&screen, start) != 0) {
+    if (str_starts(start, "app:")) {
+        if (!skip_boot)
+            boot_set_stage(&screen, &gfx, &input, "Starting shell...", 95);
+        if (apphost_open_app(&g_host, &screen, &gfx, start + 4) != 0) {
+            fprintf(stderr, "failed to open %s, falling back\n", start);
+            if (screen_load(&screen, "/apps/launcher/res/layout/lock.xml") != 0 &&
+                screen_load(&screen, "assets/screens/idle.xml") != 0)
+                hang_forever();
+            screen_layout(&screen, &gfx);
+            g_host.in_app = 0;
+        }
+    } else if (screen_load(&screen, start) != 0) {
         fprintf(stderr, "failed to load %s\n", start);
-        if (g_pid1)
-            hang_forever();
-        icon_shutdown();
-        gfx_shutdown(&gfx);
-        return 1;
+        hang_forever();
+    } else {
+        if (strstr(start, "home.xml"))
+            apphost_refresh_launcher(&g_host, &screen);
+        screen_layout(&screen, &gfx);
     }
-    if (strstr(start, "home.xml"))
-        apphost_refresh_launcher(&g_host, &screen);
-    screen_layout(&screen, &gfx);
     input_set_dialer_mode(&input, path_is_dialer(screen.path));
+    screen_render(&screen, &gfx, &input.state);
+    gfx_present(&gfx);
+
+    if (compositor_start(&g_comp, &gfx, &screen, &input) != 0) {
+        fprintf(stderr, "compositor_start failed, using sync present\n");
+    } else {
+        compositor_request_full(&g_comp);
+    }
 
     uint64_t last_tick = 0;
 restart_loop:
@@ -407,14 +418,24 @@ restart_loop:
             break;
         }
 
+        int need_frame = 0;
+        int has_comp = g_comp.running;
         if (gfx.resized) {
+            if (has_comp)
+                compositor_lock(&g_comp);
             screen_layout(&screen, &gfx);
             sync_bounds(&input, &gfx);
             gfx.resized = 0;
+            if (has_comp) {
+                compositor_unlock(&g_comp);
+                compositor_request_full(&g_comp);
+            }
         }
 
         uint64_t t = now_ms();
         if (t - last_tick > 200) {
+            if (has_comp)
+                compositor_lock(&g_comp);
             procman_tick(&g_procman);
             screen_tick(&screen, &gfx);
             apphost_on_tick(&g_host);
@@ -422,19 +443,35 @@ restart_loop:
             char mode[24];
             input_mode_label(&input, mode, sizeof(mode));
             screen_set_mode_badge(&screen, mode);
+            if (has_comp)
+                compositor_unlock(&g_comp);
+            need_frame = 1;
             last_tick = t;
         }
 
         InputEvent ev;
-        int got = input_poll(&input, &ev, 16);
+        int got = input_poll(&input, &ev, 8);
+        if (has_comp)
+            compositor_note_input(&g_comp);
         char nav[MAX_PATH];
         nav[0] = 0;
         int arc = 0;
 
         if (got) {
+            need_frame = 1;
+            int heavy = (ev.kind == IE_OK || ev.kind == IE_HOME || ev.kind == IE_BACK ||
+                         ev.kind == IE_SOFT_LEFT || ev.kind == IE_SOFT_RIGHT || ev.kind == IE_POWER ||
+                         ev.kind == IE_CLICK || ev.kind == IE_TOUCH_UP || ev.kind == IE_TOUCH_DOWN ||
+                         ev.kind == IE_TOUCH_MOVE);
+            int held = 0;
+            if (has_comp && !heavy) {
+                compositor_lock(&g_comp);
+                held = 1;
+            }
             switch (ev.kind) {
             case IE_QUIT:
-                request_stop();
+                if (!g_pid1)
+                    request_stop();
                 break;
             case IE_POWER:
                 if (!strstr(screen.path, "power.xml") && !strstr(screen.path, "boot.xml") &&
@@ -482,12 +519,8 @@ restart_loop:
                     nav[0] = 0;
                 else if (g_host.in_app)
                     apphost_route_pop(&g_host, &screen, &gfx, nav, sizeof(nav));
-                else if (strstr(screen.path, "idle.xml"))
-                    nav[0] = 0;
-                else if (strstr(screen.path, "home.xml"))
-                    str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
                 else
-                    str_copy(nav, sizeof(nav), "assets/screens/home.xml");
+                    nav[0] = 0;
                 break;
             case IE_SOFT_RIGHT:
                 arc = run_soft(&screen, &gfx, 3,
@@ -533,12 +566,7 @@ restart_loop:
                     if (side == 3 && str_eq(screen.soft_right_act, "power_cancel") && !nav[0])
                         cancel_power_menu(&screen, &gfx, &input, nav, sizeof(nav));
                     else if (side == 3 && !nav[0] && !g_host.in_app) {
-                        if (strstr(screen.path, "idle.xml"))
-                            nav[0] = 0;
-                        else if (strstr(screen.path, "home.xml"))
-                            str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
-                        else if (!strstr(screen.path, "boot.xml") && !strstr(screen.path, "shutdown.xml"))
-                            str_copy(nav, sizeof(nav), "assets/screens/home.xml");
+                        nav[0] = 0;
                     }
                 } else if (tr == 2) {
                     arc = activate_focus(&screen, &gfx, nav, sizeof(nav));
@@ -561,12 +589,7 @@ restart_loop:
                     if (side == 3 && str_eq(screen.soft_right_act, "power_cancel") && !nav[0])
                         cancel_power_menu(&screen, &gfx, &input, nav, sizeof(nav));
                     else if (side == 3 && !nav[0] && !g_host.in_app) {
-                        if (strstr(screen.path, "idle.xml"))
-                            nav[0] = 0;
-                        else if (strstr(screen.path, "home.xml"))
-                            str_copy(nav, sizeof(nav), "assets/screens/idle.xml");
-                        else if (!strstr(screen.path, "boot.xml") && !strstr(screen.path, "shutdown.xml"))
-                            str_copy(nav, sizeof(nav), "assets/screens/home.xml");
+                        nav[0] = 0;
                     }
                 } else if (ev.kind == IE_TOUCH_UP && tr == 2) {
                     arc = activate_focus(&screen, &gfx, nav, sizeof(nav));
@@ -578,29 +601,51 @@ restart_loop:
             default:
                 break;
             }
+            if (held)
+                compositor_unlock(&g_comp);
         }
 
-        if (nav[0] && strstr(screen.path, "power.xml") && strstr(nav, "home.xml"))
+        if (nav[0] && strstr(screen.path, "power.xml") && strstr(nav, "home.xml")) {
             cancel_power_menu(&screen, &gfx, &input, nav, sizeof(nav));
+            need_frame = 1;
+        }
 
         if (nav[0]) {
             if (apply_nav(&screen, &gfx, &input, nav) < 0)
                 fprintf(stderr, "nav failed: %s\n", nav);
+            need_frame = 1;
+            if (g_comp.running)
+                compositor_request_full(&g_comp);
+            else {
+                screen_render(&screen, &gfx, &input.state);
+                gfx_present(&gfx);
+            }
+        } else if (need_frame) {
+            if (g_comp.running)
+                compositor_request(&g_comp);
+            else {
+                screen_render(&screen, &gfx, &input.state);
+                gfx_present(&gfx);
+            }
         }
-
-        screen_render(&screen, &gfx, &input.state);
-        gfx_present(&gfx);
     }
+
+    compositor_stop(&g_comp);
 
     if (g_pid1) {
         g_run = 1;
-        if (screen_load(&screen, "assets/screens/idle.xml") == 0) {
-            apphost_route_home(&g_host, &screen, &gfx, NULL, 0);
-            screen_layout(&screen, &gfx);
+        if (compositor_start(&g_comp, &gfx, &screen, &input) != 0)
+            hang_forever();
+        compositor_lock(&g_comp);
+        if (apphost_route_home(&g_host, &screen, &gfx, NULL, 0) >= 0) {
             input_set_dialer_mode(&input, 0);
+            compositor_unlock(&g_comp);
+            compositor_request_full(&g_comp);
             last_tick = 0;
             goto restart_loop;
         }
+        compositor_unlock(&g_comp);
+        compositor_stop(&g_comp);
         hang_forever();
     }
 

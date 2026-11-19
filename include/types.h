@@ -5,10 +5,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#define REF_W 240
-#define REF_H 320
+#define REF_W 432
+#define REF_H 960
+#define PHONE_W 432
+#define PHONE_H 960
 #define MAX_FB_W 1920
-#define MAX_FB_H 1200
+#define MAX_FB_H 1920
 
 #define MAX_WIDGETS 128
 #define MAX_TEXT 128
@@ -45,7 +47,7 @@
 #define COL_ACCENT   RGB565(234, 88, 12)
 #define COL_FOCUS    RGB565(234, 88, 12)
 #define COL_ON_ACCENT RGB565(255, 255, 255)
-#define COL_SOFTKEY  RGB565(227, 214, 195)
+#define COL_SOFTKEY  RGB565(245, 239, 230)
 #define COL_WARN     RGB565(180, 83, 9)
 #define COL_OK       RGB565(21, 128, 61)
 #define COL_DANGER   RGB565(185, 28, 28)

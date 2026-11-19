@@ -118,6 +118,8 @@ const char *icon_alias(const char *name, const char *set)
     if (str_eq(n, "music") || str_eq(n, "audio")) {
         if (str_eq(s, "phosphor"))
             return "music-notes";
+        if (str_eq(s, "tabler"))
+            return "music";
         return "music";
     }
     if (str_eq(n, "browser") || str_eq(n, "web")) {
@@ -319,12 +321,12 @@ static IconEntry *rasterize(const char *set, const char *name, int size, uint16_
 
 static void draw_fallback(Gfx *g, int cx, int cy, int size, uint16_t fg)
 {
-    int s = size / 8;
-    if (s < 2)
-        s = 2;
-    int x = cx - size / 2;
-    int y = cy - size / 2;
-    draw_round_rect(g, x + s, y + s, size - 2 * s, size - 2 * s, s, fg, 0);
+    int r = size / 5;
+    if (r < 2)
+        r = 2;
+    if (r > 6)
+        r = 6;
+    draw_round_rect(g, cx - r, cy - r, r * 2, r * 2, r, fg, 1);
 }
 
 void icon_init(Gfx *g)
@@ -379,11 +381,22 @@ int icon_draw(Gfx *g, int cx, int cy, int size, const char *name, const char *se
     IconEntry *e = cache_find(setn, resolved, size, fg);
     if (!e)
         e = rasterize(setn, resolved, size, fg);
+    if (!e && (str_eq(resolved, "music") || str_eq(name, "music") || str_eq(name, "audio"))) {
+        e = cache_find("tabler", "music", size, fg);
+        if (!e)
+            e = rasterize("tabler", "music", size, fg);
+    }
     if (!e && !str_eq(setn, "lucide")) {
         const char *alt = icon_alias(name, "lucide");
         e = cache_find("lucide", alt, size, fg);
         if (!e)
             e = rasterize("lucide", alt, size, fg);
+    }
+    if (!e && !str_eq(setn, "tabler")) {
+        const char *alt = icon_alias(name, "tabler");
+        e = cache_find("tabler", alt, size, fg);
+        if (!e)
+            e = rasterize("tabler", alt, size, fg);
     }
     if (!e) {
         draw_fallback(g, cx, cy, size, fg);

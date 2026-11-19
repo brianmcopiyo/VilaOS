@@ -1,5 +1,5 @@
 param(
-    [int]$MemoryMB = 256
+    [int]$MemoryMB = 512
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,7 +45,7 @@ if (-not (Test-Path $IsoPath)) {
 $VBox = Find-VBoxManage
 Write-Host "Using $VBox"
 Write-Host "ISO $IsoPath"
-Write-Host "VM $VmName memory=${MemoryMB}MB"
+Write-Host "VM $VmName memory=${MemoryMB}MB portrait=432x960x32"
 
 foreach ($legacy in $LegacyNames) {
     Remove-VmIfExists -Name $legacy -VBox $VBox
@@ -55,8 +55,8 @@ Remove-VmIfExists -Name $VmName -VBox $VBox
 & $VBox createvm --name $VmName --ostype Linux_64 --register | Out-Null
 & $VBox modifyvm $VmName `
     --memory $MemoryMB `
-    --vram 8 `
-    --cpus 1 `
+    --vram 128 `
+    --cpus 2 `
     --acpi on `
     --ioapic on `
     --boot1 dvd `
@@ -71,6 +71,10 @@ Remove-VmIfExists -Name $VmName -VBox $VBox
     --nic1 none `
     --usb off | Out-Null
 
+& $VBox setextradata $VmName "CustomVideoMode1" "432x960x32"
+& $VBox setextradata $VmName "GUI/MaxGuestResolution" "any"
+& $VBox setextradata $VmName "GUI/LastGuestSizeHint" "432,960"
+
 & $VBox storagectl $VmName --name "IDE" --add ide --controller PIIX4 | Out-Null
 & $VBox storageattach $VmName `
     --storagectl "IDE" `
@@ -79,6 +83,6 @@ Remove-VmIfExists -Name $VmName -VBox $VBox
     --type dvddrive `
     --medium $IsoPath | Out-Null
 
-Write-Host "Starting $VmName (${MemoryMB} MB RAM, VBoxVGA)..."
+Write-Host "Starting $VmName (${MemoryMB} MB RAM, 432x960, VBoxVGA)..."
 & $VBox startvm $VmName --type gui
 Write-Host "Started."

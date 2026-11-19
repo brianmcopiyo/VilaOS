@@ -21,6 +21,7 @@ SRC := \
 	src/gfx/ttfont.c \
 	src/gfx/icon.c \
 	src/gfx/compose.c \
+	src/gfx/compositor.c \
 	src/gfx/pool.c \
 	src/gfx/hwinfo.c \
 	src/driver/gfx/loader.c \

@@ -56,8 +56,9 @@ static int expand_component(BuildCtx *ctx, const char *name, const XmlStart *ove
 static int is_primitive_tag(const char *tag)
 {
     static const char *const tags[] = {
-        "screen", "vbox", "hbox", "column", "flex", "grid", "label", "text", "button",
-        "input", "list", "statusbar", "softkeys"
+        "screen", "vbox", "hbox", "column", "flex", "grid", "label", "text", "header",
+        "badge", "icon", "button", "input", "list", "statusbar", "softkeys", "footer",
+        "tile", "row", "dock"
     };
     for (size_t i = 0; i < sizeof(tags) / sizeof(tags[0]); i++) {
         if (str_eq(tag, tags[i]))
@@ -117,7 +118,7 @@ static void on_start(const XmlStart *el, void *user)
     if (!w->component[0]) {
         if (str_eq(el->tag, "text") || str_eq(el->tag, "header") || str_eq(el->tag, "badge") ||
             str_eq(el->tag, "icon") || str_eq(el->tag, "footer") || str_eq(el->tag, "button") ||
-            str_eq(el->tag, "tile") || str_eq(el->tag, "row"))
+            str_eq(el->tag, "tile") || str_eq(el->tag, "row") || str_eq(el->tag, "dock"))
             str_copy(w->component, sizeof(w->component), el->tag);
     }
 
@@ -274,6 +275,8 @@ static void transfer_to_leaf(Widget *w, Widget *leaf, const char *name)
 static int expand_component(BuildCtx *ctx, const char *name, const XmlStart *overrides)
 {
     if (!ctx || !ctx->res || !name)
+        return -1;
+    if (ctx->in_component >= 8)
         return -1;
     const char *path = NULL;
     for (int i = 0; i < ctx->res->component_count; i++) {

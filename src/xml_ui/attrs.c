@@ -23,7 +23,7 @@ WidgetType xml_ui_tag_type(const char *tag)
     if (str_eq(tag, "label") || str_eq(tag, "text") || str_eq(tag, "header") ||
         str_eq(tag, "badge") || str_eq(tag, "icon"))
         return W_LABEL;
-    if (str_eq(tag, "button"))
+    if (str_eq(tag, "button") || str_eq(tag, "tile") || str_eq(tag, "row") || str_eq(tag, "dock"))
         return W_BUTTON;
     if (str_eq(tag, "input"))
         return W_INPUT;

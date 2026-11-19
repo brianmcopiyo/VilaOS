@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<screen id="shade" class="page" background="#F5EFE6">
+  <statusbar id="status"/>
+  <flex id="body" class="col gap-8 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <label id="title" text="Quick settings" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="20" font-weight="700" component="header"/>
+    <label id="clock" text="00:00" color="#1C1917" width="100%" height="wrap" value="1" font-family="JetBrains Mono" font-size="28" font-weight="500"/>
+    <label id="device" text="Device" color="#57534E" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+    <label id="memory" text="Memory" color="#57534E" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+    <header id="toggles" text="Toggles"/>
+    <button id="sound" text="Sound: On" icon="volume-2" icon-set="lucide" action="toggle_sound" background="#EAE0D0" color="#1C1917" width="100%" height="44" radius="16" border-width="0" component="button"/>
+    <button id="vibrate" text="Vibrate: On" icon="smartphone" icon-set="lucide" action="toggle_vibrate" background="#EAE0D0" color="#1C1917" width="100%" height="44" radius="16" border-width="0" component="button"/>
+    <button id="power" text="Power menu" icon="power" icon-set="lucide" action="power_menu" background="#EA580C" color="#FFFFFF" width="100%" height="44" radius="16" border-width="0" component="button"/>
+    <header id="notes" text="Notifications"/>
+    <row id="n0" title="Messages" subtitle="2 unread" icon="messages" icon-set="phosphor"/>
+    <row id="n1" title="Phone" subtitle="1 missed call" icon="phone" icon-set="lucide"/>
+  </flex>
+  <softkeys left="" center="" right=""
+            left-action="power_menu" center-action="home" right-action="route:pop"/>
+</screen>

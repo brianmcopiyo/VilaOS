@@ -28,22 +28,22 @@ static int grid_auto_cols(Gfx *g, Widget *grid)
         return grid->grid_cols;
     int avail = grid->w > 0 ? grid->w : g->w;
     float ar = g->aspect_ratio > 0.01f ? g->aspect_ratio : ((g->h > 0) ? ((float)g->w / (float)g->h) : 1.0f);
-    int min_cell = 72;
+    int min_cell = 88;
     if (ar >= 1.2f)
-        min_cell = 64;
+        min_cell = 80;
     if (ar >= 1.6f)
-        min_cell = 56;
-    if (avail < 200)
-        min_cell = 56;
-    int cols = min_cell > 0 ? (avail / min_cell) : 3;
-    if (cols < 2)
-        cols = 2;
-    if (cols > 6)
-        cols = 6;
-    if (ar < 0.7f && cols > 3)
+        min_cell = 72;
+    if (avail < 280)
+        min_cell = 72;
+    int cols = min_cell > 0 ? (avail / min_cell) : 4;
+    if (cols < 3)
         cols = 3;
-    if (ar > 1.4f && cols < 4 && avail >= 320)
+    if (cols > 5)
+        cols = 5;
+    if (ar < 0.85f)
         cols = 4;
+    if (ar > 1.3f && cols < 5 && avail >= 400)
+        cols = 5;
     return cols;
 }
 
@@ -157,6 +157,8 @@ static void measure_grid(Screen *s, Gfx *g, Widget *grid)
     int n = 0;
     for (int i = 0; i < grid->child_count; i++) {
         Widget *c = &s->widgets[grid->children[i]];
+        if (!c->visible)
+            continue;
         if (c->type == W_BUTTON || c->type == W_LABEL) {
             measure_widget(s, g, c);
             n++;
@@ -165,11 +167,11 @@ static void measure_grid(Screen *s, Gfx *g, Widget *grid)
     int rows = n > 0 ? (n + cols - 1) / cols : 1;
     int gap = scale_space(g, grid->gap > 0 ? grid->gap : g->pad);
     int pad = pad_px(g, grid->pad_t);
-    int cell = 56;
+    int cell = 76;
     if (g->aspect_ratio >= 1.2f)
-        cell = 52;
+        cell = 72;
     grid->meas_w = cols * cell + (cols - 1) * gap + pad * 2;
-    grid->meas_h = rows * (cell + 8) + (rows - 1) * gap + pad * 2;
+    grid->meas_h = rows * (cell + 22) + (rows - 1) * gap + pad * 2;
 }
 
 static void measure_list(Screen *s, Gfx *g, Widget *list)
@@ -261,6 +263,8 @@ static void arrange_grid(Screen *s, Gfx *g, Widget *grid)
     int n = 0;
     for (int i = 0; i < grid->child_count; i++) {
         Widget *c = &s->widgets[grid->children[i]];
+        if (!c->visible)
+            continue;
         if (c->type == W_BUTTON || c->type == W_LABEL)
             n++;
     }
@@ -284,12 +288,23 @@ static void arrange_grid(Screen *s, Gfx *g, Widget *grid)
         cell_h = cell_w + 8;
     if (ar < 0.8f && cell_w > cell_h + 16)
         cell_w = cell_h + 8;
+    int max_cell = cell_w < cell_h ? cell_w : cell_h;
+    if (max_cell > 96) {
+        cell_w = 96;
+        cell_h = 96;
+    }
     int idx = 0;
     int max_bottom = grid->y + pad;
     for (int i = 0; i < grid->child_count; i++) {
         Widget *c = &s->widgets[grid->children[i]];
         if (c->type != W_BUTTON && c->type != W_LABEL)
             continue;
+        if (!c->visible) {
+            c->focusable = 0;
+            c->w = 0;
+            c->h = 0;
+            continue;
+        }
         int r = idx / cols;
         int col = idx % cols;
         int span = c->col_span > 0 ? c->col_span : 1;
@@ -304,7 +319,6 @@ static void arrange_grid(Screen *s, Gfx *g, Widget *grid)
         if (c->y + c->h > grid->y + grid->h - pad)
             c->h = grid->y + grid->h - pad - c->y;
         c->focusable = (c->type == W_BUTTON);
-        c->visible = 1;
         if (c->y + c->h > max_bottom)
             max_bottom = c->y + c->h;
         idx += span;

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<screen id="drawer" class="page" background="#F5EFE6">
+  <statusbar id="status"/>
+  <flex id="body" class="col gap-8 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <label id="title" text="Apps" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="20" font-weight="700" component="header"/>
+    <input id="search" text="" width="100%" height="40" background="#EAE0D0" color="#1C1917" radius="20" border-width="0" padding="10" font-family="Inter" font-size="13"/>
+    <grid id="drawer" width="100%" height="fill" grow="1" gap="12" padding="4" columns="4">
+      <button id="app0" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app1" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app2" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app3" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app4" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app5" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app6" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app7" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app8" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app9" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app10" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      <button id="app11" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+    </grid>
+  </flex>
+  <softkeys left="" center="" right=""
+            left-action="search" center-action="home" right-action="route:pop"/>
+</screen>

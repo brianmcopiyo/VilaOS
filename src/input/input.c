@@ -487,7 +487,7 @@ void input_set_dialer_mode(InputMux *m, int enabled)
 
 int input_tap_slop(const InputMux *m)
 {
-    int short_edge = 240;
+    int short_edge = PHONE_W;
     if (m) {
         int w = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
         int h = m->state.bound_h > 0 ? m->state.bound_h : REF_H;

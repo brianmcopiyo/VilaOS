@@ -3,18 +3,92 @@
 #include "util.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-int apphost_init(AppHost *h)
+static int is_shell_app(const AppHost *h, const char *id)
+{
+    if (!h || !id || !id[0])
+        return 0;
+    if (h->shell_app[0] && str_eq(id, h->shell_app))
+        return 1;
+    return str_eq(id, "launcher");
+}
+
+void apphost_push_recent(AppHost *h, const char *id)
+{
+    if (!h || !id || !id[0] || is_shell_app(h, id))
+        return;
+    for (int i = 0; i < h->recent_count; i++) {
+        if (str_eq(h->recents[i], id)) {
+            char tmp[MAX_ID];
+            str_copy(tmp, sizeof(tmp), h->recents[i]);
+            for (int j = i; j > 0; j--)
+                str_copy(h->recents[j], sizeof(h->recents[j]), h->recents[j - 1]);
+            str_copy(h->recents[0], sizeof(h->recents[0]), tmp);
+            return;
+        }
+    }
+    if (h->recent_count < APPHOST_MAX_RECENTS)
+        h->recent_count++;
+    for (int i = h->recent_count - 1; i > 0; i--)
+        str_copy(h->recents[i], sizeof(h->recents[i]), h->recents[i - 1]);
+    str_copy(h->recents[0], sizeof(h->recents[0]), id);
+}
+
+void apphost_clear_recents(AppHost *h)
 {
     if (!h)
-        return -1;
-    memset(h, 0, sizeof(*h));
-    str_copy(h->shell_path, sizeof(h->shell_path), "assets/screens/home.xml");
-    route_reset(&h->stack);
-    pkg_registry_load(&h->reg);
-    if (h->reg.count == 0)
-        pkg_seed_from_dir("/apps", &h->reg);
+        return;
+    h->recent_count = 0;
+    memset(h->recents, 0, sizeof(h->recents));
+}
+
+static int is_dock_app(const char *id)
+{
+    return str_eq(id, "dialer") || str_eq(id, "messages") || str_eq(id, "browser") ||
+           str_eq(id, "settings");
+}
+
+static int skip_home_app(const AppHost *h, const char *id, int home_grid)
+{
+    if (is_shell_app(h, id))
+        return 1;
+    if (home_grid && is_dock_app(id))
+        return 1;
+    return 0;
+}
+
+static int fill_app_grid(AppHost *h, Screen *s, const char *grid_id)
+{
+    Widget *grid = screen_find(s, grid_id);
+    if (!grid || grid->type != W_GRID)
+        return 0;
+    int home_grid = str_eq(grid_id, "launcher");
+    int wi = 0;
+    for (int i = 0; i < grid->child_count; i++) {
+        Widget *b = &s->widgets[grid->children[i]];
+        if (b->type != W_BUTTON)
+            continue;
+        while (wi < h->reg.count && skip_home_app(h, h->reg.apps[wi].id, home_grid))
+            wi++;
+        if (wi >= h->reg.count) {
+            b->visible = 0;
+            b->focusable = 0;
+            continue;
+        }
+        const PkgApp *a = &h->reg.apps[wi++];
+        str_copy(b->text, sizeof(b->text), a->name);
+        str_copy(b->icon, sizeof(b->icon), a->icon[0] ? a->icon : a->id);
+        if (str_eq(b->icon, "music") || str_eq(a->id, "music"))
+            str_copy(b->icon_set, sizeof(b->icon_set), "tabler");
+        else if (!b->icon_set[0])
+            str_copy(b->icon_set, sizeof(b->icon_set), "lucide");
+        snprintf(b->action, sizeof(b->action), "app:%s", a->id);
+        b->border = 0;
+        b->visible = 1;
+        b->focusable = 1;
+    }
     return 0;
 }
 
@@ -22,39 +96,58 @@ int apphost_refresh_launcher(AppHost *h, Screen *s)
 {
     if (!h || !s)
         return -1;
-    Widget *grid = screen_find(s, "launcher");
-    if (!grid || grid->type != W_GRID)
-        return 0;
-    int wi = 0;
-    for (int i = 0; i < grid->child_count && wi < h->reg.count; i++) {
-        Widget *b = &s->widgets[grid->children[i]];
-        if (b->type != W_BUTTON)
+    fill_app_grid(h, s, "launcher");
+    fill_app_grid(h, s, "drawer");
+    return 0;
+}
+
+int apphost_refresh_recents(AppHost *h, Screen *s)
+{
+    if (!h || !s)
+        return -1;
+    for (int i = 0; i < APPHOST_MAX_RECENTS; i++) {
+        char wid[8];
+        snprintf(wid, sizeof(wid), "r%d", i);
+        Widget *row = screen_find(s, wid);
+        if (!row)
             continue;
-        const PkgApp *a = &h->reg.apps[wi++];
-        str_copy(b->text, sizeof(b->text), a->name);
-        str_copy(b->icon, sizeof(b->icon), a->icon[0] ? a->icon : a->id);
-        snprintf(b->action, sizeof(b->action), "app:%s", a->id);
-        b->visible = 1;
-        b->focusable = 1;
-    }
-    for (int i = 0; i < grid->child_count; i++) {
-        Widget *b = &s->widgets[grid->children[i]];
-        if (b->type != W_BUTTON)
-            continue;
-        int used = 0;
-        for (int k = 0; k < h->reg.count; k++) {
-            char act[64];
-            snprintf(act, sizeof(act), "app:%s", h->reg.apps[k].id);
-            if (str_eq(b->action, act)) {
-                used = 1;
-                break;
+        if (i < h->recent_count) {
+            int idx = pkg_registry_find(&h->reg, h->recents[i]);
+            const char *name = h->recents[i];
+            const char *icon = h->recents[i];
+            if (idx >= 0) {
+                name = h->reg.apps[idx].name;
+                if (h->reg.apps[idx].icon[0])
+                    icon = h->reg.apps[idx].icon;
             }
-        }
-        if (!used && str_starts(b->action, "app:")) {
-            b->visible = 0;
-            b->focusable = 0;
+            snprintf(row->text, sizeof(row->text), "%s\nRunning", name);
+            str_copy(row->icon, sizeof(row->icon), icon);
+            snprintf(row->action, sizeof(row->action), "app:%s", h->recents[i]);
+            row->visible = 1;
+            row->focusable = 1;
+        } else {
+            str_copy(row->text, sizeof(row->text), "—\nNot running");
+            str_copy(row->icon, sizeof(row->icon), "app");
+            str_copy(row->action, sizeof(row->action), "none");
+            row->visible = 1;
+            row->focusable = 0;
         }
     }
+    return 0;
+}
+
+int apphost_init(AppHost *h)
+{
+    if (!h)
+        return -1;
+    memset(h, 0, sizeof(*h));
+    str_copy(h->shell_app, sizeof(h->shell_app), "launcher");
+    str_copy(h->shell_path, sizeof(h->shell_path), "app:launcher");
+    h->unlocked = 0;
+    route_reset(&h->stack);
+    pkg_registry_load(&h->reg);
+    if (h->reg.count == 0)
+        pkg_seed_from_dir("/apps", &h->reg);
     return 0;
 }
 
@@ -80,6 +173,19 @@ static void normalize_layout_rel(const char *in, char *out, size_t n)
         }
     }
     str_copy(out, n, in);
+}
+
+static void after_layout(AppHost *h, Screen *s, Gfx *g)
+{
+    if (!h || !s)
+        return;
+    if (strstr(s->path, "home.xml") || strstr(s->path, "drawer.xml"))
+        apphost_refresh_launcher(h, s);
+    if (strstr(s->path, "recents.xml"))
+        apphost_refresh_recents(h, s);
+    if (g)
+        screen_layout(s, g);
+    apphost_update_softkeys(h, s);
 }
 
 static int load_layout(AppHost *h, Screen *s, Gfx *g, const PkgApp *app, const char *screen_rel, int restore_focus)
@@ -114,15 +220,39 @@ static int load_layout(AppHost *h, Screen *s, Gfx *g, const PkgApp *app, const c
         h->vsl.screen = s;
         h->vsl.loaded = 1;
     } else {
+        h->current = *app;
+        h->in_app = 1;
+        after_layout(h, s, g);
         vsl_load(&h->vsl, app, s, script);
+        if (restore_focus >= 0 && restore_focus < s->count && s->widgets[restore_focus].focusable)
+            screen_set_focus(s, restore_focus);
+        return 0;
     }
     h->current = *app;
     h->in_app = 1;
-    if (g)
-        screen_layout(s, g);
     if (restore_focus >= 0 && restore_focus < s->count && s->widgets[restore_focus].focusable)
         screen_set_focus(s, restore_focus);
-    apphost_update_softkeys(h, s);
+    after_layout(h, s, g);
+    return 0;
+}
+
+static int resolve_app(AppHost *h, const char *id, PkgApp *app)
+{
+    int idx = pkg_registry_find(&h->reg, id);
+    memset(app, 0, sizeof(*app));
+    if (idx >= 0) {
+        *app = h->reg.apps[idx];
+        return 0;
+    }
+    char man[MAX_PATH];
+    snprintf(man, sizeof(man), "%s/%s/manifest.xml", PKG_APPS_ROOT, id);
+    if (pkg_parse_manifest(man, app) != 0) {
+        str_copy(app->id, sizeof(app->id), id);
+        str_copy(app->name, sizeof(app->name), id);
+        str_copy(app->entry_screen, sizeof(app->entry_screen), "res/layout/main.xml");
+        str_copy(app->entry_script, sizeof(app->entry_script), "bin/main.kbc");
+        str_copy(app->icon, sizeof(app->icon), id);
+    }
     return 0;
 }
 
@@ -160,26 +290,33 @@ void apphost_update_softkeys(AppHost *h, Screen *s)
     }
 }
 
+int apphost_open_shell(AppHost *h, Screen *s, Gfx *g, const char *layout)
+{
+    PkgApp app;
+    if (!h || !s)
+        return -1;
+    resolve_app(h, h->shell_app[0] ? h->shell_app : "launcher", &app);
+    char rel[MAX_PATH];
+    if (layout && layout[0])
+        normalize_layout_rel(layout, rel, sizeof(rel));
+    else if (h->unlocked)
+        str_copy(rel, sizeof(rel), "res/layout/home.xml");
+    else
+        normalize_layout_rel(app.entry_screen, rel, sizeof(rel));
+    route_reset(&h->stack);
+    route_push(&h->stack, app.id, rel, -1, NULL);
+    return load_layout(h, s, g, &app, rel, -1);
+}
+
 int apphost_open_app(AppHost *h, Screen *s, Gfx *g, const char *id)
 {
     if (!h || !s || !id)
         return -1;
-    int idx = pkg_registry_find(&h->reg, id);
+    if (is_shell_app(h, id))
+        return apphost_open_shell(h, s, g, h->unlocked ? "res/layout/home.xml" : NULL);
     PkgApp app;
-    memset(&app, 0, sizeof(app));
-    if (idx >= 0) {
-        app = h->reg.apps[idx];
-    } else {
-        char man[MAX_PATH];
-        snprintf(man, sizeof(man), "%s/%s/manifest.xml", PKG_APPS_ROOT, id);
-        if (pkg_parse_manifest(man, &app) != 0) {
-            str_copy(app.id, sizeof(app.id), id);
-            str_copy(app.name, sizeof(app.name), id);
-            str_copy(app.entry_screen, sizeof(app.entry_screen), "res/layout/main.xml");
-            str_copy(app.entry_script, sizeof(app.entry_script), "bin/main.kbc");
-            str_copy(app.icon, sizeof(app.icon), id);
-        }
-    }
+    resolve_app(h, id, &app);
+    apphost_push_recent(h, id);
     route_reset(&h->stack);
     char rel[MAX_PATH];
     normalize_layout_rel(app.entry_screen, rel, sizeof(rel));
@@ -205,6 +342,8 @@ int apphost_route_replace(AppHost *h, Screen *s, Gfx *g, const char *layout)
         return -1;
     char rel[MAX_PATH];
     normalize_layout_rel(layout, rel, sizeof(rel));
+    if (strstr(rel, "home.xml") && is_shell_app(h, h->current.id))
+        h->unlocked = 1;
     if (route_depth(&h->stack) <= 0) {
         route_push(&h->stack, h->current.id, rel, -1, NULL);
     } else {
@@ -223,6 +362,11 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
         return 0;
     }
     if (route_is_root(&h->stack)) {
+        if (is_shell_app(h, h->current.id)) {
+            if (out_nav)
+                out_nav[0] = 0;
+            return 0;
+        }
         route_reset(&h->stack);
         h->in_app = 0;
         vsl_reset(&h->vsl);
@@ -234,6 +378,11 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
     route_pop(&h->stack, &discarded);
     const RouteFrame *top = route_top(&h->stack);
     if (!top) {
+        if (is_shell_app(h, h->current.id)) {
+            if (out_nav)
+                out_nav[0] = 0;
+            return 0;
+        }
         route_reset(&h->stack);
         h->in_app = 0;
         vsl_reset(&h->vsl);
@@ -250,16 +399,26 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
 
 int apphost_route_home(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_sz)
 {
-    (void)s;
-    (void)g;
     if (!h)
         return -1;
-    route_reset(&h->stack);
-    h->in_app = 0;
-    vsl_reset(&h->vsl);
+    const char *layout = h->unlocked ? "res/layout/home.xml" : "res/layout/lock.xml";
+    if (h->in_app && is_shell_app(h, h->current.id)) {
+        route_reset(&h->stack);
+        route_push(&h->stack, h->current.id, layout, -1, NULL);
+        if (load_layout(h, s, g, &h->current, layout, -1) != 0)
+            return -1;
+        if (out_nav)
+            out_nav[0] = 0;
+        return 2;
+    }
+    if (apphost_open_shell(h, s, g, layout) != 0) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, h->shell_path);
+        return 1;
+    }
     if (out_nav)
-        str_copy(out_nav, out_sz, h->shell_path);
-    return 1;
+        out_nav[0] = 0;
+    return 2;
 }
 
 int apphost_open_screen(AppHost *h, Screen *s, Gfx *g, const char *rel_or_abs)
@@ -333,6 +492,54 @@ int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, cha
         return 30;
     if (str_eq(action, "power_restart"))
         return 31;
+
+    if (str_eq(action, "unlock") && h->in_app && is_shell_app(h, h->current.id)) {
+        h->unlocked = 1;
+        if (apphost_route_replace(h, s, g, "res/layout/home.xml") == 0) {
+            if (out_nav)
+                out_nav[0] = 0;
+            return 2;
+        }
+        return -1;
+    }
+
+    if (str_eq(action, "shade")) {
+        if (h->in_app && is_shell_app(h, h->current.id)) {
+            if (apphost_route_push(h, s, g, "res/layout/shade.xml") == 0) {
+                if (out_nav)
+                    out_nav[0] = 0;
+                return 2;
+            }
+            return -1;
+        }
+        if (h->in_app && is_shell_app(h, h->shell_app)) {
+            return -1;
+        }
+    }
+
+    if (str_eq(action, "clear") && h->in_app && is_shell_app(h, h->current.id) &&
+        s && strstr(s->path, "recents.xml")) {
+        apphost_clear_recents(h);
+        apphost_refresh_recents(h, s);
+        if (g)
+            screen_layout(s, g);
+        if (out_nav)
+            out_nav[0] = 0;
+        return 2;
+    }
+
+    if (str_starts(action, "recent_") && h->in_app && is_shell_app(h, h->current.id)) {
+        int idx = atoi(action + 7);
+        if (idx >= 0 && idx < h->recent_count) {
+            if (apphost_open_app(h, s, g, h->recents[idx]) == 0) {
+                if (out_nav)
+                    out_nav[0] = 0;
+                return 2;
+            }
+            return -1;
+        }
+        return apphost_route_pop(h, s, g, out_nav, out_sz);
+    }
 
     int rc = handle_route_action(h, s, g, action, out_nav, out_sz);
     if (rc != 0)

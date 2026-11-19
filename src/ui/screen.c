@@ -176,12 +176,23 @@ int screen_focus_at(Screen *s, int x, int y)
     return -1;
 }
 
+int screen_hit_statusbar(const Screen *s, const Gfx *g, int x, int y)
+{
+    (void)s;
+    (void)x;
+    if (!g)
+        return 0;
+    if (y < 0 || y >= g->status_h)
+        return 0;
+    return 1;
+}
+
 int screen_hit_softkey(const Screen *s, const Gfx *g, int x, int y)
 {
     (void)s;
     if (!g)
         return 0;
-    int top = g->h - g->softkey_h - 4;
+    int top = g->h - g->softkey_h;
     if (top < 0)
         top = 0;
     if (y < top)
@@ -214,12 +225,7 @@ static void draw_battery(Gfx *g, int x, int y, int pct)
 
 static void draw_statusbar(Gfx *g, Widget *w)
 {
-    draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
-    draw_hline(g, 0, w->y + w->h - 1, g->w, COL_BORDER);
-    draw_hline(g, 0, w->h - 1, g->w, COL_BORDER);
-    draw_signal(g, g->pad, (w->h - 12) / 2, 4);
-    draw_battery(g, g->w - g->pad - 22, (w->h - 10) / 2, 86);
-
+    draw_fill(g, w->x, w->y, w->w, w->h, COL_BG);
     time_t t = time(NULL);
     struct tm tm_buf;
 #ifdef _WIN32
@@ -229,28 +235,38 @@ static void draw_statusbar(Gfx *g, Widget *w)
 #endif
     char clock[16];
     snprintf(clock, sizeof(clock), "%02d:%02d", tm_buf.tm_hour, tm_buf.tm_min);
-    int tw = font_text_w_scaled(g, FONT_8X12, clock);
-    int ty = (w->h - font_char_h_scaled(g, FONT_8X12)) / 2;
-    font_draw_text(g, FONT_8X12, (g->w - tw) / 2, ty, clock, COL_TEXT, COL_SOFTKEY, 1);
+    FontStyle st = font_style_from_id(g, FONT_UI);
+    st.size_px = 13;
+    st.weight = 600;
+    int th = font_char_h_style(g, &st);
+    int ty = (w->h - th) / 2;
+    font_draw_text_style(g, &st, g->pad, ty, clock, COL_TEXT, COL_BG, 1);
+    int icon_y = (w->h - 12) / 2;
+    int right = g->w - g->pad;
+    draw_battery(g, right - 22, icon_y + 1, 86);
+    right -= 30;
+    draw_signal(g, right - 20, icon_y, 4);
     if (g_procman.ready) {
         ProcService *ms = procman_find(&g_procman, "musicd");
-        if (ms && ms->state == SVC_RUNNING && ms->pid > 0)
-            font_draw_text(g, FONT_8X12, g->pad + 22, ty, "M", COL_ACCENT, COL_SOFTKEY, 1);
+        if (ms && ms->state == SVC_RUNNING && ms->pid > 0) {
+            FontStyle ms_st = font_style_from_id(g, FONT_UI);
+            ms_st.size_px = 11;
+            font_draw_text_style(g, &ms_st, right - 36, ty, "♪", COL_ACCENT, COL_BG, 1);
+        }
     }
 }
 
 static void draw_softkeys(Gfx *g, Screen *s, Widget *w)
 {
-    draw_fill(g, w->x, w->y, w->w, w->h, COL_SOFTKEY);
-    draw_hline(g, 0, w->y, g->w, COL_BORDER);
-    int third = g->w / 3;
-    int ty = w->y + (w->h - font_char_h_scaled(g, FONT_8X12)) / 2;
-    font_draw_text_clip(g, FONT_8X12, g->pad, ty, third - g->pad * 2, s->soft_left, COL_ACCENT, COL_SOFTKEY, 1);
-    int cw = font_text_w_scaled(g, FONT_8X12, s->soft_center);
-    font_draw_text(g, FONT_8X12, (g->w - cw) / 2, ty, s->soft_center, COL_TEXT, COL_SOFTKEY, 1);
-    int rw = font_text_w_scaled(g, FONT_8X12, s->soft_right);
-    font_draw_text(g, FONT_8X12, g->w - rw - g->pad, ty, s->soft_right, COL_ACCENT, COL_SOFTKEY, 1);
-    (void)third;
+    (void)s;
+    draw_fill(g, w->x, w->y, w->w, w->h, COL_BG);
+    int pill_w = clamp_i(g->w / 3, 96, 140);
+    int pill_h = 5;
+    if (g->softkey_h >= 36)
+        pill_h = 6;
+    int px = w->x + (w->w - pill_w) / 2;
+    int py = w->y + (w->h - pill_h) / 2;
+    draw_round_rect(g, px, py, pill_w, pill_h, pill_h / 2, COL_TEXT, 1);
 }
 
 static void draw_app_icon(Gfx *g, Widget *w, int cx, int cy, int size, uint16_t fg)
@@ -293,7 +309,7 @@ static void draw_box_decor(Gfx *g, Widget *w)
     int bw = w->border > 0 ? clamp_i(w->border, 1, 6) : 0;
     if (!fill && bw == 0)
         return;
-    int br = w->radius > 0 ? clamp_i(w->radius, 2, 24) : 0;
+    int br = w->radius > 0 ? clamp_i(w->radius, 2, 32) : 0;
     if (br * 2 > w->w)
         br = w->w / 2;
     if (br * 2 > w->h)
@@ -426,19 +442,24 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
                    w->value == 2) {
             FontStyle pill = widget_font_style(g, w, FONT_UI);
             int ph = clamp_i(font_char_h_style(g, &pill) + 8, 16, w->h > 0 ? w->h : font_char_h_style(g, &pill) + 8);
-            int icon_pad = w->icon[0] ? ph - 4 : 0;
+            int has_icon = w->icon[0] != 0;
+            int isz = has_icon ? clamp_i(ph - 8, 10, 18) : 0;
+            int icon_pad = has_icon ? isz + 4 : 0;
             int tw = font_text_w_style(g, &pill, w->text) + g->pad * 2 + 8 + icon_pad;
             if (tw > w->w && w->w > 0)
                 tw = w->w;
             int py = w->y + (w->h - ph) / 2;
             int pr = ph / 2;
-            uint16_t pbg = w->bg && w->bg != COL_BG ? w->bg : COL_ACCENT;
-            uint16_t pfg = w->fg ? w->fg : COL_ON_ACCENT;
+            uint16_t pbg = w->bg_set && w->bg != COL_BG ? w->bg : COL_ACCENT;
+            uint16_t pfg = w->fg_set ? w->fg : COL_ON_ACCENT;
             draw_round_rect(g, w->x, py, tw, ph, pr, pbg, 1);
             int tx = w->x + g->pad + 2;
-            if (w->icon[0]) {
-                int isz = clamp_i(ph - 8, 10, 18);
+            if (has_icon && isz > 0 && tw > isz + g->pad * 2) {
+                if (g->composer)
+                    compose_set_clip(g->composer, w->x, py, tw, ph);
                 draw_app_icon(g, w, w->x + g->pad + 2 + isz / 2, py + ph / 2, isz, pfg);
+                if (g->composer)
+                    compose_set_clip(g->composer, 0, 0, g->w, g->h);
                 tx += isz + 4;
             }
             font_draw_text_style_clip(g, &pill, tx, py + (ph - font_char_h_style(g, &pill)) / 2,
@@ -484,31 +505,55 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
         uint16_t bg = w->focused ? COL_ACCENT : (w->bg ? w->bg : COL_PANEL);
         uint16_t fg = w->focused ? COL_ON_ACCENT : (primary ? COL_ON_ACCENT : (w->fg ? w->fg : COL_TEXT));
         uint16_t border = w->focused ? COL_ACCENT : (primary ? COL_ACCENT : (w->border_c ? w->border_c : COL_BORDER));
-        int br = w->radius > 0 ? clamp_i(w->radius, 2, 18) : radius;
+        int br = w->radius > 0 ? clamp_i(w->radius, 2, 32) : radius;
         if (br * 2 > w->w)
             br = w->w / 2;
         if (br * 2 > w->h)
             br = w->h / 2;
         FontStyle btn_st = widget_font_style(g, w, FONT_UI);
         int btn_fh = font_char_h_style(g, &btn_st);
-        if (w->icon[0] || str_eq(w->component, "tile") || str_eq(w->component, "launcher_tile")) {
-            draw_elevated_rect(g, w->x, w->y, w->w, w->h, br, bg, border);
+        if (str_eq(w->component, "dock")) {
+            int box = clamp_i(w->h - 8, 40, 60);
+            if (box > w->w - 4)
+                box = w->w - 4;
+            int brd = clamp_i(box * 18 / 60, 12, 20);
+            int bx = w->x + (w->w - box) / 2;
+            int by = w->y + (w->h - box) / 2;
+            uint16_t fill = w->focused ? COL_ACCENT : (w->bg_set ? w->bg : COL_PANEL);
+            uint16_t ic = w->focused ? COL_ON_ACCENT : COL_TEXT;
+            draw_round_rect(g, bx, by, box, box, brd, fill, 1);
+            int isz = clamp_i(box * 22 / 60, 18, 28);
+            draw_app_icon(g, w, bx + box / 2, by + box / 2, isz, ic);
+        } else if (w->icon[0] || str_eq(w->component, "tile") || str_eq(w->component, "launcher_tile")) {
+            int label_h = btn_fh + 8;
+            int box = 60;
+            if (w->w < 68)
+                box = clamp_i(w->w - 8, 40, 60);
+            if (w->h - label_h - 4 < box)
+                box = clamp_i(w->h - label_h - 4, 40, 60);
+            int brd = clamp_i(w->radius > 0 ? w->radius : (box * 18 / 60), 12, 22);
+            int bx = w->x + (w->w - box) / 2;
+            int by = w->y + 2;
+            uint16_t fill = w->focused ? COL_ACCENT : (w->bg_set ? w->bg : COL_PANEL);
+            uint16_t ic = w->focused ? COL_ON_ACCENT : COL_TEXT;
+            uint16_t lab = w->focused ? COL_ACCENT : (w->fg ? w->fg : COL_TEXT);
+            draw_round_rect(g, bx, by, box, box, brd, fill, 1);
             if (g->composer)
-                compose_set_clip(g->composer, w->x + 2, w->y + 2, w->w - 4, w->h - 4);
-            int label_h = btn_fh + 6;
-            int icon_band = w->h - label_h - 4;
-            if (icon_band < 12)
-                icon_band = w->h / 2;
-            int icon_size = clamp_i(icon_band * 2 / 3, 14, 36);
-            draw_app_icon(g, w, w->x + w->w / 2, w->y + 4 + icon_band / 2, icon_size, fg);
-            int label_y = w->y + w->h - label_h;
-            int label_x = w->x + 4;
-            int label_w = w->w - 8;
-            if (label_w < 0)
-                label_w = 0;
-            font_draw_text_style_clip(g, &btn_st, label_x, label_y + (label_h - btn_fh) / 2, label_w, w->text, fg, bg, 1);
+                compose_set_clip(g->composer, bx, by, box, box);
+            int isz = clamp_i(box * 24 / 60, 18, 28);
+            draw_app_icon(g, w, bx + box / 2, by + box / 2, isz, ic);
             if (g->composer)
                 compose_set_clip(g->composer, 0, 0, g->w, g->h);
+            if (w->text[0]) {
+                int tw = font_text_w_style(g, &btn_st, w->text);
+                int lx = w->x + (w->w - tw) / 2;
+                if (lx < w->x)
+                    lx = w->x;
+                int ly = by + box + 4;
+                if (ly + btn_fh > w->y + w->h)
+                    ly = w->y + w->h - btn_fh;
+                font_draw_text_style_clip(g, &btn_st, lx, ly, w->w - (lx - w->x), w->text, lab, COL_BG, 0);
+            }
         } else if (str_eq(w->component, "row") || str_eq(w->component, "list_row") ||
                    str_eq(w->component, "message_row") || str_eq(w->component, "file_row") ||
                    (w->value == 50 && w->parent >= 0 && s->widgets[w->parent].type == W_LIST)) {
@@ -615,8 +660,11 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     }
     case W_LIST: {
         int radius_l = w->radius > 0 ? clamp_i(w->radius, 2, 16) : radius;
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, w->bg ? w->bg : COL_PANEL, 1);
-        draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, w->border_c ? w->border_c : COL_BORDER, 0);
+        uint16_t lbg = w->bg_set ? w->bg : COL_BG;
+        if (w->bg_set || w->bg)
+            draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, lbg, 1);
+        if (w->border > 0)
+            draw_round_rect(g, w->x, w->y, w->w, w->h, radius_l, w->border_c ? w->border_c : COL_BORDER, 0);
         if (g->composer)
             compose_set_clip(g->composer, w->x + 1, w->y + 1, w->w - 2, w->h - 2);
         for (int i = 0; i < w->child_count; i++) {

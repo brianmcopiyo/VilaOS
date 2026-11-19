@@ -82,6 +82,11 @@ static int activate_tap(Screen *s, Gfx *g, int x, int y, char *out_nav, size_t o
 {
     if (out_nav && out_sz)
         out_nav[0] = 0;
+    if (screen_hit_statusbar(s, g, x, y)) {
+        if (out_nav)
+            str_copy(out_nav, out_sz, "shade");
+        return 11;
+    }
     int sk = screen_hit_softkey(s, g, x, y);
     if (sk == 1) {
         if (out_nav)

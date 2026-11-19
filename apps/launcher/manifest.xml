@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<app id="launcher" name="Launcher" version="1.0.0" version_code="1" icon="layout-grid">
+ <summary text="Lock, Home, Drawer, Shade, and Recents shell"/>
+ <entry screen="res/layout/lock.xml" script="bin/main.kbc"/>
+ <capability name="ui"/>
+ <capability name="system.device"/>
+ <capability name="system.power"/>
+ <capability name="system.clock"/>
+ <capability name="storage.app"/>
+ <capability name="storage.files"/>
+</app>

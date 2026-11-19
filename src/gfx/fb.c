@@ -58,14 +58,21 @@ static void gfx_update_metrics(Gfx *g)
 {
     g->font_scale = 1;
     g->aspect_ratio = (g->h > 0) ? ((float)g->w / (float)g->h) : 1.0f;
-    g->status_h = 24;
-    g->softkey_h = 28;
-    g->pad = 8;
-    g->item_h = 36;
+    g->status_h = 32;
+    g->softkey_h = 36;
+    g->pad = 12;
+    g->item_h = 40;
+    if (g->h >= 800) {
+        g->status_h = 36;
+        g->softkey_h = 40;
+        g->pad = 14;
+        g->item_h = 44;
+    }
     if (g->h < 160) {
         g->status_h = 18;
         g->softkey_h = 22;
         g->item_h = 28;
+        g->pad = 6;
     }
 }
 
@@ -248,10 +255,18 @@ int gfx_backend_probe_fb(Gfx *g)
     g->fb_bpp = (int)vinfo.bits_per_pixel;
     g->fb_stride = (int)finfo.line_length;
     g->is_xrgb = (g->fb_bpp == 32);
-    if (gfx_set_size(g, g->fb_w, g->fb_h) != 0) {
-        close(g->fb_fd);
-        g->fb_fd = -1;
-        return -1;
+    {
+        int lw = g->fb_w;
+        int lh = g->fb_h;
+        if (lw != PHONE_W || lh != PHONE_H) {
+            lw = PHONE_W;
+            lh = PHONE_H;
+        }
+        if (gfx_set_size(g, lw, lh) != 0) {
+            close(g->fb_fd);
+            g->fb_fd = -1;
+            return -1;
+        }
     }
 
     g->fb_map_len = (size_t)finfo.smem_len;
@@ -282,7 +297,7 @@ int gfx_backend_probe_sdl(Gfx *g)
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         return -1;
     g_win = SDL_CreateWindow("VilaOS", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             640, 480, SDL_WINDOW_RESIZABLE);
+                             PHONE_W, PHONE_H, SDL_WINDOW_RESIZABLE);
     if (!g_win)
         return -1;
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_ACCELERATED);
@@ -336,7 +351,7 @@ int gfx_backend_init_all(Gfx *g, int desktop)
     g->fb_bpp = 16;
     g->is_xrgb = 0;
     str_copy(g->backend, sizeof(g->backend), "vfb");
-    if (gfx_set_size(g, 640, 480) != 0)
+    if (gfx_set_size(g, PHONE_W, PHONE_H) != 0)
         return -1;
     g->fb_w = g->w;
     g->fb_h = g->h;
@@ -358,7 +373,7 @@ int gfx_backend_init_all(Gfx *g, int desktop)
     str_copy(g->backend, sizeof(g->backend), "sw");
     g->fb_bpp = 16;
     g->is_xrgb = 0;
-    if (gfx_set_size(g, 640, 480) != 0)
+    if (gfx_set_size(g, PHONE_W, PHONE_H) != 0)
         return -1;
     g->fb_w = g->w;
     g->fb_h = g->h;
@@ -475,14 +490,90 @@ void gfx_backend_present(Gfx *g)
     }
 
     uint8_t *dst_base = (uint8_t *)g->fb_map;
-    int copy_w = g->w < g->fb_w ? g->w : g->fb_w;
-    int copy_h = g->h < g->fb_h ? g->h : g->fb_h;
-    if (x1 > copy_w)
-        x1 = copy_w;
-    if (y1 > copy_h)
-        y1 = copy_h;
-
-    if (g->is_xrgb || g->fb_bpp == 32) {
+    static int s_letterbox_ready;
+    static int s_lb_w, s_lb_h, s_lb_ox, s_lb_oy, s_lb_dw, s_lb_dh, s_lb_sw, s_lb_sh;
+    int need_scale = (g->fb_w != g->w || g->fb_h != g->h);
+    if (need_scale) {
+        int dst_w = g->fb_w;
+        int dst_h = g->fb_h;
+        if (g->w > 0 && g->h > 0) {
+            long fit_w = (long)g->fb_h * (long)g->w / (long)g->h;
+            long fit_h = (long)g->fb_w * (long)g->h / (long)g->w;
+            if (fit_w <= g->fb_w) {
+                dst_w = (int)fit_w;
+                dst_h = g->fb_h;
+            } else {
+                dst_w = g->fb_w;
+                dst_h = (int)fit_h;
+            }
+        }
+        if (dst_w < 1)
+            dst_w = 1;
+        if (dst_h < 1)
+            dst_h = 1;
+        int ox = (g->fb_w - dst_w) / 2;
+        int oy = (g->fb_h - dst_h) / 2;
+        int geometry_changed = !s_letterbox_ready || s_lb_w != g->fb_w || s_lb_h != g->fb_h ||
+                               s_lb_sw != g->w || s_lb_sh != g->h || s_lb_dw != dst_w ||
+                               s_lb_dh != dst_h || s_lb_ox != ox || s_lb_oy != oy;
+        if (geometry_changed) {
+            gfx_fill_hw(g, 0xFFF5EFE6u, COL_BG);
+            s_letterbox_ready = 1;
+            s_lb_w = g->fb_w;
+            s_lb_h = g->fb_h;
+            s_lb_sw = g->w;
+            s_lb_sh = g->h;
+            s_lb_dw = dst_w;
+            s_lb_dh = dst_h;
+            s_lb_ox = ox;
+            s_lb_oy = oy;
+            x0 = 0;
+            y0 = 0;
+            x1 = g->w;
+            y1 = g->h;
+        }
+        int dy0 = y0 * dst_h / g->h;
+        int dy1 = (y1 * dst_h + g->h - 1) / g->h;
+        int dx0 = x0 * dst_w / g->w;
+        int dx1 = (x1 * dst_w + g->w - 1) / g->w;
+        if (dy0 < 0)
+            dy0 = 0;
+        if (dx0 < 0)
+            dx0 = 0;
+        if (dy1 > dst_h)
+            dy1 = dst_h;
+        if (dx1 > dst_w)
+            dx1 = dst_w;
+        for (int dy = dy0; dy < dy1; dy++) {
+            int sy = dy * g->h / dst_h;
+            if (sy < 0)
+                sy = 0;
+            if (sy >= g->h)
+                sy = g->h - 1;
+            uint16_t *src = &g->back[sy * g->w];
+            if (g->is_xrgb || g->fb_bpp == 32) {
+                uint32_t *dst = (uint32_t *)(dst_base + (oy + dy) * g->fb_stride);
+                for (int dx = dx0; dx < dx1; dx++) {
+                    int sx = dx * g->w / dst_w;
+                    if (sx < 0)
+                        sx = 0;
+                    if (sx >= g->w)
+                        sx = g->w - 1;
+                    dst[ox + dx] = rgb565_to_xrgb(src[sx]);
+                }
+            } else {
+                uint16_t *dst = (uint16_t *)(dst_base + (oy + dy) * g->fb_stride);
+                for (int dx = dx0; dx < dx1; dx++) {
+                    int sx = dx * g->w / dst_w;
+                    if (sx < 0)
+                        sx = 0;
+                    if (sx >= g->w)
+                        sx = g->w - 1;
+                    dst[ox + dx] = src[sx];
+                }
+            }
+        }
+    } else if (g->is_xrgb || g->fb_bpp == 32) {
         for (int y = y0; y < y1; y++) {
             uint32_t *dst = (uint32_t *)(dst_base + y * g->fb_stride);
             uint16_t *src = &g->back[y * g->w];
@@ -490,11 +581,11 @@ void gfx_backend_present(Gfx *g)
                 dst[x] = rgb565_to_xrgb(src[x]);
         }
     } else {
+        size_t row_bytes = (size_t)(x1 - x0) * sizeof(uint16_t);
         for (int y = y0; y < y1; y++) {
-            uint16_t *dst = (uint16_t *)(dst_base + y * g->fb_stride);
-            uint16_t *src = &g->back[y * g->w];
-            for (int x = x0; x < x1; x++)
-                dst[x] = src[x];
+            uint16_t *dst = (uint16_t *)(dst_base + y * g->fb_stride) + x0;
+            uint16_t *src = &g->back[y * g->w + x0];
+            memcpy(dst, src, row_bytes);
         }
     }
 #else
