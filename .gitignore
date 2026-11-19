@@ -1,0 +1,10 @@
+*.o
+vilaos
+vilaos-*
+phoneos
+phoneos-*
+build/
+.vscode/
+*.cpio
+*.cpio.gz
+*.tar.*

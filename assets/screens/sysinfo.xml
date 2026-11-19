@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<screen id="sysinfo" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="System Info" fg="#28a0dc" w="100%" h="auto"/>
+    <label id="meminfo" text="Reading /proc/meminfo..." fg="#dce4ec" w="100%" h="auto"/>
+    <label id="rssinfo" text="Reading /proc/self/status..." fg="#dce4ec" w="100%" h="auto"/>
+    <label id="note1" text="Budget: 32 MB system RAM minimum" fg="#789098" w="100%" h="auto"/>
+    <label id="note2" text="Target UI RSS under 4 MB" fg="#789098" w="100%" h="auto"/>
+    <label id="fbinfo" text="FB ..." fg="#789098" w="100%" h="auto"/>
+    <button id="refresh" text="Refresh" action="ok" w="100%" h="auto"
+            bg="#145a8c" focus_bg="#28a0dc"/>
+  </vbox>
+  <softkeys left="Refresh" center="OK" right="Back"
+            left_action="ok" center_action="ok" right_action="back"/>
+</screen>

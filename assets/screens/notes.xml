@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<screen id="notes" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Notes" fg="#28a0dc" w="100%" h="auto"/>
+    <input id="note" text="Tap keys to edit note" max_len="120"
+           w="100%" h="auto" bg="#182434" focus_bg="#145a8c"/>
+    <label id="hint" text="# case  * symbols" fg="#789098" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Save" center="OK" right="Back"
+            left_action="ok" center_action="ok" right_action="back"/>
+</screen>

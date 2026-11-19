@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<screen id="compose" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="New Message" fg="#28a0dc" w="100%" h="auto"/>
+    <label id="to_lbl" text="To:" fg="#789098" w="100%" h="auto"/>
+    <input id="to" text="" max_len="32" w="100%" h="auto" bg="#182434" focus_bg="#145a8c"/>
+    <label id="body_lbl" text="Body: T9 / QWERTY / mouse" fg="#789098" w="100%" h="auto"/>
+    <input id="msg" text="" max_len="120" w="100%" h="auto" bg="#182434" focus_bg="#145a8c"/>
+    <label id="msgstatus" text="Type with keypad or keyboard" fg="#28b45a" w="100%" h="auto"/>
+  </vbox>
+  <softkeys left="Send" center="OK" right="Back"
+            left_action="send" center_action="send" right_action="nav:assets/screens/messages.xml"/>
+</screen>

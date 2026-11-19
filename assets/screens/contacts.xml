@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<screen id="contacts" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Contacts" fg="#28a0dc" w="100%" h="auto"/>
+    <list id="people" w="100%" h="auto" bg="#182434">
+      <button id="c1" text="Alice  555-0101" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="c2" text="Bob    555-0102" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="c3" text="Carol  555-0103" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="c4" text="Dave   555-0104" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
+    </list>
+  </vbox>
+  <softkeys left="Call" center="OK" right="Back"
+            left_action="ok" center_action="ok" right_action="back"/>
+</screen>

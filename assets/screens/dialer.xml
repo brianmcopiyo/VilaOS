@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<screen id="dialer" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="Dialer" fg="#28a0dc" w="100%" h="auto"/>
+    <input id="number" text="" max_len="20" w="100%" h="auto" bg="#182434" fg="#dce4ec" focus_bg="#145a8c"/>
+    <label id="hint" text="0-9 dial  F1 Call  F2 Clear" fg="#789098" w="100%" h="auto"/>
+    <label id="callstatus" text="Ready" fg="#28b45a" w="100%" h="auto"/>
+    <hbox id="keys" w="100%" h="auto">
+      <button id="b1" text="1" action="none" w="auto" h="auto"/>
+      <button id="b2" text="2" action="none" w="auto" h="auto"/>
+      <button id="b3" text="3" action="none" w="auto" h="auto"/>
+    </hbox>
+  </vbox>
+  <softkeys left="Call" center="OK" right="Clear"
+            left_action="call" center_action="call" right_action="clear"/>
+</screen>

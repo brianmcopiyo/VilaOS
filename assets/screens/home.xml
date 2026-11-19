@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<screen id="home" bg="#0c121c">
+  <statusbar id="status"/>
+  <vbox id="body" x="0%" y="auto" w="100%" h="auto">
+    <label id="title" text="VilaOS" fg="#28a0dc" w="100%" h="auto"/>
+    <label id="subtitle" text="Select an app" fg="#789098" w="100%" h="auto"/>
+    <list id="launcher" w="100%" h="auto" bg="#182434">
+      <button id="app_dialer" text="Dialer" action="nav:assets/screens/dialer.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="app_messages" text="Messages" action="nav:assets/screens/messages.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="app_contacts" text="Contacts" action="nav:assets/screens/contacts.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="app_notes" text="Notes" action="nav:assets/screens/notes.xml" bg="#182434" focus_bg="#145a8c"/>
+      <button id="app_sysinfo" text="System Info" action="nav:assets/screens/sysinfo.xml" bg="#182434" focus_bg="#145a8c"/>
+    </list>
+  </vbox>
+  <softkeys left="Open" center="OK" right="Exit"
+            left_action="ok" center_action="ok" right_action="quit"/>
+</screen>
