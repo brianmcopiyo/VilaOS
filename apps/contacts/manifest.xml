@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <app id="contacts" name="Contacts" version="1.0.0" version_code="1" icon="contacts">
   <summary text="Address book and quick search"/>
-  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
   <capability name="contacts"/>
   <capability name="telephony"/>
 </app>

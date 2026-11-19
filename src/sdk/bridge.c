@@ -105,11 +105,37 @@ int bridge_storage_get(VslRuntime *rt, const char *key, char *out, size_t n)
     return 0;
 }
 
+static void normalize_app_rel(const char *in, char *out, size_t n)
+{
+    if (!in || !out || n == 0) {
+        if (out && n)
+            out[0] = 0;
+        return;
+    }
+    if (str_starts(in, "layout/")) {
+        snprintf(out, n, "res/layout/%s", in + 7);
+        return;
+    }
+    if (str_starts(in, "ui/")) {
+        snprintf(out, n, "res/layout/%s", in + 3);
+        return;
+    }
+    if (str_starts(in, "logic/")) {
+        snprintf(out, n, "src/%s", in + 6);
+        return;
+    }
+    if (str_starts(in, "assets/") && !str_starts(in, "assets/screens/")) {
+        snprintf(out, n, "res/assets/%s", in + 7);
+        return;
+    }
+    str_copy(out, n, in);
+}
+
 int bridge_nav(VslRuntime *rt, const char *screen_rel)
 {
     if (!rt || !screen_rel)
         return -1;
-    if (str_starts(screen_rel, "assets/") || str_starts(screen_rel, "/")) {
+    if (str_starts(screen_rel, "assets/screens/") || str_starts(screen_rel, "/")) {
         str_copy(rt->nav, sizeof(rt->nav), screen_rel);
         return 0;
     }
@@ -117,8 +143,10 @@ int bridge_nav(VslRuntime *rt, const char *screen_rel)
         str_copy(rt->nav, sizeof(rt->nav), screen_rel);
         return 0;
     }
+    char rel[MAX_PATH];
+    normalize_app_rel(screen_rel, rel, sizeof(rel));
     char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s/%s/%s", PKG_APPS_ROOT, rt->app.id, screen_rel);
+    snprintf(path, sizeof(path), "%s/%s/%s", PKG_APPS_ROOT, rt->app.id, rel);
     str_copy(rt->nav, sizeof(rt->nav), path);
     return 0;
 }
@@ -158,7 +186,7 @@ int bridge_exec_cmd(VslRuntime *rt, const char *cmd, const char *a1, const char 
     if (str_eq(cmd, "call")) {
         if (!bridge_check_cap(rt, PKG_CAP_TELEPHONY))
             return -1;
-        return bridge_nav(rt, "ui/call_active.xml");
+        return bridge_nav(rt, "res/layout/call_active.xml");
     }
     return -1;
 }

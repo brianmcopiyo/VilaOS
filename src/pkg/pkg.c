@@ -90,8 +90,8 @@ int pkg_parse_manifest(const char *path, PkgApp *out)
     if (!path || !out)
         return -1;
     memset(out, 0, sizeof(*out));
-    str_copy(out->entry_screen, sizeof(out->entry_screen), "ui/main.xml");
-    str_copy(out->entry_script, sizeof(out->entry_script), "logic/main.vsl");
+    str_copy(out->entry_screen, sizeof(out->entry_screen), "res/layout/main.xml");
+    str_copy(out->entry_script, sizeof(out->entry_script), "src/main.vsl");
     str_copy(out->version, sizeof(out->version), "0.0.0");
     ManCtx ctx = {out};
     XmlHandlers h;

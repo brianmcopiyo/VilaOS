@@ -3,19 +3,19 @@ on_load
 end
 
 on_click c1
-  nav ui/detail.xml
+  nav res/layout/detail.xml
 end
 on_click c2
-  nav ui/detail.xml
+  nav res/layout/detail.xml
 end
 on_click c3
-  nav ui/detail.xml
+  nav res/layout/detail.xml
 end
 on_click c4
-  nav ui/detail.xml
+  nav res/layout/detail.xml
 end
 on_click c5
-  nav ui/detail.xml
+  nav res/layout/detail.xml
 end
 
 on_soft left

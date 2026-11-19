@@ -3,7 +3,7 @@
   <statusbar id="status"/>
   <vbox id="body" x="0%" y="auto" w="100%" h="auto">
     <label id="title" text="Browser" fg="#F1F5F9" w="100%" h="auto"/>
-    <input id="url" text="file:///apps/browser/ui/main.xml" max_len="96" w="100%" h="auto" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
+    <input id="url" text="file:///apps/browser/res/layout/main.xml" max_len="96" w="100%" h="auto" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
     <list id="pages" w="100%" h="auto" bg="#151C28">
       <button id="p1" text="VilaOS Welcome" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>
       <button id="p2" text="App Manifest Spec" action="none" bg="#151C28" fg="#F1F5F9" focus_bg="#1E40AF"/>

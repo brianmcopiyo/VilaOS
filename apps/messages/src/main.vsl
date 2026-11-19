@@ -1,0 +1,27 @@
+on_load
+  require messages
+end
+
+on_click m1
+  nav res/layout/thread.xml
+end
+on_click m2
+  nav res/layout/thread.xml
+end
+on_click m3
+  nav res/layout/thread.xml
+end
+on_click m4
+  nav res/layout/thread.xml
+end
+on_click newmsg
+  nav res/layout/compose.xml
+end
+
+on_soft left
+  nav res/layout/compose.xml
+end
+
+on_soft right
+  back
+end

@@ -55,7 +55,7 @@ make pkg
 ./vilaos-pkg remove dialer
 ```
 
-Apps install under `/apps/<id>/` with persistent data in `/data/apps/<id>/`. Launcher actions use `app:<id>`. Backend logic is VSL (`logic/*.vsl`) with capability checks.
+Apps install under `/apps/<id>/` with persistent data in `/data/apps/<id>/`. Source layout is Android-style: `res/layout/*.xml`, `res/assets/*`, `src/*.vsl`, packed into one `.vpkg`. Launcher actions use `app:<id>`.
 
 ## Build (Linux / WSL)
 

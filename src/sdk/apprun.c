@@ -56,11 +56,30 @@ int apphost_refresh_launcher(AppHost *h, Screen *s)
     return 0;
 }
 
+static void normalize_layout_rel(const char *in, char *out, size_t n)
+{
+    if (!in || !in[0]) {
+        str_copy(out, n, "res/layout/main.xml");
+        return;
+    }
+    if (str_starts(in, "layout/")) {
+        snprintf(out, n, "res/layout/%s", in + 7);
+        return;
+    }
+    if (str_starts(in, "ui/")) {
+        snprintf(out, n, "res/layout/%s", in + 3);
+        return;
+    }
+    str_copy(out, n, in);
+}
+
 static int load_app_screen(AppHost *h, Screen *s, Gfx *g, const PkgApp *app, const char *screen_rel)
 {
     char ui[MAX_PATH];
     char script[MAX_PATH];
-    snprintf(ui, sizeof(ui), "%s/%s/%s", PKG_APPS_ROOT, app->id, screen_rel && screen_rel[0] ? screen_rel : app->entry_screen);
+    char rel[MAX_PATH];
+    normalize_layout_rel(screen_rel && screen_rel[0] ? screen_rel : app->entry_screen, rel, sizeof(rel));
+    snprintf(ui, sizeof(ui), "%s/%s/%s", PKG_APPS_ROOT, app->id, rel);
     snprintf(script, sizeof(script), "%s/%s/%s", PKG_APPS_ROOT, app->id, app->entry_script);
     if (screen_load(s, ui) != 0) {
         char fallback[MAX_PATH];
@@ -96,8 +115,8 @@ int apphost_open_app(AppHost *h, Screen *s, Gfx *g, const char *id)
         if (pkg_parse_manifest(man, &app) != 0) {
             str_copy(app.id, sizeof(app.id), id);
             str_copy(app.name, sizeof(app.name), id);
-            str_copy(app.entry_screen, sizeof(app.entry_screen), "ui/main.xml");
-            str_copy(app.entry_script, sizeof(app.entry_script), "logic/main.vsl");
+            str_copy(app.entry_screen, sizeof(app.entry_screen), "res/layout/main.xml");
+            str_copy(app.entry_script, sizeof(app.entry_script), "src/main.vsl");
             str_copy(app.icon, sizeof(app.icon), id);
         }
     }

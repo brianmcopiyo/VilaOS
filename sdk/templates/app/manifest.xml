@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <app id="example" name="Example" version="1.0.0" version_code="1" icon="files">
   <summary text="Example VilaOS app"/>
-  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
   <capability name="storage"/>
   <capability name="display"/>
 </app>

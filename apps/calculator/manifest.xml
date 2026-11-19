@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <app id="calculator" name="Calculator" version="1.0.0" version_code="1" icon="calculator">
   <summary text="Basic and scientific keypad math"/>
-  <entry screen="ui/main.xml" script="logic/main.vsl"/>
+  <entry screen="res/layout/main.xml" script="src/main.vsl"/>
   <capability name="display"/>
 </app>

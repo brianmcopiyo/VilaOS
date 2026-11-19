@@ -7,10 +7,10 @@
     <label id="number" text="555-0101" fg="#F1F5F9" w="100%" h="auto"/>
     <label id="email" text="alice@vila.os" fg="#94A3B8" w="100%" h="auto"/>
     <button id="act_call" text="Call" action="call" bg="#16A34A" fg="#F1F5F9" focus_bg="#15803D" w="100%" h="auto"/>
-    <button id="act_msg" text="Message" action="nav:ui/compose.xml" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="100%" h="auto"/>
+    <button id="act_msg" text="Message" action="nav:res/layout/compose.xml" bg="#2563EB" fg="#F1F5F9" focus_bg="#1E40AF" w="100%" h="auto"/>
   </vbox>
   <softkeys left="Call" center="Message" right="Back"
             left_action="call"
-            center_action="nav:ui/compose.xml"
+            center_action="nav:res/layout/compose.xml"
             right_action="back"/>
 </screen>
