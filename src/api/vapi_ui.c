@@ -25,10 +25,16 @@ static void normalize_app_rel(const char *in, char *out, size_t n)
 
 int vapi_ui(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n)
 {
-    (void)out;
-    (void)out_n;
     if (!ctx || !ctx->rt || !op)
         return VAPI_ERR_INVALID_ARG;
+
+    if (str_eq(op, "get_text") || str_eq(op, "text")) {
+        if (!a1 || !a1[0] || !out || out_n == 0)
+            return VAPI_ERR_INVALID_ARG;
+        if (bridge_get_text(ctx->rt, a1, out, out_n) != 0)
+            return VAPI_ERR_NOT_FOUND;
+        return VAPI_OK;
+    }
 
     if (str_eq(op, "push") || str_eq(op, "push_route")) {
         if (!a1 || !a1[0])

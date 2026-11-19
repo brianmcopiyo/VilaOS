@@ -194,18 +194,31 @@ int vapi_call(VapiCtx *ctx, const char *method, const char *a1, const char *a2, 
     return VAPI_ERR_UNSUPPORTED;
 }
 
-int vapi_bridge(VslRuntime *rt, const char *method, const char *a1, const char *a2)
+int vapi_bridge_out(VslRuntime *rt, const char *method, const char *a1, const char *a2, char *out, size_t n)
 {
+    if (out && n)
+        out[0] = 0;
     if (!rt || !method)
-        return -1;
+        return VAPI_ERR_INVALID_ARG;
     VapiCtx ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.rt = rt;
     ctx.screen = rt->screen;
     ctx.app = &rt->app;
     ctx.gfx = NULL;
+    char scratch[MAX_TEXT];
+    if (!out || !n) {
+        out = scratch;
+        n = sizeof(scratch);
+    }
+    return vapi_call(&ctx, method, a1, a2, out, n);
+}
+
+int vapi_bridge(VslRuntime *rt, const char *method, const char *a1, const char *a2)
+{
+    if (!rt || !method)
+        return -1;
     char out[MAX_TEXT];
-    int st = vapi_call(&ctx, method, a1, a2, out, sizeof(out));
-    (void)out;
+    int st = vapi_bridge_out(rt, method, a1, a2, out, sizeof(out));
     return st == VAPI_OK ? 0 : -1;
 }

@@ -22,6 +22,8 @@ enum class Cap(val id: String) {
 
 fun require(vararg caps: Cap) {}
 
+fun vapi(method: String, a1: String = "", a2: String = ""): String = ""
+
 open class VilaApp {
     open fun onStart(screen: Screen) {}
     open fun onLoad() {}

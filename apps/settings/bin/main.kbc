@@ -1,9 +1,112 @@
+fn profileName
+  if eq $g_profile 1
+    ret Silent
+  endif
+  if eq $g_profile 2
+    ret Meeting
+  endif
+  if eq $g_profile 3
+    ret Outdoor
+  endif
+  ret General
+endfn
+
+fn refresh
+  if eq $g_sound 1
+    ui.set_text toggle_sound "Sound: On"
+  else
+    ui.set_text toggle_sound "Sound: Off"
+  endif
+  if eq $g_vibrate 1
+    ui.set_text toggle_vibrate "Vibrate: On"
+  else
+    ui.set_text toggle_vibrate "Vibrate: Off"
+  endif
+  if eq $g_large 1
+    ui.set_text toggle_text "Text: Large"
+  else
+    ui.set_text toggle_text "Text: Normal"
+  endif
+  invoke profileName _t0
+  concat _t1 "Profile: " $_t0
+  ui.set_text toggle_profile $_t1
+  storage.app.set sound $g_sound
+  storage.app.set vibrate $g_vibrate
+  storage.app.set large_text $g_large
+  storage.app.set profile $g_profile
+endfn
+
 on_load
+  if eq $g_sound ""
+    let g_sound 1
+  endif
+  if eq $g_vibrate ""
+    let g_vibrate 1
+  endif
+  if eq $g_large ""
+    let g_large 0
+  endif
+  if eq $g_profile ""
+    let g_profile 0
+  endif
   require ui
   require system.device
+  require storage.app
   system.device.info about2
   system.locale time_help
   system.theme about1
+  vapi s storage.app.get sound
+  if ne $s ""
+    let g_sound $s
+  endif
+  vapi v storage.app.get vibrate
+  if ne $v ""
+    let g_vibrate $v
+  endif
+  vapi t storage.app.get large_text
+  if ne $t ""
+    let g_large $t
+  endif
+  vapi p storage.app.get profile
+  if ne $p ""
+    let g_profile $p
+  endif
+  invoke refresh _
+end
+
+on_action toggle_sound
+  if eq $g_sound 1
+    let g_sound 0
+  else
+    let g_sound 1
+  endif
+  invoke refresh _
+end
+
+on_action toggle_vibrate
+  if eq $g_vibrate 1
+    let g_vibrate 0
+  else
+    let g_vibrate 1
+  endif
+  invoke refresh _
+end
+
+on_action toggle_text
+  if eq $g_large 1
+    let g_large 0
+  else
+    let g_large 1
+  endif
+  invoke refresh _
+end
+
+on_action cycle_profile
+  toint _t2 $g_profile
+  add _t3 $_t2 1
+  mod _t4 $_t3 4
+  tostr g_profile $_t4
+  invoke refresh _
 end
 
 on_soft left

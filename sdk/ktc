@@ -2,434 +2,2140 @@
 import os
 import re
 import sys
+import zlib
 
 CAP = {
-    "Cap.UI": "ui",
-    "Cap.STORAGE": "storage.app",
-    "Cap.STORAGE_APP": "storage.app",
-    "Cap.STORAGE_FILES": "storage.files",
-    "Cap.TELEPHONY": "telephony",
-    "Cap.MESSAGES": "messages",
-    "Cap.CONTACTS": "contacts",
-    "Cap.AUDIO": "audio.bg",
-    "Cap.AUDIO_BG": "audio.bg",
-    "Cap.CLOCK": "system.clock",
-    "Cap.SYSTEM_CLOCK": "system.clock",
-    "Cap.SYSTEM_POWER": "system.power",
-    "Cap.SYSTEM_DEVICE": "system.device",
-    "Cap.NETWORK": "network",
+    "UI": "ui",
+    "STORAGE": "storage.app",
+    "STORAGE_APP": "storage.app",
+    "STORAGE_FILES": "storage.files",
+    "TELEPHONY": "telephony",
+    "MESSAGES": "messages",
+    "CONTACTS": "contacts",
+    "AUDIO": "audio.bg",
+    "AUDIO_BG": "audio.bg",
+    "CLOCK": "system.clock",
+    "SYSTEM_CLOCK": "system.clock",
+    "SYSTEM_POWER": "system.power",
+    "SYSTEM_DEVICE": "system.device",
+    "NETWORK": "network",
 }
 
-SOFT = {
-    "SoftKey.LEFT": "left",
-    "SoftKey.CENTER": "center",
-    "SoftKey.RIGHT": "right",
-    "LEFT": "left",
-    "CENTER": "center",
-    "RIGHT": "right",
+SOFT = {"LEFT": "left", "CENTER": "center", "RIGHT": "right"}
+FORBIDDEN = {"Keypad", "Graphics", "Keyboard", "Font", "Draw"}
+BINDINGS = {"DialKeypad", "TextInput", "ActionButton", "ListRow", "SurfaceCard", "StatusBadge", "AppTile"}
+ROW_IDS = ("m1", "m2", "m3", "m4", "c1", "c2", "c3", "c4", "c5")
+RESERVED = {"key", "target", "event", "status"}
+MODS = {
+    "private", "public", "internal", "protected", "override", "open", "const", "lateinit",
+    "final", "abstract", "inline", "operator", "data", "sealed", "tailrec", "suspend",
+    "infix", "external",
+}
+EVENTS = {
+    "onStart": "load",
+    "onLoad": "load",
+    "onTick": "tick",
+    "onClick": "click",
+    "onSoft": "soft",
+    "onAction": "action",
+    "onNumber": "number",
+}
+KEYED = {"click", "soft", "action", "number"}
+LIST_CTORS = {"mutableListOf", "arrayListOf", "ArrayList", "listOf", "emptyList", "mutableListOf"}
+BLANK = {"isBlank", "isEmpty", "isNotBlank", "isNotEmpty"}
+API_OBJS = {
+    "Ui", "Storage", "Service", "Audio", "Telephony", "Messages", "Contacts",
+    "Clock", "System", "Action", "Widget", "SoftkeyBar",
+}
+CMP = {"==": "eq", "!=": "ne", "<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
+NEG = {
+    "eq": "ne", "ne": "eq", "lt": "ge", "ge": "lt", "le": "gt", "gt": "le",
+    "truthy": "falsy", "falsy": "truthy",
+}
+ARITH = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "mod"}
+BIN_PREC = {
+    "||": 1, "&&": 2, "==": 3, "!=": 3, "<": 4, ">": 4, "<=": 4, ">=": 4,
+    "?:": 5, "until": 6, "downTo": 6, "step": 6, "..": 7, "+": 8, "-": 8,
+    "*": 9, "/": 9, "%": 9,
+}
+ASSIGN_OPS = {"=", "+=", "-=", "*=", "/=", "%="}
+OPS2 = (
+    "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "%=", "++", "--",
+    "->", "..", "?.", "?:", "::", "!!",
+)
+TYPES = {
+    "String": "str", "Char": "str", "Int": "int", "Long": "int", "Short": "int",
+    "Byte": "int", "Double": "float", "Float": "float", "Boolean": "bool",
+    "Unit": "unit", "List": "list", "MutableList": "list", "ArrayList": "list",
 }
 
-def strip_comments(src: str) -> str:
-    out = []
+API = {
+    ("Ui", "setText"): ("ui.set_text", "iv", 2),
+    ("Ui", "appendText"): ("ui.append_text", "iv", 2),
+    ("Ui", "clearText"): ("ui.clear_text", "i", 1),
+    ("Ui", "push"): ("ui.push", "i", 1),
+    ("Ui", "replace"): ("ui.replace", "i", 1),
+    ("Ui", "pop"): ("ui.pop", "", 0),
+    ("Ui", "home"): ("ui.home", "", 0),
+    ("Ui", "dialog"): ("ui.dialog", "vv", 2),
+    ("Ui", "getText"): ("ui.get_text", "i", 1),
+    ("Storage", "get"): ("storage.app.get", "ii", 1),
+    ("Storage", "set"): ("storage.app.set", "iv", 2),
+    ("Storage", "filesList"): ("storage.files.list", "ii", 2),
+    ("Storage", "filesRead"): ("storage.files.read", "ii", 2),
+    ("Storage", "assetRead"): ("storage.asset.read", "ii", 2),
+    ("Service", "start"): ("service.start", "i", 1),
+    ("Service", "stop"): ("service.stop", "i", 1),
+    ("Service", "status"): ("service.status", "ii", 2),
+    ("Audio", "play"): ("audio.play", "", 0),
+    ("Audio", "pause"): ("audio.pause", "", 0),
+    ("Audio", "skip"): ("audio.skip", "", 0),
+    ("Audio", "stop"): ("audio.stop", "ii", 0),
+    ("Audio", "status"): ("audio.status", "i", 1),
+    ("Telephony", "digit"): ("telephony.digit", "v", 1),
+    ("Telephony", "call"): ("telephony.call", "", 0),
+    ("Telephony", "end"): ("telephony.end", "", 0),
+    ("Telephony", "clear"): ("telephony.clear", "", 0),
+    ("Telephony", "mute"): ("telephony.mute", "", 0),
+    ("Telephony", "speaker"): ("telephony.speaker", "", 0),
+    ("Telephony", "lookup"): ("telephony.lookup", "v", 1),
+    ("Messages", "open"): ("messages.open", "", 0),
+    ("Messages", "compose"): ("messages.compose", "", 0),
+    ("Messages", "send"): ("messages.send", "vi", 0),
+    ("Contacts", "open"): ("contacts.open", "", 0),
+    ("Contacts", "search"): ("contacts.search", "vi", 1),
+    ("Contacts", "call"): ("contacts.call", "", 0),
+    ("Clock", "now"): ("clock.now", "i", 0),
+    ("Clock", "date"): ("clock.date", "i", 0),
+    ("Clock", "tick"): ("clock.tick", "i", 0),
+    ("System", "deviceInfo"): ("system.device.info", "i", 0),
+    ("System", "locale"): ("system.locale", "i", 0),
+    ("System", "theme"): ("system.theme", "i", 0),
+    ("System", "time"): ("system.time", "i", 0),
+    ("System", "apiVersion"): ("system.api.version", "i", 0),
+    ("System", "powerMenu"): ("system.power.menu", "", 0),
+    ("System", "powerOff"): ("system.power.off", "", 0),
+    ("System", "powerRestart"): ("system.power.restart", "", 0),
+}
+
+
+class KtcError(Exception):
+    def __init__(self, msg, file="", line=0):
+        Exception.__init__(self, msg)
+        self.msg = msg
+        self.file = file
+        self.line = line
+
+
+class N:
+    def __init__(self, k, line, **kw):
+        self.k = k
+        self.line = line
+        self.__dict__.update(kw)
+
+
+class Tok:
+    def __init__(self, k, v, nl, line, file):
+        self.k = k
+        self.v = v
+        self.nl = nl
+        self.line = line
+        self.file = file
+
+
+class Decls:
+    def __init__(self):
+        self.props = []
+        self.funs = []
+        self.inits = []
+
+
+def lex_string(src, i, line, file):
+    n = len(src)
+    i += 1
+    parts = []
+    buf = []
+    nls = 0
+    if src.startswith('""', i):
+        raise KtcError("raw strings are not supported", file, line)
+    while True:
+        if i >= n:
+            raise KtcError("unterminated string", file, line)
+        c = src[i]
+        if c == '"':
+            i += 1
+            break
+        if c == "\n":
+            raise KtcError("unterminated string", file, line)
+        if c == "\\":
+            if i + 1 >= n:
+                raise KtcError("bad escape", file, line)
+            d = src[i + 1]
+            i += 2
+            if d == "t":
+                buf.append("\t")
+            elif d == "\\":
+                buf.append("\\")
+            elif d == "'":
+                buf.append("'")
+            elif d == "$":
+                buf.append("$")
+            else:
+                raise KtcError("string escape \\%s is not supported" % d, file, line)
+            continue
+        if c == "$" and i + 1 < n:
+            d = src[i + 1]
+            if d == "{":
+                depth = 1
+                j = i + 2
+                while j < n and depth > 0:
+                    if src[j] == "{":
+                        depth += 1
+                    elif src[j] == "}":
+                        depth -= 1
+                    elif src[j] == '"':
+                        j += 1
+                        while j < n and src[j] != '"':
+                            if src[j] == "\\":
+                                j += 1
+                            j += 1
+                    j += 1
+                if depth != 0:
+                    raise KtcError("unterminated template", file, line)
+                if buf:
+                    parts.append(("s", "".join(buf)))
+                    buf = []
+                parts.append(("e", src[i + 2:j - 1], line))
+                i = j
+                continue
+            if d.isalpha() or d == "_":
+                j = i + 1
+                while j < n and (src[j].isalnum() or src[j] == "_"):
+                    j += 1
+                if buf:
+                    parts.append(("s", "".join(buf)))
+                    buf = []
+                parts.append(("e", src[i + 1:j], line))
+                i = j
+                continue
+        buf.append(c)
+        i += 1
+    if buf or not parts:
+        parts.append(("s", "".join(buf)))
+    return parts, i, nls
+
+
+NUM_RE = re.compile(r"0[xX][0-9a-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?")
+
+
+def lex(src, file, line=1):
+    toks = []
     i = 0
     n = len(src)
+    nl = False
     while i < n:
-        if src[i:i+2] == "//":
+        c = src[i]
+        if c == "\n":
+            line += 1
+            nl = True
+            i += 1
+            continue
+        if c in " \t\r":
+            i += 1
+            continue
+        if src.startswith("//", i):
             while i < n and src[i] != "\n":
                 i += 1
             continue
-        if src[i:i+2] == "/*":
+        if src.startswith("/*", i):
+            depth = 1
             i += 2
-            while i + 1 < n and src[i:i+2] != "*/":
-                i += 1
-            i = min(i + 2, n)
-            continue
-        out.append(src[i])
-        i += 1
-    return "".join(out)
-
-def unquote(s: str) -> str:
-    s = s.strip()
-    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
-        return s[1:-1]
-    return s
-
-def resolve_value_expr(expr: str, bindings: dict) -> str:
-    expr = expr.strip()
-    m = re.match(r'(\w+)\.value\s*\(\s*screen\s*\)$', expr)
-    if m:
-        bid = bindings.get(m.group(1), {}).get("id")
-        if bid:
-            return f"text:{bid}"
-    m = re.match(r'Widget\.text\s*\(\s*(.+)\s*\)$', expr)
-    if m:
-        return f"text:{unquote(m.group(1))}"
-    return unquote(expr)
-
-def map_call(expr: str, bindings: dict | None = None) -> str | None:
-    bindings = bindings or {}
-    expr = expr.strip().rstrip(";").strip()
-    if not expr:
-        return None
-    if re.match(r'\w+\.attach\s*\(', expr):
-        return ""
-    m = re.match(r'require\((.+)\)$', expr)
-    if m:
-        args = [a.strip() for a in m.group(1).split(",") if a.strip()]
-        lines = []
-        for a in args:
-            cap = CAP.get(a, a.replace("Cap.", "").lower().replace("_", "."))
-            if cap.startswith("storage.app") or a.endswith("STORAGE_APP") or a.endswith("STORAGE)"):
-                cap = "storage.app"
-            lines.append(f"require {cap}")
-        return "\n".join(lines)
-
-    if re.search(r'\bKeypad\b|\bGraphics\b|\bKeyboard\b|\bFont\b|\bDraw\b', expr):
-        raise SystemExit(f"apps must not use graphics/keyboard APIs: {expr}")
-
-    m = re.match(r'(\w+)\.clear\s*\(\s*screen\s*\)$', expr)
-    if m and m.group(1) in bindings:
-        return f"ui.clear_text {bindings[m.group(1)]['id']}"
-    m = re.match(r'(\w+)\.setText\s*\(\s*screen\s*,\s*(.+)\)$', expr)
-    if m and m.group(1) in bindings:
-        return f"ui.set_text {bindings[m.group(1)]['id']} {resolve_value_expr(m.group(2), bindings)}"
-
-    patterns = [
-        (r'Ui(?:Api)?\.setText\(([^,]+),\s*(.+)\)$', lambda a, b: f"ui.set_text {unquote(a)} {resolve_value_expr(b, bindings)}"),
-        (r'Ui(?:Api)?\.appendText\(([^,]+),\s*(.+)\)$', lambda a, b: f"ui.append_text {unquote(a)} {resolve_value_expr(b, bindings)}"),
-        (r'Ui(?:Api)?\.clearText\((.+)\)$', lambda a: f"ui.clear_text {unquote(a)}"),
-        (r'Ui(?:Api)?\.push\((.+)\)$', lambda a: f"ui.push {unquote(a)}"),
-        (r'Ui(?:Api)?\.replace\((.+)\)$', lambda a: f"ui.replace {unquote(a)}"),
-        (r'Ui(?:Api)?\.pop\(\)$', lambda: "ui.pop"),
-        (r'Ui(?:Api)?\.home\(\)$', lambda: "ui.home"),
-        (r'Ui(?:Api)?\.softkey\((SoftKey\.\w+|ui\.SoftKey\.\w+),\s*([^,]+),\s*(.+)\)$',
-         lambda a, b, c: f"ui.softkey {SOFT.get(a.split('.')[-1] if a.startswith('ui.') else a, a.lower())} {unquote(b)} {unquote(c)}"),
-        (r'Ui(?:Api)?\.softkey\((SoftKey\.\w+|ui\.SoftKey\.\w+),\s*(.+)\)$',
-         lambda a, b: f"ui.softkey {SOFT.get(a.split('.')[-1] if a.startswith('ui.') else a, a.lower())} {unquote(b)}"),
-        (r'Storage\.get\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.get {unquote(a)} {unquote(b)}"),
-        (r'Storage\.set\(([^,]+),\s*Widget\.text\((.+)\)\)$', lambda a, b: f"storage.app.set {unquote(a)} text:{unquote(b)}"),
-        (r'Storage\.set\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.set {unquote(a)} {resolve_value_expr(b, bindings)}"),
-        (r'Storage\.setFromWidget\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.app.set {unquote(a)} text:{unquote(b)}"),
-        (r'Storage\.filesList\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.files.list {unquote(a)} {unquote(b)}"),
-        (r'Storage\.filesRead\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.files.read {unquote(a)} {unquote(b)}"),
-        (r'Storage\.assetRead\(([^,]+),\s*(.+)\)$', lambda a, b: f"storage.asset.read {unquote(a)} {unquote(b)}"),
-        (r'Service\.start\((.+)\)$', lambda a: f"service.start {unquote(a)}"),
-        (r'Service\.stop\((.+)\)$', lambda a: f"service.stop {unquote(a)}"),
-        (r'Service\.status\(([^,]+),\s*(.+)\)$', lambda a, b: f"service.status {unquote(a)} {unquote(b)}"),
-        (r'Service\.cmd\(([^,]+),\s*([^,]+),\s*(.+)\)$', lambda a, b, c: f"service.cmd {unquote(a)} {unquote(b)} {unquote(c)}"),
-        (r'Audio\.play\(\)$', lambda: "audio.play"),
-        (r'Audio\.pause\(\)$', lambda: "audio.pause"),
-        (r'Audio\.skip\(\)$', lambda: "audio.skip"),
-        (r'Audio\.stop\(\)$', lambda: "audio.stop"),
-        (r'Audio\.stop\(([^,]+),\s*(.+)\)$', lambda a, b: f"audio.stop {unquote(a)} {unquote(b)}"),
-        (r'Audio\.stop\((.+)\)$', lambda a: f"audio.stop {unquote(a)}"),
-        (r'Telephony\.digit\((.+)\)$', lambda a: f"telephony.digit {resolve_value_expr(a, bindings)}"),
-        (r'Telephony\.call\(\)$', lambda: "telephony.call"),
-        (r'Telephony\.end\(\)$', lambda: "telephony.end"),
-        (r'Telephony\.clear\(\)$', lambda: "telephony.clear"),
-        (r'Messages\.openThread\((.+)\)$', lambda a: "messages.open"),
-        (r'Messages\.open\(\)$', lambda: "messages.open"),
-        (r'Messages\.compose\(\)$', lambda: "messages.compose"),
-        (r'Messages\.send\((.+)\)$', lambda a: "messages.send"),
-        (r'Messages\.send\(\)$', lambda: "messages.send"),
-        (r'Contacts\.open\(\)$', lambda: "contacts.open"),
-        (r'Contacts\.search\((.+)\)$', lambda a: f"contacts.search {unquote(a)}"),
-        (r'Contacts\.call\(\)$', lambda: "contacts.call"),
-        (r'Clock\.now\((.+)\)$', lambda a: f"clock.now {unquote(a)}"),
-        (r'Clock\.date\((.+)\)$', lambda a: f"clock.date {unquote(a)}"),
-        (r'Clock\.tick\((.+)\)$', lambda a: f"clock.tick {unquote(a)}"),
-        (r'System\.deviceInfo\((.+)\)$', lambda a: f"system.device.info {unquote(a)}"),
-        (r'System\.locale\((.+)\)$', lambda a: f"system.locale {unquote(a)}"),
-        (r'System\.theme\((.+)\)$', lambda a: f"system.theme {unquote(a)}"),
-        (r'System\.time\((.+)\)$', lambda a: f"system.time {unquote(a)}"),
-        (r'System\.powerMenu\(\)$', lambda: "system.power.menu"),
-        (r'System\.powerOff\(\)$', lambda: "system.power.off"),
-        (r'System\.powerRestart\(\)$', lambda: "system.power.restart"),
-        (r'System\.apiVersion\((.+)\)$', lambda a: f"system.api.version {unquote(a)}"),
-        (r'Action\.run\((.+)\)$', lambda a: f"action {unquote(a)}"),
-        (r'StatusBadge\((\w+)\)\.setText\((.+)\)$', lambda a, b: f"ui.set_text {unquote(a)} {unquote(b)}"),
-    ]
-    for pat, fn in patterns:
-        m = re.match(pat, expr)
-        if m:
-            return fn(*m.groups()) if m.groups() else fn()
-    return None
-
-def split_statements(body: str):
-    parts = []
-    cur = []
-    depth = 0
-    i = 0
-    while i < len(body):
-        ch = body[i]
-        if ch in "([{":
-            depth += 1
-            cur.append(ch)
-        elif ch in ")]}":
-            depth = max(0, depth - 1)
-            cur.append(ch)
-        elif ch == ";" and depth == 0:
-            s = "".join(cur).strip()
-            if s:
-                parts.append(s)
-            cur = []
-        elif ch == "\n" and depth == 0:
-            s = "".join(cur).strip()
-            if s:
-                parts.append(s)
-            cur = []
-        else:
-            cur.append(ch)
-        i += 1
-    s = "".join(cur).strip()
-    if s:
-        parts.append(s)
-    return parts
-
-def map_statements(body: str, bindings: dict) -> list[str]:
-    lines = []
-    for st in split_statements(body):
-        st = st.strip()
-        if not st or st.startswith("when"):
-            continue
-        if st.startswith("if ") or st.startswith("if("):
-            bm = re.search(r'\{(.*)\}\s*$', st, re.S)
-            if bm:
-                lines.extend(map_statements(bm.group(1), bindings))
-            continue
-        if st.startswith("val ") or st.startswith("var "):
-            continue
-        mapped = map_call(st, bindings)
-        if mapped is None:
-            raise SystemExit(f"unsupported statement: {st}")
-        if mapped:
-            lines.extend(mapped.splitlines())
-    return lines
-
-def map_block_or_expr(expr: str, bindings: dict) -> str:
-    expr = expr.strip().rstrip(",").strip()
-    if expr.startswith("{") and expr.endswith("}"):
-        return "\n".join(map_statements(expr[1:-1], bindings))
-    mapped = map_call(expr, bindings)
-    if mapped is None:
-        raise SystemExit(f"unsupported expression in when: {expr}")
-    return mapped
-
-def compile_when(param: str, body: str, bindings: dict):
-    handlers = []
-    i = 0
-    while i < len(body):
-        m = re.match(
-            r'\s*(?:"([^"]+)"|\'([^\']+)\'|(SoftKey\.\w+)|([A-Za-z0-9_]+))\s*->\s*',
-            body[i:],
-        )
-        if not m:
-            i += 1
-            continue
-        key = m.group(1) or m.group(2) or m.group(3) or m.group(4)
-        if key.startswith("ui.SoftKey."):
-            key = "SoftKey." + key.split(".")[-1]
-        i += m.end()
-        if i < len(body) and body[i] == "{":
-            depth = 0
-            j = i
-            while j < len(body):
-                if body[j] == "{":
+            while i < n and depth > 0:
+                if src.startswith("/*", i):
                     depth += 1
-                elif body[j] == "}":
+                    i += 2
+                elif src.startswith("*/", i):
                     depth -= 1
-                    if depth == 0:
-                        j += 1
-                        break
-                j += 1
-            expr = body[i:j]
-            i = j
-        else:
-            j = i
-            while j < len(body) and body[j] not in "\n":
-                j += 1
-            expr = body[i:j]
-            i = j
-        mapped = map_block_or_expr(expr, bindings)
-        if param == "id":
-            handlers.append((f"click {key}", mapped))
-        elif param == "side":
-            sk = SOFT.get(key, key.lower().replace("SoftKey.", ""))
-            handlers.append((f"soft {sk}", mapped))
-        elif param == "action":
-            handlers.append((f"action {key}", mapped))
-        elif param == "number":
-            handlers.append((f"number {key}", mapped))
-        else:
-            handlers.append((param, mapped))
-    return handlers
-
-def extract_fun_bodies(src: str):
-    funs = []
-    for m in re.finditer(r'(?:override\s+)?fun\s+(\w+)\s*\(([^)]*)\)\s*\{', src):
-        name = m.group(1)
-        params = m.group(2).strip()
-        start = m.end()
-        depth = 1
-        i = start
-        while i < len(src) and depth > 0:
-            if src[i] == "{":
-                depth += 1
-            elif src[i] == "}":
-                depth -= 1
+                    i += 2
+                else:
+                    if src[i] == "\n":
+                        line += 1
+                        nl = True
+                    i += 1
+            continue
+        if c == "@":
             i += 1
-        body = src[start:i-1]
-        funs.append((name, params, body))
-    return funs
-
-def extract_named_arg(args: str, name: str) -> str | None:
-    m = re.search(rf'{name}\s*=\s*("([^"]*)"|\'([^\']*)\'|([^,\)]+))', args)
-    if not m:
-        return None
-    return m.group(2) if m.group(2) is not None else (m.group(3) if m.group(3) is not None else m.group(4).strip())
-
-def extract_lambda_after(src: str, start: int):
-    i = start
-    while i < len(src) and src[i].isspace():
-        i += 1
-    if i >= len(src) or src[i] != '{':
-        return "", i
-    depth = 0
-    j = i
-    while j < len(src):
-        if src[j] == '{':
-            depth += 1
-        elif src[j] == '}':
-            depth -= 1
-            if depth == 0:
+            while i < n and (src[i].isalnum() or src[i] in "_:."):
+                i += 1
+            if i < n and src[i] == "(":
+                depth = 0
+                while i < n:
+                    if src[i] == "(":
+                        depth += 1
+                    elif src[i] == ")":
+                        depth -= 1
+                        if depth == 0:
+                            i += 1
+                            break
+                    elif src[i] == "\n":
+                        line += 1
+                    i += 1
+            continue
+        if c == '"':
+            parts, i, _ = lex_string(src, i, line, file)
+            toks.append(Tok("str", parts, nl, line, file))
+            nl = False
+            continue
+        if c == "'":
+            j = i + 1
+            if j < n and src[j] == "\\":
+                esc = src[j + 1:j + 2]
+                if esc == "'":
+                    ch = "'"
+                elif esc == "\\":
+                    ch = "\\"
+                elif esc == "t":
+                    ch = "\t"
+                else:
+                    raise KtcError("char escape is not supported", file, line)
+                j += 2
+            else:
+                ch = src[j:j + 1]
                 j += 1
+            if j >= n or src[j] != "'":
+                raise KtcError("bad char literal", file, line)
+            toks.append(Tok("str", [("s", ch)], nl, line, file))
+            nl = False
+            i = j + 1
+            continue
+        if c.isdigit():
+            m = NUM_RE.match(src, i)
+            text = m.group(0)
+            i = m.end()
+            suffix = ""
+            while i < n and src[i] in "fFLuU":
+                suffix += src[i]
+                i += 1
+            clean = text.replace("_", "")
+            if clean[:2] in ("0x", "0X"):
+                toks.append(Tok("int", str(int(clean, 16)), nl, line, file))
+            elif "." in clean or "e" in clean or "E" in clean or "f" in suffix or "F" in suffix:
+                toks.append(Tok("float", clean, nl, line, file))
+            else:
+                toks.append(Tok("int", str(int(clean)), nl, line, file))
+            nl = False
+            continue
+        if c.isalpha() or c == "_":
+            j = i
+            while j < n and (src[j].isalnum() or src[j] == "_"):
+                j += 1
+            word = src[i:j]
+            if word in FORBIDDEN:
+                raise KtcError("apps must not use graphics/keyboard APIs: %s" % word, file, line)
+            toks.append(Tok("id", word, nl, line, file))
+            nl = False
+            i = j
+            continue
+        two = src[i:i + 2]
+        if two in OPS2:
+            toks.append(Tok("op", two, nl, line, file))
+            nl = False
+            i += 2
+            continue
+        if c in "+-*/%<>=!(){}[],.:;?":
+            toks.append(Tok("op", c, nl, line, file))
+            nl = False
+            i += 1
+            continue
+        raise KtcError("unexpected character %r" % c, file, line)
+    toks.append(Tok("eof", "", True, line, file))
+    return toks
+
+
+class Parser:
+    def __init__(self, toks, file):
+        self.t = toks
+        self.p = 0
+        self.file = file
+        self.depth = 0
+
+    @property
+    def c(self):
+        return self.t[self.p]
+
+    def peek(self, k=1):
+        return self.t[min(self.p + k, len(self.t) - 1)]
+
+    def fail(self, msg, tok=None):
+        tok = tok or self.c
+        raise KtcError(msg, self.file, tok.line)
+
+    def adv(self):
+        t = self.t[self.p]
+        if self.p < len(self.t) - 1:
+            self.p += 1
+        return t
+
+    def isop(self, v):
+        return self.c.k == "op" and self.c.v == v
+
+    def isid(self, v):
+        return self.c.k == "id" and self.c.v == v
+
+    def eat(self, v):
+        if self.isop(v):
+            self.adv()
+            return True
+        return False
+
+    def expect(self, v):
+        if not self.isop(v):
+            self.fail("expected '%s' but found '%s'" % (v, self.c.v if self.c.k != "str" else "string"))
+        return self.adv()
+
+    def ident(self):
+        if self.c.k != "id":
+            self.fail("expected identifier")
+        return self.adv()
+
+    def parse_file(self):
+        d = Decls()
+        while self.c.k != "eof":
+            if self.eat(";"):
+                continue
+            if self.c.k == "id" and self.c.v in ("package", "import"):
+                self.adv()
+                while self.c.k != "eof" and not self.c.nl:
+                    self.adv()
+                continue
+            self.member(d)
+        return d
+
+    def member(self, d):
+        while self.c.k == "id" and self.c.v in MODS:
+            self.adv()
+        t = self.c
+        if t.k == "id":
+            v = t.v
+            if v in ("class", "object", "interface"):
+                self.klass(d)
+                return
+            if v == "companion":
+                self.adv()
+                if self.isid("object"):
+                    self.klass(d)
+                    return
+                self.fail("unsupported declaration")
+            if v == "fun":
+                d.funs.append(self.fun())
+                return
+            if v in ("val", "var"):
+                d.props.append(self.local())
+                return
+            if v == "init":
+                self.adv()
+                d.inits.extend(self.block())
+                return
+        self.fail("unsupported declaration '%s'" % (t.v if t.k != "str" else "string"))
+
+    def skip_parens(self):
+        depth = 0
+        while self.c.k != "eof":
+            if self.isop("("):
+                depth += 1
+            elif self.isop(")"):
+                depth -= 1
+                if depth == 0:
+                    self.adv()
+                    return
+            self.adv()
+
+    def skip_generics(self):
+        depth = 0
+        while self.c.k != "eof":
+            if self.isop("<"):
+                depth += 1
+            elif self.isop(">"):
+                depth -= 1
+                if depth == 0:
+                    self.adv()
+                    return
+            self.adv()
+
+    def klass(self, d):
+        self.adv()
+        if self.c.k == "id":
+            self.adv()
+        if self.isop("<"):
+            self.skip_generics()
+        if self.isop("("):
+            self.skip_parens()
+        if self.isop(":"):
+            while self.c.k != "eof" and not self.isop("{"):
+                if self.c.nl and self.c.k == "id" and self.c.v not in ("where",):
+                    break
+                if self.isop("("):
+                    self.skip_parens()
+                else:
+                    self.adv()
+        if self.isop("{"):
+            self.adv()
+            sd = self.depth
+            self.depth = 0
+            while not self.isop("}"):
+                if self.c.k == "eof":
+                    self.fail("unterminated class body")
+                if self.eat(";"):
+                    continue
+                self.member(d)
+            self.adv()
+            self.depth = sd
+
+    def type(self):
+        t = self.c
+        if t.k != "id":
+            self.fail("expected type")
+        name = t.v
+        self.adv()
+        while self.isop(".") and self.peek().k == "id":
+            self.adv()
+            name = self.c.v
+            self.adv()
+        if self.isop("<"):
+            self.skip_generics()
+        if self.isop("?"):
+            self.adv()
+        return name
+
+    def local(self):
+        kw = self.adv()
+        if self.c.k != "id":
+            self.fail("destructuring declarations are not supported")
+        name = self.adv().v
+        ty = None
+        if self.isop(":"):
+            self.adv()
+            ty = self.type()
+        init = None
+        if self.isop("="):
+            self.adv()
+            init = self.expr()
+        if self.c.k == "id" and self.c.v in ("by", "get", "set") and not self.c.nl:
+            self.fail("delegated and accessor properties are not supported")
+        return N("local", kw.line, mut=(kw.v == "var"), name=name, type=ty, init=init, file=self.file)
+
+    def fun(self):
+        kw = self.adv()
+        if self.isop("<"):
+            self.skip_generics()
+        name = self.ident().v
+        if self.isop("."):
+            self.fail("extension functions are not supported")
+        self.expect("(")
+        params = []
+        while not self.isop(")"):
+            if self.isid("vararg"):
+                self.fail("vararg is not supported")
+            pn = self.ident().v
+            self.expect(":")
+            pt = self.type()
+            if self.isop("="):
+                self.fail("default parameter values are not supported")
+            params.append((pn, pt))
+            if not self.eat(","):
                 break
-        j += 1
-    return src[i+1:j-1], j
-
-def extract_bindings(src: str) -> dict:
-    bindings = {}
-    for m in re.finditer(
-        r'(?:private\s+|val\s+|private\s+val\s+)(\w+)\s*=\s*(DialKeypad|TextInput|ActionButton|ListRow|SurfaceCard|StatusBadge|AppTile)\s*\((.*?)\)\s*(\{)?',
-        src,
-        re.S,
-    ):
-        var = m.group(1)
-        kind = m.group(2)
-        args = m.group(3)
-        has_brace = m.group(4)
-        cid = extract_named_arg(args, "id") or var
-        placeholder = extract_named_arg(args, "placeholder") or ""
-        variant = extract_named_arg(args, "variant") or ""
-        end = m.end()
-        lambda_body = ""
-        lambda_param = ""
-        if has_brace:
-            body, end = extract_lambda_after(src, m.end() - 1)
-            lm = re.match(r'\s*(\w+)\s*(?::\s*[\w\.<>]+)?\s*->\s*(.*)\s*$', body, re.S)
-            if lm:
-                lambda_param = lm.group(1)
-                lambda_body = lm.group(2).strip()
-            else:
-                lambda_body = body.strip()
-        bindings[var] = {
-            "kind": kind,
-            "id": cid,
-            "placeholder": placeholder,
-            "variant": variant,
-            "lambda_param": lambda_param,
-            "lambda_body": lambda_body,
-        }
-    return bindings
-
-def emit_handler(out: list, event: str, lines: list[str]):
-    if not lines:
-        return
-    out.append(f"on_{event}")
-    for line in lines:
-        out.append(f"  {line}")
-    out.append("end")
-    out.append("")
-
-def compile_bindings(bindings: dict, out: list):
-    for var, b in bindings.items():
-        kind = b["kind"]
-        body = b["lambda_body"]
-        if not body:
-            continue
-        param = b["lambda_param"]
-        body2 = body
-        if param:
-            body2 = re.sub(rf'\b{re.escape(param)}\b', "$key", body2)
-        lines = map_statements(body2, bindings)
-        if kind == "DialKeypad":
-            emit_handler(out, "number *", lines)
-        elif kind == "ActionButton":
-            emit_handler(out, f"click {b['id']}", lines)
-        elif kind == "ListRow":
-            for row_id in ("m1", "m2", "m3", "m4", "c1", "c2", "c3", "c4", "c5"):
-                emit_handler(out, f"click {row_id}", lines)
-
-def compile_kt(src: str) -> str:
-    src = strip_comments(src)
-    src = re.sub(r'package\s+[^\n]+', '', src)
-    src = re.sub(r'import\s+[^\n]+', '', src)
-    bindings = extract_bindings(src)
-    out = []
-    compile_bindings(bindings, out)
-
-    for name, params, body in extract_fun_bodies(src):
-        body = body.strip()
-        if name in ("onLoad", "onStart"):
-            lines = map_statements(body, bindings)
-            emit_handler(out, "load", lines if lines else ["require ui"])
-        elif name == "onTick":
-            lines = map_statements(body, bindings)
-            emit_handler(out, "tick", lines)
-        elif name in ("onClick", "onSoft", "onAction", "onNumber"):
-            if name in ("onKey", "onDigit") or "Keypad" in body or "Keyboard" in body:
-                raise SystemExit("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber")
-            param = "id"
-            if name == "onSoft":
-                param = "side"
-            elif name == "onAction":
-                param = "action"
-            elif name == "onNumber":
-                param = "number"
-            wm = re.search(r'when\s*\(([^)]+)\)\s*\{(.*)\}\s*$', body, re.S)
-            if wm:
-                for ev, mapped in compile_when(param, wm.group(2), bindings):
-                    emit_handler(out, ev, mapped.splitlines() if mapped else [])
-            elif name == "onNumber":
-                body2 = body.replace("value", "$key")
-                lines = map_statements(body2, bindings)
-                emit_handler(out, "number *", lines)
-            else:
-                raise SystemExit(f"{name} requires when(...) {{ }}")
-        elif name in ("onKey", "onDigit"):
-            raise SystemExit("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber")
+        self.expect(")")
+        ret = None
+        if self.eat(":"):
+            ret = self.type()
+        body = None
+        expr = None
+        if self.isop("{"):
+            body = self.block()
+        elif self.eat("="):
+            expr = self.expr()
         else:
-            continue
-    return "\n".join(out).rstrip() + "\n"
+            self.fail("function '%s' needs a body" % name)
+        return N("fun", kw.line, name=name, params=params, ret=ret, body=body, expr=expr, file=self.file)
 
-def compile_dir(app_dir: str, out_path: str):
+    def block(self):
+        self.expect("{")
+        sd = self.depth
+        self.depth = 0
+        out = []
+        while not self.isop("}"):
+            if self.c.k == "eof":
+                self.fail("unterminated block")
+            if self.eat(";"):
+                continue
+            out.append(self.stmt())
+        self.adv()
+        self.depth = sd
+        return out
+
+    def body(self):
+        if self.isop("{"):
+            return self.block()
+        return [self.stmt()]
+
+    def stmt(self):
+        t = self.c
+        if t.k == "id":
+            v = t.v
+            if v in ("val", "var"):
+                return self.local()
+            if v == "if":
+                return self.parse_if()
+            if v == "when":
+                return self.parse_when()
+            if v == "while":
+                self.adv()
+                self.expect("(")
+                self.depth += 1
+                cond = self.expr()
+                self.depth -= 1
+                self.expect(")")
+                return N("while", t.line, cond=cond, body=self.body())
+            if v == "for":
+                self.adv()
+                self.expect("(")
+                self.depth += 1
+                var = self.ident().v
+                if not self.isid("in"):
+                    self.fail("expected 'in'")
+                self.adv()
+                it = self.expr()
+                self.depth -= 1
+                self.expect(")")
+                return N("for", t.line, var=var, iter=it, body=self.body())
+            if v == "return":
+                self.adv()
+                e = None
+                if not (self.c.nl or self.isop("}") or self.isop(";") or self.c.k == "eof"):
+                    e = self.expr()
+                return N("return", t.line, e=e)
+            if v in ("break", "continue"):
+                self.fail("'%s' is not supported by VSL" % v)
+            if v in ("do", "try", "throw", "fun", "class", "object"):
+                self.fail("'%s' is not supported here" % v)
+        e = self.expr()
+        if self.c.k == "op" and self.c.v in ASSIGN_OPS:
+            op = self.adv().v
+            rhs = self.expr()
+            return N("assign", t.line, target=e, op=op, val=rhs)
+        if self.c.k == "op" and self.c.v in ("++", "--") and not self.c.nl:
+            op = self.adv().v
+            return N("assign", t.line, target=e, op="+=" if op == "++" else "-=", val=N("int", t.line, v="1"))
+        return N("expr", t.line, e=e)
+
+    def parse_if(self):
+        t = self.adv()
+        self.expect("(")
+        self.depth += 1
+        cond = self.expr()
+        self.depth -= 1
+        self.expect(")")
+        then = self.body()
+        els = None
+        if self.isid("else"):
+            self.adv()
+            if self.isid("if"):
+                els = [self.parse_if()]
+            else:
+                els = self.body()
+        return N("if", t.line, cond=cond, then=then, els=els)
+
+    def parse_when(self):
+        t = self.adv()
+        subj = None
+        if self.isop("("):
+            self.adv()
+            self.depth += 1
+            subj = self.expr()
+            self.depth -= 1
+            self.expect(")")
+        self.expect("{")
+        sd = self.depth
+        self.depth = 0
+        branches = []
+        while not self.isop("}"):
+            if self.c.k == "eof":
+                self.fail("unterminated when")
+            if self.eat(";"):
+                continue
+            conds = None
+            if self.isid("else"):
+                self.adv()
+            else:
+                conds = [self.expr()]
+                while self.eat(","):
+                    conds.append(self.expr())
+            self.expect("->")
+            branches.append(N("branch", t.line, conds=conds, body=self.body()))
+        self.adv()
+        self.depth = sd
+        return N("when", t.line, subj=subj, branches=branches)
+
+    def expr(self, minp=0):
+        left = self.unary()
+        while True:
+            t = self.c
+            if t.k == "op":
+                op = t.v
+            elif t.k == "id" and t.v in ("until", "downTo", "step"):
+                op = t.v
+            else:
+                break
+            prec = BIN_PREC.get(op)
+            if prec is None or prec < minp:
+                break
+            if t.nl and self.depth == 0 and op not in ("&&", "||", "?:"):
+                break
+            self.adv()
+            right = self.expr(prec + 1)
+            left = N("bin", t.line, op=op, l=left, r=right)
+        return left
+
+    def unary(self):
+        t = self.c
+        if t.k == "op" and t.v in ("-", "+", "!"):
+            self.adv()
+            return N("un", t.line, op=t.v, x=self.unary())
+        return self.postfix()
+
+    def postfix(self):
+        e = self.primary()
+        while True:
+            t = self.c
+            if t.k != "op":
+                break
+            v = t.v
+            if v in (".", "?."):
+                self.adv()
+                nt = self.c
+                if nt.k != "id":
+                    self.fail("expected member name")
+                self.adv()
+                e = N("member", nt.line, obj=e, name=nt.v)
+            elif v == "(" and not (t.nl and self.depth == 0):
+                e = self.call(e)
+            elif v == "[" and not (t.nl and self.depth == 0):
+                self.adv()
+                self.depth += 1
+                i = self.expr()
+                self.depth -= 1
+                self.expect("]")
+                e = N("index", t.line, obj=e, idx=i)
+            elif v == "!!":
+                self.adv()
+            else:
+                break
+        return e
+
+    def call(self, fn):
+        line = self.c.line
+        self.expect("(")
+        self.depth += 1
+        args = []
+        while not self.isop(")"):
+            name = None
+            if self.c.k == "id" and self.peek().k == "op" and self.peek().v == "=":
+                name = self.adv().v
+                self.adv()
+            args.append((name, self.expr()))
+            if not self.eat(","):
+                break
+        self.depth -= 1
+        self.expect(")")
+        lam = None
+        if self.isop("{") and not self.c.nl:
+            lam = self.lambda_()
+        return N("call", line, fn=fn, args=args, lam=lam)
+
+    def lambda_(self):
+        t = self.expect("{")
+        sd = self.depth
+        self.depth = 0
+        params = []
+        j = self.p
+        names = []
+        ok = False
+        while True:
+            tk = self.t[j]
+            if tk.k != "id":
+                break
+            names.append(tk.v)
+            j += 1
+            if self.t[j].k == "op" and self.t[j].v == ":":
+                while not (self.t[j].k == "op" and self.t[j].v in (",", "->")) and self.t[j].k != "eof":
+                    j += 1
+            if self.t[j].k == "op" and self.t[j].v == ",":
+                j += 1
+                continue
+            if self.t[j].k == "op" and self.t[j].v == "->":
+                ok = True
+            break
+        if ok:
+            params = names
+            self.p = j + 1
+        elif self.isop("->"):
+            self.adv()
+        body = []
+        while not self.isop("}"):
+            if self.c.k == "eof":
+                self.fail("unterminated lambda")
+            if self.eat(";"):
+                continue
+            body.append(self.stmt())
+        self.adv()
+        self.depth = sd
+        return N("lambda", t.line, params=params, body=body)
+
+    def primary(self):
+        t = self.c
+        k = t.k
+        if k == "int":
+            self.adv()
+            return N("int", t.line, v=t.v)
+        if k == "float":
+            self.adv()
+            return N("float", t.line, v=t.v)
+        if k == "str":
+            self.adv()
+            parts = []
+            for p in t.v:
+                if p[0] == "s":
+                    parts.append(p[1])
+                else:
+                    sub = Parser(lex(p[1], self.file, p[2]), self.file)
+                    parts.append(sub.expr())
+            return N("str", t.line, parts=parts)
+        if k == "op" and t.v == "(":
+            self.adv()
+            self.depth += 1
+            e = self.expr()
+            self.depth -= 1
+            self.expect(")")
+            return e
+        if k == "id":
+            v = t.v
+            if v in ("true", "false"):
+                self.adv()
+                return N("bool", t.line, v=(v == "true"))
+            if v == "null":
+                self.fail("null is not supported")
+            if v == "if":
+                return self.parse_if()
+            if v == "when":
+                return self.parse_when()
+            self.adv()
+            if v in LIST_CTORS and self.isop("<"):
+                self.skip_generics()
+            return N("id", t.line, name=v)
+        self.fail("unexpected '%s'" % (t.v if k != "eof" else "end of file"))
+
+
+def map_type(name):
+    return TYPES.get(name, "any")
+
+
+def qlit(s, file="", line=0):
+    if '"' in s or "\n" in s or "\r" in s:
+        raise KtcError("string literal cannot contain quotes or line breaks", file, line)
+    if s and re.fullmatch(r"[A-Za-z0-9_./:-]+", s) and not s.startswith("text:"):
+        return s
+    return '"' + s + '"'
+
+
+def shorten(name):
+    if len(name) <= 31:
+        return name
+    return "%s_%03x" % (name[:26], zlib.crc32(name.encode()) & 0xFFF)
+
+
+def reserve(name):
+    if name in RESERVED:
+        name = "v_" + name
+    return shorten(name)
+
+
+def walk(node):
+    if isinstance(node, N):
+        yield node
+        for v in node.__dict__.values():
+            for x in walk(v):
+                yield x
+    elif isinstance(node, (list, tuple)):
+        for v in node:
+            for x in walk(v):
+                yield x
+
+
+class Val:
+    __slots__ = ("a", "t", "lit")
+
+    def __init__(self, a, t, lit=None):
+        self.a = a
+        self.t = t
+        self.lit = lit
+
+
+class Var:
+    __slots__ = ("ir", "t")
+
+    def __init__(self, ir, t):
+        self.ir = ir
+        self.t = t
+
+
+class Bind:
+    def __init__(self, kind, cid, lam, line, file):
+        self.kind = kind
+        self.id = cid
+        self.lam = lam
+        self.line = line
+        self.file = file
+
+
+class Scope:
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.v = {}
+
+    def find(self, name):
+        s = self
+        while s is not None:
+            if name in s.v:
+                return s.v[name]
+            s = s.parent
+        return None
+
+    def irs(self):
+        out = set()
+        s = self
+        while s is not None:
+            for x in s.v.values():
+                if isinstance(x, Var):
+                    out.add(x.ir)
+            s = s.parent
+        return out
+
+
+class Fn:
+    def __init__(self, node):
+        self.node = node
+        self.name = node.name
+        self.params = [(n, map_type(t)) for n, t in node.params]
+        self.ret = map_type(node.ret) if node.ret else None
+
+
+UNIT = Val("", "unit")
+
+
+def lit_str(s, file="", line=0):
+    return Val(qlit(s, file, line), "str", s)
+
+
+def lit_int(n):
+    return Val(str(n), "int", n)
+
+
+class Compiler:
+    def __init__(self, decls, file):
+        self.d = decls
+        self.file = file
+        self.line = 0
+        self.fns = {}
+        self.fn_order = []
+        self.handlers = []
+        self.props = {}
+        self.prop_nodes = []
+        self.sizes = {}
+        self.rets = {}
+        self.ptypes = {}
+        self.hsize = 0
+        self.warn = []
+        self.setup()
+
+    def err(self, msg, line=None):
+        raise KtcError(msg, self.file, line if line is not None else self.line)
+
+    def setup(self):
+        for f in self.d.funs:
+            if f.name in ("onKey", "onDigit"):
+                self.err("keyboard/keypad handling belongs in the SDK; use DialKeypad or onNumber", f.line)
+            if f.name in EVENTS:
+                self.handlers.append(f)
+                continue
+            if f.name in self.fns:
+                self.err("duplicate function '%s'" % f.name, f.line)
+            if len(f.params) > 6:
+                self.err("function '%s' has more than 6 parameters" % f.name, f.line)
+            self.fns[f.name] = Fn(f)
+            self.fn_order.append(f.name)
+        for p in self.d.props:
+            self.file = p.file
+            if p.name in self.props:
+                self.err("duplicate property '%s'" % p.name, p.line)
+            self.prop_nodes.append(p)
+            ini = p.init
+            if ini is not None and ini.k == "call" and ini.fn.k == "id" and ini.fn.name in BINDINGS:
+                self.props[p.name] = self.make_bind(ini, p.name)
+                continue
+            t = map_type(p.type) if p.type else self.quick_type(ini)
+            self.props[p.name] = Var(reserve(p.name), self.ptypes.get(p.name, t))
+        for n in walk([self.d.funs, self.d.inits, self.d.props]):
+            if n.k == "assign" and n.target.k == "id" and n.target.name.startswith("g_"):
+                if n.target.name not in self.props:
+                    self.props[n.target.name] = Var(reserve(n.target.name), "any")
+
+    def quick_type(self, e):
+        if e is None:
+            return "any"
+        k = e.k
+        if k == "int":
+            return "int"
+        if k == "float":
+            return "float"
+        if k == "str":
+            return "str"
+        if k == "bool":
+            return "bool"
+        if k == "un" and e.op == "-":
+            return self.quick_type(e.x)
+        if k == "call" and e.fn.k == "id" and e.fn.name in LIST_CTORS:
+            return "list"
+        return "any"
+
+    def make_bind(self, call, varname):
+        cid = None
+        for name, a in call.args:
+            if name == "id" or (name is None and cid is None):
+                if a.k == "str" and all(isinstance(p, str) for p in a.parts):
+                    cid = "".join(a.parts)
+                    if name == "id":
+                        break
+        return Bind(call.fn.name, cid or varname, call.lam, call.line, self.file)
+
+    def lookup(self, name):
+        v = self.scope.find(name)
+        if v is not None:
+            return v
+        return self.props.get(name)
+
+    def begin(self, base, fn=None):
+        self.base = base
+        self.fn = fn
+        self.tcur = 0
+        self.maxt = 0
+        self.out = []
+        self.ind = 0
+        self.scope = Scope()
+        self.alias = {}
+
+    def end(self):
+        return self.out, self.maxt
+
+    def emit(self, s):
+        if len(s) > 480:
+            self.err("generated IR line is too long")
+        self.out.append("  " * self.ind + s)
+
+    def op(self, *toks):
+        self.emit(" ".join(toks))
+
+    def tmp(self):
+        n = self.base + self.tcur
+        self.tcur += 1
+        if self.tcur > self.maxt:
+            self.maxt = self.tcur
+        return "_t%d" % n
+
+    def alloc_ir(self, name):
+        base = reserve(name)
+        if self.fn:
+            base = shorten("%s_%s" % (self.fn, base))
+        taken = self.scope.irs() | set(v.ir for v in self.props.values() if isinstance(v, Var))
+        ir = base
+        k = 2
+        while ir in taken:
+            ir = shorten("%s%d" % (base, k))
+            k += 1
+        return ir
+
+    def block(self, stmts):
+        self.scope = Scope(self.scope)
+        for s in stmts:
+            self.stmt(s)
+        self.scope = self.scope.parent
+
+    def stmt(self, s):
+        self.line = s.line
+        saved = self.tcur
+        getattr(self, "s_" + s.k)(s)
+        self.tcur = saved
+
+    def store(self, ir, v):
+        if v.t == "unit":
+            self.err("expression has no value")
+        a = v.a
+        if a == "$" + ir:
+            return
+        if v.t == "str" and isinstance(v.lit, str) and (v.lit.startswith("$") or v.lit.startswith("text:")):
+            self.op("concat", ir, '""', a)
+        else:
+            self.op("let", ir, a)
+
+    def safe(self, v, pos):
+        if v.t in ("unit", "screen"):
+            self.err("value expected")
+        if v.t == "str" and isinstance(v.lit, str):
+            s = v.lit
+            if s.startswith("$") or s.startswith("text:") or (pos == 1 and (s == "" or re.search(r"\s", s))):
+                t = self.tmp()
+                self.op("concat", t, '""', v.a)
+                return "$" + t
+        return v.a
+
+    def atom(self, v):
+        if v.t in ("unit", "screen"):
+            self.err("value expected")
+        return v.a
+
+    def cs(self, c):
+        if c[0] in ("truthy", "falsy"):
+            return "%s %s" % (c[0], c[1])
+        return "%s %s %s" % (c[0], c[1], c[2])
+
+    def s_local(self, s):
+        ini = s.init
+        if ini is not None and ini.k == "call" and ini.fn.k == "id" and ini.fn.name in BINDINGS:
+            bd = self.make_bind(ini, s.name)
+            self.scope.v[s.name] = bd
+            self.q.append(bd)
+            return
+        t = map_type(s.type) if s.type else None
+        if ini is None:
+            ir = self.alloc_ir(s.name)
+            self.scope.v[s.name] = Var(ir, t or "any")
+            return
+        ir = self.alloc_ir(s.name)
+        v = self.ex(ini, ir)
+        if v.t == "unit":
+            self.err("initializer has no value")
+        self.store(ir, v)
+        self.scope.v[s.name] = Var(ir, t or v.t)
+
+    def resolve_target(self, tg):
+        if tg.k == "member" and tg.obj.k == "id" and tg.obj.name == "this":
+            tg = N("id", tg.line, name=tg.name)
+        if tg.k != "id":
+            return None
+        if tg.name in self.alias:
+            self.err("cannot assign to handler parameter '%s'" % tg.name)
+        v = self.lookup(tg.name)
+        if v is None:
+            self.err("assignment to undeclared variable '%s'" % tg.name)
+        if not isinstance(v, Var):
+            self.err("cannot assign to '%s'" % tg.name)
+        return v
+
+    def s_assign(self, s):
+        tg = s.target
+        if tg.k == "index":
+            lv = self.ex(tg.obj)
+            iv = self.ex(tg.idx)
+            if s.op != "=":
+                cur = self.ex(tg)
+                nv = self.arith(s.op[0], cur, self.ex(s.val), None)
+            else:
+                nv = self.ex(s.val)
+            self.op("list.set", self.atom(lv), self.atom(iv), self.atom(nv))
+            return
+        var = self.resolve_target(tg)
+        if var is None:
+            self.err("unsupported assignment target")
+        if s.op == "=":
+            e = s.val
+        else:
+            e = N("bin", s.line, op=s.op[0], l=tg, r=s.val)
+        v = self.ex(e, var.ir)
+        self.store(var.ir, v)
+        if var.t == "any" and v.t not in ("unit", "screen"):
+            var.t = v.t
+            for n, p in self.props.items():
+                if p is var:
+                    self.ptypes[n] = v.t
+
+    def s_expr(self, s):
+        e = s.e
+        if e.k == "call":
+            self.call(e, None, False)
+        else:
+            self.ex(e)
+
+    def s_if(self, s):
+        c = self.cond(s.cond)
+        self.emit("if " + self.cs(c))
+        self.ind += 1
+        self.block(s.then)
+        self.ind -= 1
+        if s.els is not None:
+            self.emit("else")
+            self.ind += 1
+            self.block(s.els)
+            self.ind -= 1
+        self.emit("endif")
+
+    def s_when(self, s):
+        self.when_gen(s, None, False)
+
+    def s_while(self, s):
+        mark = self.tcur
+        c = self.cond(s.cond)
+        head = self.cs(c)
+        self.emit("while " + head)
+        self.ind += 1
+        self.block(s.body)
+        self.tcur = mark
+        c2 = self.cond(s.cond)
+        if self.cs(c2) != head:
+            self.err("loop condition is too complex")
+        self.ind -= 1
+        self.emit("endwhile")
+
+    def s_for(self, s):
+        it = s.iter
+        self.scope = Scope(self.scope)
+        if it.k == "bin" and it.op in ("..", "until", "downTo"):
+            lo = self.ex(it.l)
+            hi = self.ex(it.r)
+            ir = self.alloc_ir(s.var)
+            self.store(ir, lo)
+            h = self.tmp()
+            self.store(h, hi)
+            self.scope.v[s.var] = Var(ir, "int")
+            cmpop = {"..": "le", "until": "lt", "downTo": "ge"}[it.op]
+            self.emit("while %s $%s $%s" % (cmpop, ir, h))
+            self.ind += 1
+            self.block(s.body)
+            self.op("sub" if it.op == "downTo" else "add", ir, "$" + ir, "1")
+            self.ind -= 1
+            self.emit("endwhile")
+        else:
+            if it.k == "bin":
+                self.err("unsupported range expression in for")
+            lv = self.ex(it)
+            la = self.atom(lv)
+            ln = self.tmp()
+            ix = self.tmp()
+            self.op("list.len", ln, la)
+            self.op("let", ix, "0")
+            ir = self.alloc_ir(s.var)
+            self.scope.v[s.var] = Var(ir, "str")
+            self.emit("while lt $%s $%s" % (ix, ln))
+            self.ind += 1
+            self.op("list.get", ir, la, "$" + ix)
+            self.block(s.body)
+            self.op("add", ix, "$" + ix, "1")
+            self.ind -= 1
+            self.emit("endwhile")
+        self.scope = self.scope.parent
+
+    def s_return(self, s):
+        if s.e is None:
+            self.emit("ret")
+            return
+        v = self.ex(s.e)
+        if self.fn and v.t not in ("unit", "screen"):
+            self.emit("ret " + v.a)
+        else:
+            self.emit("ret")
+
+    def ex(self, e, dst=None):
+        h = getattr(self, "x_" + e.k, None)
+        if h is None:
+            self.err("unsupported expression", e.line)
+        self.line = e.line
+        return h(e, dst)
+
+    def x_int(self, e, dst):
+        return Val(e.v, "int", int(e.v))
+
+    def x_float(self, e, dst):
+        return Val(e.v, "float", float(e.v))
+
+    def x_bool(self, e, dst):
+        return Val("1" if e.v else "0", "bool", 1 if e.v else 0)
+
+    def x_str(self, e, dst):
+        vals = []
+        for p in e.parts:
+            if isinstance(p, str):
+                if p:
+                    if vals and vals[-1].lit is not None and isinstance(vals[-1].lit, str) and vals[-1].t == "str":
+                        s = vals[-1].lit + p
+                        vals[-1] = lit_str(s, self.file, e.line)
+                    else:
+                        vals.append(lit_str(p, self.file, e.line))
+            else:
+                v = self.ex(p)
+                if v.t in ("unit", "screen"):
+                    self.err("value expected in string template")
+                vals.append(v)
+        if not vals:
+            return lit_str("", self.file, e.line)
+        if len(vals) == 1:
+            v = vals[0]
+            if v.t == "str":
+                return v
+            return Val(v.a, "str", None)
+        return self.concat_chain(vals, dst)
+
+    def concat_chain(self, vals, dst):
+        later = set(v.a for v in vals[2:])
+        if dst is not None and ("$" + dst) in later:
+            dst = None
+        t = dst or self.tmp()
+        self.op("concat", t, self.safe_ext(vals[0]), self.safe_ext(vals[1]))
+        for v in vals[2:]:
+            self.op("concat", t, "$" + t, self.safe_ext(v))
+        return Val("$" + t, "str")
+
+    def safe_ext(self, v):
+        if v.t in ("unit", "screen"):
+            self.err("value expected")
+        return v.a
+
+    def x_id(self, e, dst):
+        n = e.name
+        if n in self.alias:
+            return self.alias[n]
+        v = self.lookup(n)
+        if isinstance(v, Var):
+            return Val("$" + v.ir, v.t)
+        if isinstance(v, Bind):
+            self.err("'%s' is a UI binding, not a value" % n)
+        if n == "screen":
+            return Val("", "screen")
+        if n in SOFT:
+            return lit_str(SOFT[n], self.file, e.line)
+        self.err("unknown identifier '%s'" % n)
+
+    def x_member(self, e, dst):
+        o = e.obj
+        if o.k == "id" and self.lookup(o.name) is None and o.name not in self.alias:
+            if o.name == "SoftKey" and e.name in SOFT:
+                return lit_str(SOFT[e.name], self.file, e.line)
+            if o.name == "this":
+                return self.x_id(N("id", e.line, name=e.name), dst)
+        if o.k == "id":
+            b = self.lookup(o.name)
+            if isinstance(b, Bind) and e.name == "value":
+                return Val("text:" + b.id, "str")
+        v = self.ex(o)
+        if e.name == "length":
+            t = dst or self.tmp()
+            self.op("len", t, self.atom(v))
+            return Val("$" + t, "int")
+        if e.name == "size" and v.t in ("list", "any"):
+            t = dst or self.tmp()
+            self.op("list.len", t, self.atom(v))
+            return Val("$" + t, "int")
+        self.err("unsupported member '%s'" % e.name)
+
+    def x_index(self, e, dst):
+        o = self.ex(e.obj)
+        i = self.ex(e.idx)
+        t = dst or self.tmp()
+        if o.t == "str":
+            self.op("substr", t, self.atom(o), self.atom(i), "1")
+        else:
+            self.op("list.get", t, self.atom(o), self.atom(i))
+        return Val("$" + t, "str")
+
+    def x_un(self, e, dst):
+        if e.op == "!":
+            c = self.cond(e)
+            return self.cond_val(c, dst)
+        v = self.ex(e.x)
+        if e.op == "+":
+            return v
+        if v.t == "int" and isinstance(v.lit, int):
+            return lit_int(-v.lit)
+        if v.t == "float" and isinstance(v.lit, float):
+            return Val(repr(-v.lit), "float", -v.lit)
+        t = dst or self.tmp()
+        if v.t == "float":
+            self.op("fsub", t, "0", self.atom(v))
+            return Val("$" + t, "float")
+        self.op("neg", t, self.atom(v))
+        return Val("$" + t, "int")
+
+    def cond_val(self, c, dst):
+        t = dst or self.tmp()
+        if c[0] in ("truthy", "falsy"):
+            if c[0] == "falsy":
+                self.op("not", t, c[1])
+            else:
+                self.op("not", t, c[1])
+                self.op("not", t, "$" + t)
+        else:
+            self.op(c[0], t, c[1], c[2])
+        return Val("$" + t, "bool")
+
+    def x_bin(self, e, dst):
+        op = e.op
+        if op in CMP:
+            a = self.ex(e.l)
+            b = self.ex(e.r)
+            t = dst or self.tmp()
+            self.op(CMP[op], t, self.atom(a), self.atom(b))
+            return Val("$" + t, "bool")
+        if op in ("&&", "||"):
+            c = self.cond(e)
+            if dst is not None:
+                self.op("let", dst, c[1])
+                return Val("$" + dst, "bool")
+            return Val(c[1], "bool")
+        if op in ARITH:
+            return self.arith(op, self.ex(e.l), self.ex(e.r), dst)
+        self.err("unsupported operator '%s'" % op)
+
+    def arith(self, op, lv, rv, dst):
+        for v in (lv, rv):
+            if v.t in ("unit", "screen"):
+                self.err("value expected")
+        if op == "+" and (lv.t == "str" or rv.t == "str"):
+            if lv.lit is not None and rv.lit is not None and lv.t == "str" and rv.t == "str":
+                return lit_str(lv.lit + rv.lit, self.file, self.line)
+            t = dst or self.tmp()
+            self.op("concat", t, lv.a, rv.a)
+            return Val("$" + t, "str")
+        if lv.t == "int" and rv.t == "int" and isinstance(lv.lit, int) and isinstance(rv.lit, int):
+            x, y = lv.lit, rv.lit
+            r = None
+            if op == "+":
+                r = x + y
+            elif op == "-":
+                r = x - y
+            elif op == "*":
+                r = x * y
+            elif op in ("/", "%") and y != 0:
+                q = abs(x) // abs(y)
+                if (x < 0) != (y < 0):
+                    q = -q
+                r = q if op == "/" else x - y * q
+            if r is not None and -(2 ** 62) < r < 2 ** 62:
+                return lit_int(r)
+        fl = lv.t == "float" or rv.t == "float"
+        name = ARITH[op]
+        if fl:
+            if op == "%":
+                self.err("'%' is not supported on floating point values")
+            name = "f" + name
+        t = dst or self.tmp()
+        self.op(name, t, lv.a, rv.a)
+        return Val("$" + t, "float" if fl else "int")
+
+    def flatten(self, e, op):
+        if e.k == "bin" and e.op == op:
+            return self.flatten(e.l, op) + self.flatten(e.r, op)
+        return [e]
+
+    def bool_and(self, fns):
+        t = self.tmp()
+        self.op("let", t, "0")
+        n = 0
+        for f in fns:
+            c = f()
+            self.emit("if " + self.cs(c))
+            self.ind += 1
+            n += 1
+        self.op("let", t, "1")
+        for _ in range(n):
+            self.ind -= 1
+            self.emit("endif")
+        return ("truthy", "$" + t, None)
+
+    def bool_or(self, fns):
+        t = self.tmp()
+        self.op("let", t, "0")
+        n = 0
+        last = len(fns) - 1
+        for i, f in enumerate(fns):
+            c = f()
+            self.emit("if " + self.cs(c))
+            self.ind += 1
+            self.op("let", t, "1")
+            self.ind -= 1
+            if i < last:
+                self.emit("else")
+                self.ind += 1
+                n += 1
+        self.emit("endif")
+        for _ in range(n):
+            self.ind -= 1
+            self.emit("endif")
+        return ("truthy", "$" + t, None)
+
+    def cond(self, e):
+        k = e.k
+        if k == "bin":
+            if e.op in CMP:
+                a = self.ex(e.l)
+                b = self.ex(e.r)
+                return (CMP[e.op], self.atom(a), self.atom(b))
+            if e.op == "&&":
+                return self.bool_and([(lambda x=x: self.cond(x)) for x in self.flatten(e, "&&")])
+            if e.op == "||":
+                return self.bool_or([(lambda x=x: self.cond(x)) for x in self.flatten(e, "||")])
+        if k == "un" and e.op == "!":
+            c = self.cond(e.x)
+            return (NEG[c[0]], c[1], c[2])
+        if k == "call" and e.fn.k == "member" and not e.args and e.fn.name in BLANK:
+            o = e.fn.obj
+            if not (o.k == "id" and o.name in API_OBJS and self.lookup(o.name) is None):
+                v = self.ex(o)
+                a = self.atom(v)
+                if v.t == "list":
+                    t = self.tmp()
+                    self.op("list.len", t, a)
+                    a = "$" + t
+                    z = "0"
+                else:
+                    z = '""'
+                return ("eq" if e.fn.name in ("isBlank", "isEmpty") else "ne", a, z)
+        if k == "bool":
+            return ("truthy", "1" if e.v else "0", None)
+        v = self.ex(e)
+        return ("truthy", self.atom(v), None)
+
+    def block_value(self, stmts, t):
+        self.scope = Scope(self.scope)
+        ty = "any"
+        if stmts:
+            for s in stmts[:-1]:
+                self.stmt(s)
+            last = stmts[-1]
+            self.line = last.line
+            if last.k == "expr":
+                v = self.ex(last.e, t)
+                self.store(t, v)
+                ty = v.t
+            elif last.k in ("if", "when"):
+                v = self.ex(last, t)
+                self.store(t, v)
+                ty = v.t
+            else:
+                self.stmt(last)
+        self.scope = self.scope.parent
+        return ty
+
+    def x_if(self, e, dst):
+        t = dst or self.tmp()
+        c = self.cond(e.cond)
+        self.emit("if " + self.cs(c))
+        self.ind += 1
+        ty = self.block_value(e.then, t)
+        self.ind -= 1
+        if e.els is not None:
+            self.emit("else")
+            self.ind += 1
+            self.block_value(e.els, t)
+            self.ind -= 1
+        self.emit("endif")
+        return Val("$" + t, ty)
+
+    def x_when(self, e, dst):
+        return self.when_gen(e, dst, True)
+
+    def when_gen(self, w, dst, value):
+        t = None
+        ty = "any"
+        if value:
+            t = dst or self.tmp()
+        subj = None
+        if w.subj is not None:
+            subj = self.ex(w.subj)
+            if subj.a.startswith("$_t"):
+                h = self.tmp()
+                self.store(h, subj)
+                subj = Val("$" + h, subj.t)
+        branches = [b for b in w.branches if b.conds is not None]
+        els = [b for b in w.branches if b.conds is None]
+        opened = 0
+        for i, b in enumerate(branches):
+            fns = [(lambda ce=ce: self.when_cond(subj, ce)) for ce in b.conds]
+            c = fns[0]() if len(fns) == 1 else self.bool_or(fns)
+            self.emit("if " + self.cs(c))
+            self.ind += 1
+            if value:
+                bt = self.block_value(b.body, t)
+                if i == 0:
+                    ty = bt
+            else:
+                self.block(b.body)
+            self.ind -= 1
+            if i < len(branches) - 1 or els:
+                self.emit("else")
+                self.ind += 1
+                opened += 1
+            else:
+                self.emit("endif")
+        if els:
+            if value:
+                self.block_value(els[0].body, t)
+            else:
+                self.block(els[0].body)
+        for _ in range(opened):
+            self.ind -= 1
+            self.emit("endif")
+        if value:
+            return Val("$" + t, ty)
+        return UNIT
+
+    def when_cond(self, subj, ce):
+        if subj is None:
+            return self.cond(ce)
+        v = self.ex(ce)
+        return ("eq", subj.a, self.atom(v))
+
+    def x_call(self, e, dst):
+        return self.call(e, dst, True)
+
+    def call(self, e, dst, want):
+        f = e.fn
+        if f.k == "id":
+            n = f.name
+            if n == "require":
+                return self.c_require(e)
+            if n in LIST_CTORS:
+                return self.c_list(e, dst)
+            if n == "vapi":
+                return self.c_vapi(e, dst, want)
+            if n in self.fns:
+                return self.invoke(n, e, dst, want)
+            if n in BINDINGS:
+                self.err("%s can only be declared as a property or local" % n, e.line)
+            self.err("unknown function '%s'" % n, e.line)
+        if f.k == "member":
+            o = f.obj
+            m = f.name
+            if o.k == "id":
+                if o.name == "this" and m in self.fns:
+                    return self.invoke(m, e, dst, want)
+                lv = self.lookup(o.name) if o.name not in self.alias else self.alias[o.name]
+                if lv is None and o.name in API_OBJS:
+                    return self.api(o.name, m, e, dst, want)
+                if isinstance(lv, Bind):
+                    return self.bind_call(lv, m, e)
+            return self.value_call(e, dst, want)
+        self.err("unsupported call", e.line)
+
+    def c_require(self, e):
+        for _, a in e.args:
+            if a.k == "member" and a.obj.k == "id" and a.obj.name == "Cap":
+                cap = CAP.get(a.name, a.name.lower().replace("_", "."))
+            elif a.k == "str" and all(isinstance(p, str) for p in a.parts):
+                cap = "".join(a.parts)
+            else:
+                self.err("require() takes Cap.* constants", e.line)
+            self.op("require", cap)
+        return UNIT
+
+    def c_list(self, e, dst):
+        name = dst or self.tmp()
+        self.op("list.new", name)
+        for _, a in e.args:
+            v = self.ex(a)
+            self.op("list.push", "$" + name, self.atom(v))
+        return Val("$" + name, "list")
+
+    def c_vapi(self, e, dst, want):
+        if not e.args or len(e.args) > 3:
+            self.err("vapi(method, a1, a2)", e.line)
+        vals = [self.ex(a) for _, a in e.args]
+        d = (dst or self.tmp()) if want else "_"
+        self.op("vapi", d, *[self.atom(v) for v in vals])
+        return Val("$" + d, "str") if want else UNIT
+
+    def fn_ret(self, f):
+        if f.ret:
+            return f.ret
+        if f.node.expr is not None:
+            return self.rets.get(f.name, "any")
+        return "unit"
+
+    def invoke(self, name, e, dst, want):
+        f = self.fns[name]
+        if len(e.args) != len(f.params):
+            self.err("'%s' expects %d argument(s)" % (name, len(f.params)), e.line)
+        vals = [self.ex(a) for _, a in e.args]
+        atoms = [self.atom(v) for v in vals]
+        ret = self.fn_ret(f)
+        if not want:
+            d = "_"
+        else:
+            d = dst or self.tmp()
+        self.op("invoke", name, d, *atoms)
+        if not want:
+            return UNIT
+        return Val("$" + d, ret if ret != "unit" else "any")
+
+    def idarg(self, a):
+        if a.k == "id" and a.name not in self.alias and self.lookup(a.name) is None and a.name != "screen":
+            return lit_str(a.name, self.file, a.line)
+        return self.ex(a)
+
+    def dom(self, method, vals):
+        toks = [method]
+        if len(vals) >= 1:
+            toks.append(self.safe(vals[0], 1))
+        if len(vals) >= 2:
+            toks.append(self.safe(vals[1], 2))
+        if len(vals) > 2:
+            self.err("too many arguments for %s" % method)
+        self.op(*toks)
+
+    def literal_text(self, a):
+        if a.k == "str" and all(isinstance(p, str) for p in a.parts):
+            return "".join(a.parts)
+        if a.k == "id" and a.name not in self.alias and self.lookup(a.name) is None:
+            return a.name
+        return None
+
+    def api(self, obj, m, e, dst, want):
+        args = [a for _, a in e.args if not (a.k == "id" and a.name == "screen" and self.lookup("screen") is None)]
+        key = (obj, m)
+        line = e.line
+        if key == ("Action", "run"):
+            if len(args) != 1:
+                self.err("Action.run(name)", line)
+            s = self.literal_text(args[0])
+            if s is not None:
+                self.op("action", qlit(s, self.file, line))
+            else:
+                self.op("action", self.safe(self.ex(args[0]), 1))
+            return UNIT
+        if key == ("Widget", "text"):
+            if len(args) != 1:
+                self.err("Widget.text(id)", line)
+            s = self.literal_text(args[0])
+            if s is None:
+                self.err("Widget.text requires a literal id", line)
+            return Val("text:" + s, "str")
+        if key == ("Storage", "setFromWidget"):
+            if len(args) != 2:
+                self.err("Storage.setFromWidget(key, widgetId)", line)
+            k = self.idarg(args[0])
+            w = self.literal_text(args[1])
+            if w is None:
+                self.err("Storage.setFromWidget requires a literal widget id", line)
+            self.dom("storage.app.set", [k, Val("text:" + w, "str")])
+            return UNIT
+        if key == ("Messages", "openThread"):
+            self.op("messages.open")
+            return UNIT
+        if key == ("Service", "cmd"):
+            if len(args) != 3:
+                self.err("Service.cmd(name, command, widgetId)", line)
+            lits = [self.literal_text(a) for a in args]
+            if any(x is None or re.search(r"\s", x) for x in lits):
+                self.err("Service.cmd arguments must be literal words", line)
+            self.op("service.cmd", lits[0], "%s %s" % (lits[1], lits[2]))
+            return UNIT
+        if key == ("Ui", "softkey"):
+            if len(args) not in (2, 3):
+                self.err("Ui.softkey(side, label[, action])", line)
+            side = self.ex(args[0])
+            label = self.ex(args[1])
+            self.dom("ui.softkey", [side, label])
+            if len(args) == 3:
+                act = self.ex(args[2])
+                if side.t == "str" and isinstance(side.lit, str):
+                    self.dom("ui.softkey", [lit_str(side.lit + "_action", self.file, line), act])
+                else:
+                    self.err("softkey action requires a literal side", line)
+            return UNIT
+        if obj == "SoftkeyBar" and m in ("left", "center", "right"):
+            if len(args) != 2:
+                self.err("SoftkeyBar.%s(label, action)" % m, line)
+            label = self.ex(args[0])
+            act = self.ex(args[1])
+            self.dom("ui.softkey", [lit_str(m, self.file, line), label])
+            self.dom("ui.softkey", [lit_str(m + "_action", self.file, line), act])
+            return UNIT
+        if key not in API:
+            self.err("unknown API %s.%s" % (obj, m), line)
+        method, kinds, mn = API[key]
+        if len(args) < mn or len(args) > len(kinds):
+            self.err("wrong number of arguments for %s.%s" % (obj, m), line)
+        vals = []
+        for a, kd in zip(args, kinds):
+            vals.append(self.idarg(a) if kd == "i" else self.ex(a))
+        if key == ("Storage", "get") and len(args) == 1:
+            want = True
+        if want:
+            d = dst or self.tmp()
+            toks = ["vapi", d, method]
+            if len(vals) >= 1:
+                toks.append(self.atom(vals[0]))
+            if len(vals) >= 2:
+                toks.append(self.atom(vals[1]))
+            self.op(*toks)
+            return Val("$" + d, "str")
+        self.dom(method, vals)
+        return UNIT
+
+    def bind_call(self, b, m, e):
+        args = [a for _, a in e.args if not (a.k == "id" and a.name == "screen" and self.lookup("screen") is None)]
+        if m == "attach":
+            return UNIT
+        if m == "value":
+            return Val("text:" + b.id, "str")
+        if m == "clear":
+            self.dom("ui.clear_text", [lit_str(b.id, self.file, e.line)])
+            return UNIT
+        if m == "setText":
+            if len(args) != 1:
+                self.err("setText takes one value", e.line)
+            self.dom("ui.set_text", [lit_str(b.id, self.file, e.line), self.ex(args[0])])
+            return UNIT
+        self.err("unsupported UI binding method '%s'" % m, e.line)
+
+    def value_call(self, e, dst, want):
+        f = e.fn
+        m = f.name
+        args = [a for _, a in e.args]
+        v = self.ex(f.obj)
+        if v.t == "screen":
+            self.err("unsupported call on screen", e.line)
+        if m == "toString":
+            if v.t == "str":
+                return v
+            t = dst or self.tmp()
+            self.op("tostr", t, self.atom(v))
+            return Val("$" + t, "str")
+        if m in ("toInt", "toLong", "toShort", "toByte"):
+            if v.t == "int":
+                return v
+            t = dst or self.tmp()
+            self.op("toint", t, self.atom(v))
+            return Val("$" + t, "int")
+        if m in ("toDouble", "toFloat"):
+            return Val(v.a, "float", None)
+        if m == "length" and not args:
+            t = dst or self.tmp()
+            self.op("len", t, self.atom(v))
+            return Val("$" + t, "int")
+        if m == "substring":
+            a = self.ex(args[0])
+            if len(args) == 1:
+                t = dst or self.tmp()
+                self.op("substr", t, self.atom(v), self.atom(a))
+            else:
+                b = self.ex(args[1])
+                if isinstance(a.lit, int) and isinstance(b.lit, int) and a.t == "int" and b.t == "int":
+                    ln = str(max(0, b.lit - a.lit))
+                else:
+                    lt = self.tmp()
+                    self.op("sub", lt, self.atom(b), self.atom(a))
+                    ln = "$" + lt
+                t = dst or self.tmp()
+                self.op("substr", t, self.atom(v), self.atom(a), ln)
+            return Val("$" + t, "str")
+        if m in BLANK and not args:
+            c = self.cond(e)
+            return self.cond_val(c, dst)
+        if m == "add" and len(args) == 1:
+            self.op("list.push", self.atom(v), self.atom(self.ex(args[0])))
+            return UNIT
+        if m == "clear" and not args:
+            self.op("list.clear", self.atom(v))
+            return UNIT
+        if m == "get" and len(args) == 1:
+            t = dst or self.tmp()
+            self.op("list.get", t, self.atom(v), self.atom(self.ex(args[0])))
+            return Val("$" + t, "str")
+        if m == "set" and len(args) == 2:
+            self.op("list.set", self.atom(v), self.atom(self.ex(args[0])), self.atom(self.ex(args[1])))
+            return UNIT
+        self.err("unsupported method '%s'" % m, e.line)
+
+    def gen_fn(self, f, base):
+        self.file = f.node.file
+        self.begin(base, f.name)
+        irs = []
+        for pn, pt in f.params:
+            ir = reserve(pn)
+            irs.append(ir)
+            self.scope.v[pn] = Var(ir, pt)
+        node = f.node
+        self.line = node.line
+        if node.expr is not None:
+            v = self.ex(node.expr)
+            self.rets[f.name] = f.ret or v.t
+            if v.t not in ("unit", "screen") and f.ret != "unit":
+                self.emit("ret " + v.a)
+        else:
+            self.rets[f.name] = f.ret or "unit"
+            self.block(node.body)
+        lines, mx = self.end()
+        self.new_sizes[f.name] = mx
+        return ["fn %s %s" % (f.name, " ".join(irs)) if irs else "fn %s" % f.name] + ["  " + x for x in lines] + ["endfn", ""]
+
+    def block_text(self, head, lines):
+        return [head] + ["  " + x for x in lines] + ["end", ""]
+
+    def const_key(self, ce, ev):
+        if ce.k == "str" and all(isinstance(p, str) for p in ce.parts):
+            key = "".join(ce.parts)
+        elif ce.k == "member" and ce.obj.k == "id" and ce.obj.name == "SoftKey" and ce.name in SOFT:
+            key = SOFT[ce.name]
+        elif ce.k == "id" and ce.name in SOFT and ev == "soft":
+            key = SOFT[ce.name]
+        elif ce.k == "id" and self.lookup(ce.name) is None:
+            key = ce.name
+        elif ce.k == "int":
+            key = ce.v
+        else:
+            return None
+        if not key or re.search(r"\s", key) or len(key) > 31:
+            return None
+        if ev == "soft":
+            key = SOFT.get(key.upper(), key)
+        return key
+
+    def gen_handler(self, node):
+        self.file = node.file
+        ev = EVENTS[node.name]
+        param = node.params[0][0] if node.params else None
+        hb = self.hbase
+        if ev not in KEYED:
+            self.begin(hb)
+            self.line = node.line
+            self.stmts_top(node.body)
+            lines, mx = self.end()
+            self.hmax = max(self.hmax, mx)
+            return ev, lines
+        body = node.body
+        if (
+            len(body) == 1
+            and body[0].k == "when"
+            and body[0].subj is not None
+            and body[0].subj.k == "id"
+            and body[0].subj.name == param
+            and all(b.conds is not None for b in body[0].branches)
+        ):
+            plan = []
+            ok = True
+            for b in body[0].branches:
+                keys = [self.const_key(c, ev) for c in b.conds]
+                if any(k is None for k in keys):
+                    ok = False
+                    break
+                plan.append((keys, b.body))
+            if ok:
+                blocks = []
+                for keys, bbody in plan:
+                    self.begin(hb)
+                    if param:
+                        self.alias[param] = Val("$key", "str")
+                    self.line = node.line
+                    self.stmts_top(bbody)
+                    lines, mx = self.end()
+                    self.hmax = max(self.hmax, mx)
+                    if lines:
+                        for k in keys:
+                            blocks.append(self.block_text("on_%s %s" % (ev, k), lines))
+                return ev, blocks
+        self.begin(hb)
+        if param:
+            self.alias[param] = Val("$key", "str")
+        self.line = node.line
+        self.stmts_top(body)
+        lines, mx = self.end()
+        self.hmax = max(self.hmax, mx)
+        if not lines:
+            return ev, []
+        return ev, [self.block_text("on_%s *" % ev, lines)]
+
+    def stmts_top(self, stmts):
+        for s in stmts:
+            self.stmt(s)
+
+    def gen_bind(self, bd):
+        self.file = bd.file
+        if bd.lam is None or bd.kind not in ("DialKeypad", "ActionButton", "ListRow"):
+            return []
+        self.begin(self.hbase)
+        if bd.lam.params:
+            self.alias[bd.lam.params[0]] = Val("$key", "str")
+        self.line = bd.line
+        self.stmts_top(bd.lam.body)
+        lines, mx = self.end()
+        self.hmax = max(self.hmax, mx)
+        if not lines:
+            return []
+        if bd.kind == "DialKeypad":
+            return [self.block_text("on_number *", lines)]
+        if bd.kind == "ActionButton":
+            return [self.block_text("on_click %s" % bd.id, lines)]
+        return [self.block_text("on_click %s" % r, lines) for r in ROW_IDS]
+
+    def gen_init(self):
+        self.begin(self.hbase)
+        for p in self.prop_nodes:
+            ent = self.props[p.name]
+            if isinstance(ent, Bind) or p.init is None:
+                continue
+            guard = p.name.startswith("g_")
+            ini = p.init
+            if guard and ini.k == "str" and all(isinstance(x, str) for x in ini.parts) and "".join(ini.parts) == "":
+                continue
+            self.line = p.line
+            self.file = p.file
+            saved = self.tcur
+            if guard:
+                self.emit('if eq $%s ""' % ent.ir)
+                self.ind += 1
+            v = self.ex(ini, ent.ir)
+            self.store(ent.ir, v)
+            ent.t = map_type(p.type) if p.type else v.t
+            self.ptypes[p.name] = ent.t
+            if guard:
+                self.ind -= 1
+                self.emit("endif")
+            self.tcur = saved
+        self.stmts_top(self.d.inits)
+        lines, mx = self.end()
+        self.hmax = max(self.hmax, mx)
+        return lines
+
+    def once(self):
+        self.new_sizes = {}
+        self.hmax = 0
+        self.q = []
+        base = 0
+        fn_blocks = []
+        for name in self.fn_order:
+            f = self.fns[name]
+            fn_blocks.extend(self.gen_fn(f, base))
+            base += self.sizes.get(name, 0)
+        self.hbase = base
+        init_lines = self.gen_init()
+        blocks = []
+        load_idx = None
+        load_lines = list(init_lines)
+        has_load = bool(init_lines)
+        for node in self.handlers:
+            ev, res = self.gen_handler(node)
+            if ev == "load":
+                has_load = True
+                load_lines.extend(res)
+                if load_idx is None:
+                    load_idx = len(blocks)
+                    blocks.append(None)
+            else:
+                if ev == "tick":
+                    if res:
+                        blocks.append(self.block_text("on_tick", res))
+                else:
+                    for b in res:
+                        blocks.append(b)
+        bind_blocks = []
+        i = 0
+        while i < len(self.q):
+            bind_blocks.extend(self.gen_bind(self.q[i]))
+            i += 1
+        for p in self.prop_nodes:
+            ent = self.props[p.name]
+            if isinstance(ent, Bind):
+                bind_blocks.extend(self.gen_bind(ent))
+        out = list(fn_blocks)
+        for b in bind_blocks:
+            out.extend(b)
+        load_block = None
+        if has_load:
+            if not load_lines:
+                load_lines = ["require ui"]
+            load_block = self.block_text("on_load", load_lines)
+        if load_idx is None and load_block is not None:
+            blocks.insert(0, None)
+            load_idx = 0
+        for b in blocks:
+            if b is None:
+                out.extend(load_block)
+            else:
+                out.extend(b)
+        return out
+
+    def compile(self):
+        out = []
+        for _ in range(8):
+            before = (dict(self.sizes), dict(self.rets), dict(self.ptypes), self.hsize)
+            out = self.once()
+            self.sizes = dict(self.new_sizes)
+            self.hsize = self.hmax
+            after = (dict(self.sizes), dict(self.rets), dict(self.ptypes), self.hsize)
+            if before == after:
+                break
+        names = set()
+        for line in out:
+            t = line.split()
+            if not t:
+                continue
+            if t[0] in ("let", "add", "sub", "mul", "div", "mod", "neg", "fadd", "fsub", "fmul", "fdiv",
+                        "concat", "len", "substr", "tostr", "toint", "eq", "ne", "lt", "le", "gt", "ge",
+                        "not", "list.new", "list.len") and len(t) > 1:
+                names.add(t[1])
+            elif t[0] in ("vapi", "list.get") and len(t) > 1:
+                names.add(t[1])
+            elif t[0] == "invoke" and len(t) > 2:
+                names.add(t[2])
+        names.discard("_")
+        if len(names) + 4 > 64:
+            sys.stderr.write("ktc: warning: %d IR variables exceed the VSL runtime limit of 64\n" % (len(names) + 4))
+        if len(out) > 1000:
+            sys.stderr.write("ktc: warning: %d IR lines approach the VSL limit of 1024\n" % len(out))
+        return "\n".join(out).rstrip() + "\n"
+
+
+def compile_sources(files):
+    decls = Decls()
+    cur = ""
+    try:
+        for f in files:
+            cur = f
+            with open(f, "r", encoding="utf-8-sig") as fh:
+                src = fh.read()
+            d = Parser(lex(src, f), f).parse_file()
+            decls.props.extend(d.props)
+            decls.funs.extend(d.funs)
+            decls.inits.extend(d.inits)
+        cur = files[0] if files else ""
+        return Compiler(decls, cur).compile()
+    except KtcError as e:
+        raise SystemExit("ktc: %s:%d: %s" % (e.file or cur, e.line, e.msg))
+
+
+def compile_dir(app_dir, out_path):
     src_dir = os.path.join(app_dir, "src")
-    files = sorted(
-        os.path.join(src_dir, f)
-        for f in os.listdir(src_dir)
-        if f.endswith(".kt")
-    )
+    files = []
+    for root, dirs, names in os.walk(src_dir):
+        dirs.sort()
+        for n in sorted(names):
+            if n.endswith(".kt"):
+                files.append(os.path.join(root, n))
     if not files:
-        raise SystemExit(f"no .kt sources in {src_dir}")
-    combined = []
-    for f in files:
-        with open(f, "r", encoding="utf-8") as fh:
-            combined.append(fh.read())
-    ir = compile_kt("\n".join(combined))
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        raise SystemExit("no .kt sources in %s" % src_dir)
+    ir = compile_sources(files)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(ir)
     return out_path
+
 
 def main():
     if len(sys.argv) < 2:
@@ -439,12 +2145,15 @@ def main():
     out = os.path.join(app_dir, "bin", "main.kbc")
     if "-o" in sys.argv:
         i = sys.argv.index("-o")
+        if i + 1 >= len(sys.argv):
+            print("usage: ktc <app_dir> [-o bin/main.kbc]", file=sys.stderr)
+            return 1
         out = sys.argv[i + 1]
         if not os.path.isabs(out):
             out = os.path.join(app_dir, out)
-    path = compile_dir(app_dir, out)
-    print(path)
+    print(compile_dir(app_dir, out))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

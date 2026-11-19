@@ -1,10 +1,43 @@
+fn refreshMatch
+  vapi refreshMatch_num ui.get_text number
+  if eq $refreshMatch_num ""
+    ui.set_text contact_match "Enter a number"
+  else
+    contacts.search $refreshMatch_num
+  endif
+endfn
+
 on_number *
   telephony.digit $key
+  invoke refreshMatch _
 end
 
 on_load
   require ui
   require telephony
+  require contacts
+  invoke refreshMatch _
+end
+
+on_action call
+  telephony.call
+end
+
+on_action clear
+  telephony.clear
+  invoke refreshMatch _
+end
+
+on_action end_call
+  telephony.end
+end
+
+on_action mute
+  telephony.mute
+end
+
+on_action speaker
+  telephony.speaker
 end
 
 on_soft left
@@ -17,4 +50,5 @@ end
 
 on_soft right
   telephony.clear
+  invoke refreshMatch _
 end

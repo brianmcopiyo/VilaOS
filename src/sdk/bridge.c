@@ -70,6 +70,11 @@ static int ensure_data_dir(const VslRuntime *rt)
     return 0;
 }
 
+int bridge_call_out(VslRuntime *rt, const char *method, const char *a1, const char *a2, char *out, size_t n)
+{
+    return vapi_bridge_out(rt, method, a1, a2, out, n);
+}
+
 int bridge_storage_set(VslRuntime *rt, const char *key, const char *val)
 {
     return vapi_bridge(rt, "storage.app.set", key, val);

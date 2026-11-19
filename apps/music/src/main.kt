@@ -5,7 +5,6 @@ import app.VilaApp
 import app.require
 import audio.Audio
 import service.Service
-import ui.Action
 import ui.ActionButton
 import ui.Screen
 import ui.SoftKey
@@ -55,7 +54,10 @@ class MusicApp : VilaApp() {
 
     override fun onSoft(side: SoftKey) {
         when (side) {
-            SoftKey.LEFT -> Action.run("music_play")
+            SoftKey.LEFT -> {
+                Audio.play()
+                Service.status("musicd", "svc_state")
+            }
             SoftKey.RIGHT -> Ui.pop()
         }
     }

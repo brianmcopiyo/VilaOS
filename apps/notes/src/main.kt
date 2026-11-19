@@ -4,12 +4,10 @@ import app.Cap
 import app.VilaApp
 import app.require
 import storage.Storage
-import ui.Action
 import ui.Screen
 import ui.SoftKey
 import ui.TextInput
 import ui.Ui
-import ui.Widget
 
 class NotesApp : VilaApp() {
     private val noteInput = TextInput(id = "note", placeholder = "Write a note")
@@ -20,11 +18,22 @@ class NotesApp : VilaApp() {
         noteInput.attach(screen)
     }
 
+    override fun onAction(action: String) {
+        when (action) {
+            "save_note" -> {
+                val body = Ui.getText("note")
+                Storage.set("note1", body)
+                Ui.setText("note_status", "Note saved")
+            }
+        }
+    }
+
     override fun onSoft(side: SoftKey) {
         when (side) {
             SoftKey.LEFT -> {
-                Storage.set("note1", Widget.text("note"))
-                Action.run("save_note")
+                val body = Ui.getText("note")
+                Storage.set("note1", body)
+                Ui.setText("note_status", "Note saved")
             }
             SoftKey.RIGHT -> Ui.pop()
         }

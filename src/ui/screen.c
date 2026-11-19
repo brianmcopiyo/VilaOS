@@ -7,6 +7,7 @@
 #include "util.h"
 #include "procman.h"
 #include "compose.h"
+#include "contacts.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,36 +16,42 @@
 
 static XmlUiResources g_ui_res;
 
-typedef struct {
-    uint64_t call_start;
-    int call_muted;
-    int call_speaker;
-    char call_number[MAX_TEXT];
-    char call_name[MAX_TEXT];
-    double calc_acc;
-    char calc_op;
-    int calc_fresh;
-    char calc_buf[MAX_TEXT];
-    uint64_t sw_base;
-    uint64_t sw_acc;
-    int sw_running;
-    uint64_t tm_deadline;
-    int tm_running;
-    int tm_secs;
-    int sound_on;
-    int vibrate_on;
-    int large_text;
-    int profile;
-} AppState;
+#define CARRY_MAX 8
 
-static AppState g_app = {
-    .sound_on = 1,
-    .vibrate_on = 1,
-    .large_text = 0,
-    .profile = 0,
-    .tm_secs = 60,
-    .calc_fresh = 1
-};
+typedef struct {
+    char id[MAX_ID];
+    char text[MAX_TEXT];
+} CarryText;
+
+static CarryText g_carry[CARRY_MAX];
+static int g_carry_n;
+
+void screen_carry_text(const char *id, const char *text)
+{
+    if (!id || !id[0])
+        return;
+    for (int i = 0; i < g_carry_n; i++) {
+        if (str_eq(g_carry[i].id, id)) {
+            str_copy(g_carry[i].text, sizeof(g_carry[i].text), text ? text : "");
+            return;
+        }
+    }
+    if (g_carry_n >= CARRY_MAX)
+        return;
+    str_copy(g_carry[g_carry_n].id, sizeof(g_carry[g_carry_n].id), id);
+    str_copy(g_carry[g_carry_n].text, sizeof(g_carry[g_carry_n].text), text ? text : "");
+    g_carry_n++;
+}
+
+static void carry_apply(Screen *s)
+{
+    for (int i = 0; i < g_carry_n; i++) {
+        Widget *w = screen_find(s, g_carry[i].id);
+        if (w)
+            str_copy(w->text, sizeof(w->text), g_carry[i].text);
+    }
+    g_carry_n = 0;
+}
 
 int screen_init(Screen *s)
 {
@@ -59,26 +66,7 @@ int screen_load(Screen *s, const char *path)
     if (xml_ui_load_screen(s, path, &g_ui_res) != 0)
         return -1;
 
-    if (strstr(path, "call_active.xml")) {
-        if (!g_app.call_start)
-            g_app.call_start = now_ms();
-        Widget *num = screen_find(s, "call_number");
-        if (num && g_app.call_number[0])
-            str_copy(num->text, sizeof(num->text), g_app.call_number);
-        Widget *name = screen_find(s, "call_name");
-        if (name && g_app.call_name[0])
-            str_copy(name->text, sizeof(name->text), g_app.call_name);
-    }
-
-    if (strstr(path, "calculator.xml")) {
-        Widget *disp = screen_find(s, "calc_display");
-        if (disp) {
-            if (g_app.calc_buf[0])
-                str_copy(disp->text, sizeof(disp->text), g_app.calc_buf);
-            else
-                str_copy(disp->text, sizeof(disp->text), "0");
-        }
-    }
+    carry_apply(s);
 
     screen_focus_first(s);
     return 0;
@@ -716,79 +704,6 @@ void screen_set_mode_badge(Screen *s, const char *mode)
         str_copy(b->text, sizeof(b->text), mode);
 }
 
-static void match_contact(const char *num, char *name, size_t n)
-{
-    name[0] = 0;
-    if (!num || !num[0])
-        return;
-    if (str_starts(num, "5550101") || str_starts(num, "555-0101"))
-        str_copy(name, n, "Alice Chen");
-    else if (str_starts(num, "5550102") || str_starts(num, "555-0102"))
-        str_copy(name, n, "Bob Okonkwo");
-    else if (str_starts(num, "5550103") || str_starts(num, "555-0103"))
-        str_copy(name, n, "Carol Diaz");
-    else if (str_starts(num, "5550104") || str_starts(num, "555-0104"))
-        str_copy(name, n, "Dave Park");
-}
-
-static void calc_set_display(Screen *s)
-{
-    Widget *d = screen_find(s, "calc_display");
-    if (!d)
-        return;
-    if (g_app.calc_buf[0])
-        str_copy(d->text, sizeof(d->text), g_app.calc_buf);
-    else
-        str_copy(d->text, sizeof(d->text), "0");
-}
-
-static void calc_push_digit(Screen *s, char dig)
-{
-    if (g_app.calc_fresh) {
-        g_app.calc_buf[0] = 0;
-        g_app.calc_fresh = 0;
-    }
-    size_t n = strlen(g_app.calc_buf);
-    if (n + 1 < sizeof(g_app.calc_buf)) {
-        g_app.calc_buf[n] = dig;
-        g_app.calc_buf[n + 1] = 0;
-    }
-    calc_set_display(s);
-}
-
-static void calc_apply_op(Screen *s, char op)
-{
-    double v = atof(g_app.calc_buf[0] ? g_app.calc_buf : "0");
-    if (g_app.calc_op == 0) {
-        g_app.calc_acc = v;
-    } else {
-        if (g_app.calc_op == '+')
-            g_app.calc_acc += v;
-        else if (g_app.calc_op == '-')
-            g_app.calc_acc -= v;
-        else if (g_app.calc_op == '*')
-            g_app.calc_acc *= v;
-        else if (g_app.calc_op == '/' && v != 0.0)
-            g_app.calc_acc /= v;
-    }
-    if (op == '=') {
-        snprintf(g_app.calc_buf, sizeof(g_app.calc_buf), "%g", g_app.calc_acc);
-        g_app.calc_op = 0;
-    } else {
-        g_app.calc_op = op;
-        g_app.calc_buf[0] = 0;
-    }
-    g_app.calc_fresh = 1;
-    calc_set_display(s);
-    Widget *expr = screen_find(s, "calc_expr");
-    if (expr) {
-        if (g_app.calc_op)
-            snprintf(expr->text, sizeof(expr->text), "%g %c", g_app.calc_acc, g_app.calc_op);
-        else
-            str_copy(expr->text, sizeof(expr->text), "");
-    }
-}
-
 void screen_tick(Screen *s, Gfx *g)
 {
     (void)g;
@@ -814,88 +729,54 @@ void screen_tick(Screen *s, Gfx *g)
         snprintf(idle_date->text, sizeof(idle_date->text), "%s, %s %d",
                  days[tm_buf.tm_wday], mons[tm_buf.tm_mon], tm_buf.tm_mday);
     }
-
-    Widget *match = screen_find(s, "contact_match");
-    Widget *number = screen_find(s, "number");
-    if (match && number) {
-        char name[MAX_TEXT];
-        match_contact(number->text, name, sizeof(name));
-        if (name[0])
-            snprintf(match->text, sizeof(match->text), "%s", name);
-        else if (number->text[0])
-            str_copy(match->text, sizeof(match->text), "Unknown number");
-        else
-            str_copy(match->text, sizeof(match->text), "Enter a number");
-    }
-
-    Widget *call_timer = screen_find(s, "call_timer");
-    if (call_timer && g_app.call_start) {
-        unsigned sec = (unsigned)((now_ms() - g_app.call_start) / 1000ull);
-        snprintf(call_timer->text, sizeof(call_timer->text), "%02u:%02u", sec / 60, sec % 60);
-    }
-
-    Widget *mute = screen_find(s, "btn_mute");
-    if (mute)
-        str_copy(mute->text, sizeof(mute->text), g_app.call_muted ? "Unmute" : "Mute");
-    Widget *spk = screen_find(s, "btn_speaker");
-    if (spk)
-        str_copy(spk->text, sizeof(spk->text), g_app.call_speaker ? "Earpiece" : "Speaker");
-
-    Widget *sw = screen_find(s, "stopwatch_time");
-    if (sw) {
-        uint64_t ms = g_app.sw_acc;
-        if (g_app.sw_running)
-            ms += now_ms() - g_app.sw_base;
-        unsigned sec = (unsigned)(ms / 1000ull);
-        unsigned cs = (unsigned)((ms / 10ull) % 100ull);
-        snprintf(sw->text, sizeof(sw->text), "%02u:%02u.%02u", sec / 60, sec % 60, cs);
-    }
-
-    Widget *tm = screen_find(s, "timer_time");
-    if (tm) {
-        int left = g_app.tm_secs;
-        if (g_app.tm_running) {
-            int rem = (int)((g_app.tm_deadline - now_ms()) / 1000ll);
-            if (rem < 0)
-                rem = 0;
-            left = rem;
-            if (rem == 0)
-                g_app.tm_running = 0;
-        }
-        snprintf(tm->text, sizeof(tm->text), "%02d:%02d", left / 60, left % 60);
-    }
-
-    Widget *clock_now = screen_find(s, "clock_now");
-    if (clock_now)
-        snprintf(clock_now->text, sizeof(clock_now->text), "%02d:%02d:%02d", tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec);
-
-    Widget *snd = screen_find(s, "toggle_sound");
-    if (snd)
-        snprintf(snd->text, sizeof(snd->text), "Sound: %s", g_app.sound_on ? "On" : "Off");
-    Widget *vib = screen_find(s, "toggle_vibrate");
-    if (vib)
-        snprintf(vib->text, sizeof(vib->text), "Vibrate: %s", g_app.vibrate_on ? "On" : "Off");
-    Widget *txt = screen_find(s, "toggle_text");
-    if (txt)
-        snprintf(txt->text, sizeof(txt->text), "Large text: %s", g_app.large_text ? "On" : "Off");
-    Widget *prof = screen_find(s, "toggle_profile");
-    if (prof) {
-        const char *names[] = {"General", "Silent", "Meeting", "Outdoor"};
-        snprintf(prof->text, sizeof(prof->text), "Profile: %s", names[g_app.profile & 3]);
-    }
 }
 
-static int append_digit(Screen *s, char dig)
+static Widget *primary_input(Screen *s)
 {
-    Widget *num = screen_find(s, "number");
-    if (!num)
+    if (!s)
+        return NULL;
+    if (s->focus >= 0 && s->focus < s->count && s->widgets[s->focus].type == W_INPUT)
+        return &s->widgets[s->focus];
+    for (int i = 0; i < s->count; i++) {
+        if (s->widgets[i].type == W_INPUT && s->widgets[i].visible)
+            return &s->widgets[i];
+    }
+    return NULL;
+}
+
+static int append_char(Screen *s, char ch)
+{
+    Widget *in = primary_input(s);
+    if (!in)
         return 0;
-    size_t n = strlen(num->text);
-    if ((int)n < num->max_len && n + 1 < sizeof(num->text)) {
-        num->text[n] = dig;
-        num->text[n + 1] = 0;
+    size_t n = strlen(in->text);
+    if ((int)n < in->max_len && n + 1 < sizeof(in->text)) {
+        in->text[n] = ch;
+        in->text[n + 1] = 0;
     }
     return 2;
+}
+
+static void nav_to(char *out_nav, size_t out_sz, const char *target)
+{
+    if (out_nav)
+        str_copy(out_nav, out_sz, target);
+}
+
+static int action_is_path(const char *action)
+{
+    return strchr(action, '/') != NULL || strstr(action, ".xml") != NULL;
+}
+
+static int thin_call(Screen *s, char *out_nav, size_t out_sz)
+{
+    Widget *in = primary_input(s);
+    const char *n = (in && in->text[0]) ? in->text : "555-0101";
+    const Contact *c = contacts_by_number(n);
+    screen_carry_text("call_number", n);
+    screen_carry_text("call_name", c ? c->name : "Calling...");
+    nav_to(out_nav, out_sz, "route:replace:res/layout/call_active.xml");
+    return 1;
 }
 
 int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t out_sz)
@@ -903,8 +784,7 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
     if (!action || !action[0] || str_eq(action, "none"))
         return 0;
     if (str_starts(action, "nav:")) {
-        if (out_nav)
-            str_copy(out_nav, out_sz, action + 4);
+        nav_to(out_nav, out_sz, action + 4);
         return 1;
     }
     if (str_eq(action, "back")) {
@@ -914,48 +794,38 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
             return 0;
         }
         if (strstr(s->path, "home.xml")) {
-            if (out_nav)
-                str_copy(out_nav, out_sz, "assets/screens/idle.xml");
+            nav_to(out_nav, out_sz, "assets/screens/idle.xml");
             return 1;
         }
         if (strstr(s->path, "message_thread") || strstr(s->path, "compose")) {
-            if (out_nav)
-                str_copy(out_nav, out_sz, "assets/screens/messages.xml");
+            nav_to(out_nav, out_sz, "assets/screens/messages.xml");
             return 1;
         }
         if (strstr(s->path, "contact_detail")) {
-            if (out_nav)
-                str_copy(out_nav, out_sz, "assets/screens/contacts.xml");
+            nav_to(out_nav, out_sz, "assets/screens/contacts.xml");
             return 1;
         }
         if (strstr(s->path, "call_active")) {
-            g_app.call_start = 0;
-            if (out_nav)
-                str_copy(out_nav, out_sz, "assets/screens/dialer.xml");
+            nav_to(out_nav, out_sz, "assets/screens/dialer.xml");
             return 1;
         }
-        if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/home.xml");
+        nav_to(out_nav, out_sz, "assets/screens/home.xml");
         return 1;
     }
     if (str_eq(action, "quit") || str_eq(action, "exit") || str_eq(action, "lock")) {
-        if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/idle.xml");
+        nav_to(out_nav, out_sz, "assets/screens/idle.xml");
         return 1;
     }
     if (str_eq(action, "unlock") || str_eq(action, "menu")) {
-        if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/home.xml");
+        nav_to(out_nav, out_sz, "assets/screens/home.xml");
         return 1;
     }
     if (str_eq(action, "power") || str_eq(action, "power_menu") || str_eq(action, "options")) {
-        if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/power.xml");
+        nav_to(out_nav, out_sz, "assets/screens/power.xml");
         return 1;
     }
     if (str_eq(action, "power_cancel") || str_eq(action, "cancel")) {
-        if (out_nav)
-            str_copy(out_nav, out_sz, "assets/screens/home.xml");
+        nav_to(out_nav, out_sz, "assets/screens/home.xml");
         return 1;
     }
     if (str_eq(action, "power_off"))
@@ -963,203 +833,35 @@ int screen_handle_action(Screen *s, const char *action, char *out_nav, size_t ou
     if (str_eq(action, "power_restart"))
         return 31;
     if (str_eq(action, "clear")) {
-        if (s && s->focus >= 0) {
-            Widget *w = &s->widgets[s->focus];
-            if (w->type == W_INPUT)
-                w->text[0] = 0;
-        }
-        Widget *num = screen_find(s, "number");
-        if (num)
-            num->text[0] = 0;
-        Widget *note = screen_find(s, "note");
-        if (note && (!num || s->focus == (int)(note - s->widgets)))
-            note->text[0] = 0;
-        Widget *msg = screen_find(s, "msg");
-        if (msg && s->focus >= 0 && &s->widgets[s->focus] == msg)
-            msg->text[0] = 0;
-        Widget *match = screen_find(s, "contact_match");
-        if (match)
-            str_copy(match->text, sizeof(match->text), "Enter a number");
+        Widget *in = primary_input(s);
+        if (in)
+            in->text[0] = 0;
         return 2;
     }
-    if (str_starts(action, "digit:")) {
-        append_digit(s, action[6]);
+    if (str_starts(action, "digit:") && action[6]) {
+        append_char(s, action[6]);
         return 2;
     }
-    if (str_starts(action, "key:")) {
-        append_digit(s, action[4]);
+    if (str_starts(action, "key:") && action[4]) {
+        append_char(s, action[4]);
         return 2;
     }
-    if (str_eq(action, "call")) {
-        Widget *num = screen_find(s, "number");
-        const char *n = (num && num->text[0]) ? num->text : "";
-        if (!n[0] && s->focus >= 0) {
-            Widget *f = &s->widgets[s->focus];
-            if (f->text[0] && strstr(f->text, "555"))
-                n = f->text;
-        }
-        if (!n[0])
-            n = "555-0101";
-        str_copy(g_app.call_number, sizeof(g_app.call_number), n);
-        match_contact(n, g_app.call_name, sizeof(g_app.call_name));
-        if (!g_app.call_name[0])
-            str_copy(g_app.call_name, sizeof(g_app.call_name), "Calling...");
-        g_app.call_start = now_ms();
-        g_app.call_muted = 0;
-        g_app.call_speaker = 0;
-        if (out_nav)
-            str_copy(out_nav, out_sz, "route:replace:res/layout/call_active.xml");
-        return 1;
-    }
+    if (str_eq(action, "call"))
+        return thin_call(s, out_nav, out_sz);
     if (str_eq(action, "end_call")) {
-        g_app.call_start = 0;
-        if (out_nav)
-            str_copy(out_nav, out_sz, "route:pop");
+        nav_to(out_nav, out_sz, "route:pop");
         return 1;
-    }
-    if (str_eq(action, "mute")) {
-        g_app.call_muted = !g_app.call_muted;
-        return 2;
-    }
-    if (str_eq(action, "speaker")) {
-        g_app.call_speaker = !g_app.call_speaker;
-        return 2;
-    }
-    if (str_eq(action, "send")) {
-        Widget *body = screen_find(s, "msg");
-        if (!body)
-            body = screen_find(s, "msg_input");
-        if (!body)
-            body = screen_find(s, "note");
-        Widget *st = screen_find(s, "msgstatus");
-        if (!st)
-            st = screen_find(s, "status_line");
-        if (st) {
-            if (body && body->text[0])
-                str_copy(st->text, sizeof(st->text), "Sent");
-            else
-                str_copy(st->text, sizeof(st->text), "Nothing to send");
-        }
-        return 2;
-    }
-    if (str_eq(action, "save_note")) {
-        Widget *st = screen_find(s, "note_status");
-        if (st)
-            str_copy(st->text, sizeof(st->text), "Note saved");
-        return 2;
-    }
-    if (str_starts(action, "calc:")) {
-        const char *p = action + 5;
-        if (str_eq(p, "clear")) {
-            g_app.calc_buf[0] = 0;
-            g_app.calc_acc = 0;
-            g_app.calc_op = 0;
-            g_app.calc_fresh = 1;
-            calc_set_display(s);
-            Widget *expr = screen_find(s, "calc_expr");
-            if (expr)
-                expr->text[0] = 0;
-            return 2;
-        }
-        if (str_eq(p, "eq")) {
-            calc_apply_op(s, '=');
-            return 2;
-        }
-        if (p[0] && !p[1] && (p[0] == '+' || p[0] == '-' || p[0] == '*' || p[0] == '/')) {
-            calc_apply_op(s, p[0]);
-            return 2;
-        }
-        if (p[0] == 'd' && p[1] == ':') {
-            calc_push_digit(s, p[2]);
-            return 2;
-        }
-        if (str_eq(p, "dot")) {
-            if (!strchr(g_app.calc_buf, '.'))
-                calc_push_digit(s, '.');
-            return 2;
-        }
-        return 2;
-    }
-    if (str_eq(action, "sw_start")) {
-        if (!g_app.sw_running) {
-            g_app.sw_base = now_ms();
-            g_app.sw_running = 1;
-        }
-        return 2;
-    }
-    if (str_eq(action, "sw_stop")) {
-        if (g_app.sw_running) {
-            g_app.sw_acc += now_ms() - g_app.sw_base;
-            g_app.sw_running = 0;
-        }
-        return 2;
-    }
-    if (str_eq(action, "sw_reset")) {
-        g_app.sw_running = 0;
-        g_app.sw_acc = 0;
-        return 2;
-    }
-    if (str_eq(action, "tm_start")) {
-        if (!g_app.tm_running) {
-            g_app.tm_deadline = now_ms() + (uint64_t)g_app.tm_secs * 1000ull;
-            g_app.tm_running = 1;
-        }
-        return 2;
-    }
-    if (str_eq(action, "tm_stop")) {
-        if (g_app.tm_running) {
-            int rem = (int)((g_app.tm_deadline - now_ms()) / 1000ll);
-            if (rem < 0)
-                rem = 0;
-            g_app.tm_secs = rem;
-            g_app.tm_running = 0;
-        }
-        return 2;
-    }
-    if (str_eq(action, "tm_reset")) {
-        g_app.tm_running = 0;
-        g_app.tm_secs = 60;
-        return 2;
-    }
-    if (str_eq(action, "tm_plus")) {
-        g_app.tm_secs += 30;
-        return 2;
-    }
-    if (str_eq(action, "toggle_sound")) {
-        g_app.sound_on = !g_app.sound_on;
-        return 2;
-    }
-    if (str_eq(action, "toggle_vibrate")) {
-        g_app.vibrate_on = !g_app.vibrate_on;
-        return 2;
-    }
-    if (str_eq(action, "toggle_text")) {
-        g_app.large_text = !g_app.large_text;
-        return 2;
-    }
-    if (str_eq(action, "cycle_profile")) {
-        g_app.profile = (g_app.profile + 1) & 3;
-        return 2;
-    }
-    if (str_eq(action, "preview")) {
-        Widget *preview = screen_find(s, "file_preview");
-        if (preview && s->focus >= 0) {
-            Widget *f = &s->widgets[s->focus];
-            char tmp[MAX_TEXT];
-            str_copy(tmp, sizeof(tmp), f->text);
-            snprintf(preview->text, sizeof(preview->text), "Preview: %s", tmp);
-        }
-        return 2;
     }
     if (str_eq(action, "select") || str_eq(action, "ok")) {
         if (s && s->focus >= 0) {
             Widget *w = &s->widgets[s->focus];
-            if (w->action[0])
+            if (w->action[0] && !str_eq(w->action, "ok") && !str_eq(w->action, "select"))
                 return screen_handle_action(s, w->action, out_nav, out_sz);
         }
         return 2;
     }
-    if (out_nav)
-        str_copy(out_nav, out_sz, action);
+    if (!action_is_path(action) && !str_starts(action, "route:") && !str_starts(action, "app:"))
+        return 0;
+    nav_to(out_nav, out_sz, action);
     return 1;
 }

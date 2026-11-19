@@ -4,9 +4,16 @@ on_load
   storage.app.get note1 note
 end
 
+on_action save_note
+  vapi body ui.get_text note
+  storage.app.set note1 $body
+  ui.set_text note_status "Note saved"
+end
+
 on_soft left
-  storage.app.set note1 text:note
-  action save_note
+  vapi body ui.get_text note
+  storage.app.set note1 $body
+  ui.set_text note_status "Note saved"
 end
 
 on_soft right

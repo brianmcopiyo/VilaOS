@@ -236,22 +236,36 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
     return 1;
 }
 
+static int soft_act_is_os(const char *act)
+{
+    return str_starts(act, "route:") || str_starts(act, "app:") || str_starts(act, "power") ||
+           str_eq(act, "back") || str_eq(act, "home") || str_eq(act, "go_home") ||
+           str_eq(act, "pop_route") || str_eq(act, "clear") || str_eq(act, "options");
+}
+
 static int run_soft(Screen *s, Gfx *g, int side, const char *act, char *nav, size_t nav_sz)
 {
     if (!act || !act[0])
         return 0;
     char taken[MAX_PATH];
+    int matched = 0;
+    int consumed = 0;
     taken[0] = 0;
     if (g_host.in_app) {
         const char *tgt = side == 1 ? "left" : (side == 2 ? "center" : "right");
-        apphost_fire_event(&g_host, "soft", tgt);
-        vsl_consume_nav(&g_host.vsl, taken, sizeof(taken));
+        matched = apphost_fire_event(&g_host, "soft", tgt) > 0;
+        consumed = vsl_consume_nav(&g_host.vsl, taken, sizeof(taken));
     }
-    if (str_eq(act, "clear") || str_eq(act, "power_cancel") || str_eq(act, "power_off") ||
-        str_eq(act, "power_restart") || str_eq(act, "power_menu") || str_eq(act, "options"))
-        return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
-    if (taken[0])
+    if (matched && consumed && taken[0])
         return apphost_handle_action(&g_host, s, g, taken, nav, nav_sz);
+    if (matched && soft_act_is_os(act))
+        return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
+    if (matched) {
+        apphost_update_softkeys(&g_host, s);
+        if (nav && nav_sz)
+            nav[0] = 0;
+        return 2;
+    }
     return apphost_handle_action(&g_host, s, g, act, nav, nav_sz);
 }
 

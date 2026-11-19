@@ -14,8 +14,11 @@ import ui.Ui
 class MessagesApp : VilaApp() {
     private val composeInput = TextInput(id = "msg_input", placeholder = "Type message")
     private val sendBtn = ActionButton(id = "send_btn", variant = "primary") {
-        Messages.send(composeInput.value(screen))
-        composeInput.clear(screen)
+        val body = composeInput.value(screen)
+        if (body.isNotBlank()) {
+            Messages.send(body, "msgstatus")
+            composeInput.clear(screen)
+        }
     }
     private val threadList = ListRow(id = "thread_list") { index ->
         Messages.openThread(index)
@@ -26,6 +29,23 @@ class MessagesApp : VilaApp() {
         composeInput.attach(screen)
         sendBtn.attach(screen)
         threadList.attach(screen)
+    }
+
+    override fun onAction(action: String) {
+        when (action) {
+            "send" -> {
+                val body = Ui.getText("msg_input")
+                if (body.isBlank()) {
+                    val alt = Ui.getText("msg")
+                    if (alt.isNotBlank()) {
+                        Messages.send(alt, "msgstatus")
+                    }
+                } else {
+                    Messages.send(body, "msgstatus")
+                    Ui.clearText("msg_input")
+                }
+            }
+        }
     }
 
     override fun onSoft(side: SoftKey) {

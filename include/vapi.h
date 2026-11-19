@@ -41,6 +41,7 @@ int vapi_check_cap(const VapiCtx *ctx, unsigned cap);
 const char *vapi_status_name(int st);
 int vapi_call(VapiCtx *ctx, const char *method, const char *a1, const char *a2, char *out, size_t out_n);
 int vapi_bridge(VslRuntime *rt, const char *method, const char *a1, const char *a2);
+int vapi_bridge_out(VslRuntime *rt, const char *method, const char *a1, const char *a2, char *out, size_t n);
 
 int vapi_ui(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
 int vapi_storage(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);

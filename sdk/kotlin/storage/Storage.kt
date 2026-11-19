@@ -1,7 +1,7 @@
 package storage
 
 object Storage {
-    fun get(key: String, widgetId: String) {}
+    fun get(key: String, widgetId: String = ""): String = ""
     fun set(key: String, value: String) {}
     fun setFromWidget(key: String, widgetId: String) {}
     fun assetRead(name: String, widgetId: String) {}

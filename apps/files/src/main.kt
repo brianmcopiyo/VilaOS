@@ -4,7 +4,6 @@ import app.Cap
 import app.VilaApp
 import app.require
 import storage.Storage
-import ui.Action
 import ui.Screen
 import ui.SoftKey
 import ui.Ui
@@ -15,9 +14,21 @@ class FilesApp : VilaApp() {
         Storage.filesList(".", "file_preview")
     }
 
+    override fun onAction(action: String) {
+        when (action) {
+            "preview" -> {
+                val name = Ui.getText("file_preview")
+                Ui.setText("file_preview", "Preview: " + name)
+            }
+        }
+    }
+
     override fun onSoft(side: SoftKey) {
         when (side) {
-            SoftKey.LEFT -> Action.run("preview")
+            SoftKey.LEFT -> {
+                val name = Ui.getText("file_preview")
+                Ui.setText("file_preview", "Preview: " + name)
+            }
             SoftKey.RIGHT -> Ui.pop()
         }
     }

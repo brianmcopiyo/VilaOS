@@ -1,6 +1,9 @@
 on_click send_btn
-  messages.send
-  ui.clear_text msg_input
+  let body text:msg_input
+  if ne $body ""
+    messages.send $body msgstatus
+    ui.clear_text msg_input
+  endif
 end
 
 on_click m1
@@ -42,6 +45,19 @@ end
 on_load
   require ui
   require messages
+end
+
+on_action send
+  vapi body ui.get_text msg_input
+  if eq $body ""
+    vapi alt ui.get_text msg
+    if ne $alt ""
+      messages.send $alt msgstatus
+    endif
+  else
+    messages.send $body msgstatus
+    ui.clear_text msg_input
+  endif
 end
 
 on_soft left

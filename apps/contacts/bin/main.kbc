@@ -1,6 +1,16 @@
 on_load
   require ui
   require contacts
+  require telephony
+end
+
+on_action call
+  contacts.call
+end
+
+on_action search
+  vapi q ui.get_text filter
+  contacts.search $q
 end
 
 on_soft left

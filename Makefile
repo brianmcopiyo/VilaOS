@@ -14,6 +14,7 @@ SRC := \
 	src/main.c \
 	src/core/util.c \
 	src/core/syspower.c \
+	src/core/contacts.c \
 	src/gfx/fb.c \
 	src/gfx/draw.c \
 	src/gfx/font.c \

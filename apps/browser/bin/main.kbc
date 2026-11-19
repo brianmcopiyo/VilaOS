@@ -1,13 +1,22 @@
+fn add a b
+  add _t0 $a $b
+  ret $_t0
+endfn
+
 on_load
   require ui
+  invoke add n 2 3
+  tostr _t1 $n
+  concat _t2 "Ready " $_t1
+  ui.set_text hint $_t2
 end
 
 on_soft left
-  action ok
+  ui.set_text hint OK
 end
 
 on_soft center
-  action ok
+  ui.set_text hint OK
 end
 
 on_soft right

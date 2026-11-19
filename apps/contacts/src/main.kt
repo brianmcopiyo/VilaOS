@@ -13,8 +13,18 @@ class ContactsApp : VilaApp() {
     private val filter = TextInput(id = "filter", placeholder = "Search")
 
     override fun onStart(screen: Screen) {
-        require(Cap.UI, Cap.CONTACTS)
+        require(Cap.UI, Cap.CONTACTS, Cap.TELEPHONY)
         filter.attach(screen)
+    }
+
+    override fun onAction(action: String) {
+        when (action) {
+            "call" -> Contacts.call()
+            "search" -> {
+                val q = Ui.getText("filter")
+                Contacts.search(q)
+            }
+        }
     }
 
     override fun onSoft(side: SoftKey) {

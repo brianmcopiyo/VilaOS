@@ -1,4 +1,5 @@
 #include "apprun.h"
+#include "bridge.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -138,7 +139,6 @@ void apphost_update_softkeys(AppHost *h, Screen *s)
     (void)h;
     if (!s)
         return;
-    /* Only dialer/notes/compose fields toggle Clear↔Back — never browser URL etc. */
     Widget *inp = NULL;
     if (s->focus >= 0 && softkey_clearable_input(&s->widgets[s->focus]))
         inp = &s->widgets[s->focus];
@@ -310,6 +310,21 @@ static int handle_route_action(AppHost *h, Screen *s, Gfx *g, const char *action
     return 0;
 }
 
+static const char *vapi_method_for(const char *action)
+{
+    if (str_eq(action, "call"))
+        return "telephony.call";
+    if (str_eq(action, "end_call"))
+        return "telephony.end";
+    if (str_eq(action, "mute"))
+        return "telephony.mute";
+    if (str_eq(action, "speaker"))
+        return "telephony.speaker";
+    if (str_eq(action, "send"))
+        return "messages.send";
+    return NULL;
+}
+
 int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, char *out_nav, size_t out_sz)
 {
     if (!h || !action || !action[0])
@@ -383,6 +398,22 @@ int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, cha
                 return apphost_handle_action(h, s, g, taken, out_nav, out_sz);
             if (w->action[0] && !str_eq(w->action, "none"))
                 return apphost_handle_action(h, s, g, w->action, out_nav, out_sz);
+        }
+    }
+
+    const char *method = h->in_app ? vapi_method_for(action) : NULL;
+    if (method) {
+        const char *status = NULL;
+        if (str_eq(action, "send"))
+            status = screen_find(s, "msgstatus") ? "msgstatus" : "status_line";
+        if (bridge_exec_cmd(&h->vsl, method, NULL, status) == 0) {
+            char taken[MAX_PATH];
+            if (vsl_consume_nav(&h->vsl, taken, sizeof(taken)))
+                return apphost_handle_action(h, s, g, taken, out_nav, out_sz);
+            apphost_update_softkeys(h, s);
+            if (out_nav)
+                out_nav[0] = 0;
+            return 2;
         }
     }
 
