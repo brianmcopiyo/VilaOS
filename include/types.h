@@ -99,11 +99,17 @@ typedef struct {
     int valid;
 } DirtyRect;
 
+typedef struct Composer Composer;
+struct vilaos_gfx_driver;
+
 typedef struct {
     uint16_t *back;
     size_t back_pixels;
+    uint32_t *compose_px;
+    size_t compose_pixels;
     void *fb_map;
     int fb_fd;
+    int dri_fd;
     int w, h;
     int fb_w, fb_h, fb_bpp, fb_stride;
     int is_xrgb;
@@ -115,6 +121,16 @@ typedef struct {
     DirtyRect dirty;
     int desktop;
     int resized;
+    const struct vilaos_gfx_driver *drv;
+    void *drv_dl;
+    char drv_name[64];
+    char backend[32];
+    char drv_version[32];
+    int cores;
+    long ram_mb;
+    int ram_tier;
+    int workers;
+    Composer *composer;
 } Gfx;
 
 typedef struct {

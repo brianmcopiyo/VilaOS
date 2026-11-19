@@ -858,7 +858,6 @@ void screen_render(Screen *s, Gfx *g, const InputState *in)
             draw_widget(s, g, &s->widgets[i]);
     }
     draw_cursor(g, in);
-    gfx_dirty_all(g);
 }
 
 void screen_set_mode_badge(Screen *s, const char *mode)

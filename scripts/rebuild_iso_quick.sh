@@ -33,6 +33,7 @@ fi
 
 ln -sfn /usr/include/linux /usr/include/x86_64-linux-musl/linux
 ln -sfn /usr/include/asm-generic /usr/include/x86_64-linux-musl/asm-generic
+ln -sfn /usr/include/asm-generic /usr/include/x86_64-linux-musl/asm 2>/dev/null || true
 ln -sfn /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm
 
 cd "${WORK}"
@@ -40,6 +41,7 @@ make clean
 make musl
 strip --strip-unneeded vilaos-musl vilaos-pkg-musl
 bash scripts/pack_apps.sh
+bash scripts/pack_gfx_driver.sh
 
 if [[ ! -f build/bzImage ]]; then
   echo "missing build/bzImage; run full build first" >&2
@@ -58,9 +60,28 @@ if [[ -z "${BB}" ]]; then
   exit 1
 fi
 
+install_musl_runtime() {
+  local dest="$1"
+  mkdir -p "${dest}/lib"
+  local musl_ld=""
+  for cand in /lib/ld-musl-x86_64.so.1 /usr/lib/x86_64-linux-musl/libc.so /lib/x86_64-linux-musl/libc.so; do
+    if [[ -f "${cand}" && -x "${cand}" && "$(stat -c%s "${cand}" 2>/dev/null || echo 0)" -gt 4096 ]]; then
+      musl_ld="${cand}"
+      break
+    fi
+  done
+  if [[ -z "${musl_ld}" ]]; then
+    echo "missing musl dynamic linker" >&2
+    exit 1
+  fi
+  cp -f "${musl_ld}" "${dest}/lib/ld-musl-x86_64.so.1"
+  chmod 755 "${dest}/lib/ld-musl-x86_64.so.1"
+  ln -sfn ld-musl-x86_64.so.1 "${dest}/lib/libc.so"
+}
+
 ROOTFS="${WORK}/build/rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens,apps,data/apps,var/lib/vilaos,packages}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,assets/screens,apps,data/apps,var/lib/vilaos,packages,drivers/gfx/builtin}
 cp -f "${BB}" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
@@ -68,6 +89,22 @@ done
 cp -f vilaos-musl "${ROOTFS}/bin/vilaos"
 cp -f vilaos-pkg-musl "${ROOTFS}/bin/vilaos-pkg"
 chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
+install_musl_runtime "${ROOTFS}"
+echo "builtin" > "${ROOTFS}/drivers/gfx/active"
+cat > "${ROOTFS}/drivers/gfx/builtin/manifest.xml" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<driver>
+  <id>builtin</id>
+  <version>1.0.0</version>
+  <abi>1</abi>
+  <entry>libvilaos_gfx.so</entry>
+  <name>vilaos-gfx-builtin</name>
+</driver>
+EOF
+if [[ -f build/libvilaos_gfx.so ]]; then
+  cp -f build/libvilaos_gfx.so "${ROOTFS}/drivers/gfx/builtin/libvilaos_gfx.so"
+  cp -f build/libvilaos_gfx.so "${ROOTFS}/lib/libvilaos_gfx.so"
+fi
 cp -a assets/screens/. "${ROOTFS}/assets/screens/"
 cp -a apps/. "${ROOTFS}/apps/"
 cp -a build/packages/. "${ROOTFS}/packages/" 2>/dev/null || true
@@ -82,9 +119,10 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
+export LD_LIBRARY_PATH=/lib:/drivers/gfx/builtin
 cd /
 export HOME=/
 while true; do
@@ -138,5 +176,8 @@ genisoimage -o "${ISO_OUT}" \
 mkdir -p "${HOST}/build/packages"
 cp -f "${ISO_OUT}" "${WORK}/build/bzImage" "${WORK}/build/rootfs.cpio.gz" "${HOST}/build/"
 cp -a "${WORK}/build/packages/." "${HOST}/build/packages/" 2>/dev/null || true
+if [[ -f "${WORK}/build/libvilaos_gfx.so" ]]; then
+  cp -f "${WORK}/build/libvilaos_gfx.so" "${HOST}/build/"
+fi
 ls -lh "${HOST}/build/vilaos.iso" "${HOST}/build/bzImage" "${HOST}/build/rootfs.cpio.gz"
 echo "ISO ready: ${HOST}/build/vilaos.iso"

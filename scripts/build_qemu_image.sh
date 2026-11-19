@@ -13,7 +13,7 @@ KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VER}.tar
 
 mkdir -p "${BUILD}" "${ROOTFS}"
 
-echo "==> Building vilaos + vilaos-pkg (static musl if available)"
+echo "==> Building vilaos + vilaos-pkg (dynamic musl if available)"
 cd "${ROOT}"
 if command -v musl-gcc >/dev/null 2>&1; then
   make clean
@@ -22,7 +22,7 @@ if command -v musl-gcc >/dev/null 2>&1; then
   PKG_BIN="${ROOT}/vilaos-pkg-musl"
 else
   make clean
-  make CFLAGS="-std=c11 -O2 -Wall -Wextra -static" LDFLAGS="-static" APP=vilaos-static PKG_APP=vilaos-pkg-static all
+  make CFLAGS="-std=c11 -O2 -Wall -Wextra" LDFLAGS="" LIBS="-lm -ldl -lpthread" APP=vilaos-static PKG_APP=vilaos-pkg-static all
   UI_BIN="${ROOT}/vilaos-static"
   PKG_BIN="${ROOT}/vilaos-pkg-static"
 fi
@@ -31,6 +31,50 @@ test -x "${PKG_BIN}"
 strip --strip-unneeded "${UI_BIN}" 2>/dev/null || true
 strip --strip-unneeded "${PKG_BIN}" 2>/dev/null || true
 bash "${ROOT}/scripts/pack_apps.sh" || true
+bash "${ROOT}/scripts/pack_gfx_driver.sh" || true
+
+install_musl_runtime() {
+  local dest="$1"
+  mkdir -p "${dest}/lib"
+  local musl_ld=""
+  for cand in /lib/ld-musl-x86_64.so.1 /usr/lib/x86_64-linux-musl/libc.so /lib/x86_64-linux-musl/libc.so; do
+    if [[ -f "${cand}" && -x "${cand}" && "$(stat -c%s "${cand}" 2>/dev/null || echo 0)" -gt 4096 ]]; then
+      musl_ld="${cand}"
+      break
+    fi
+  done
+  if [[ -z "${musl_ld}" ]]; then
+    echo "missing musl dynamic linker" >&2
+    exit 1
+  fi
+  cp -f "${musl_ld}" "${dest}/lib/ld-musl-x86_64.so.1"
+  chmod 755 "${dest}/lib/ld-musl-x86_64.so.1"
+  ln -sfn ld-musl-x86_64.so.1 "${dest}/lib/libc.so"
+}
+
+install_gfx_drivers() {
+  local dest="$1"
+  mkdir -p "${dest}/drivers/gfx/builtin"
+  echo "builtin" > "${dest}/drivers/gfx/active"
+  cat > "${dest}/drivers/gfx/builtin/manifest.xml" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<driver>
+  <id>builtin</id>
+  <version>1.0.0</version>
+  <abi>1</abi>
+  <entry>libvilaos_gfx.so</entry>
+  <name>vilaos-gfx-builtin</name>
+</driver>
+EOF
+  if [[ -f "${ROOT}/build/libvilaos_gfx.so" ]]; then
+    cp -f "${ROOT}/build/libvilaos_gfx.so" "${dest}/drivers/gfx/builtin/libvilaos_gfx.so"
+    cp -f "${ROOT}/build/libvilaos_gfx.so" "${dest}/lib/libvilaos_gfx.so" 2>/dev/null || true
+  fi
+  if [[ -f "${ROOT}/build/packages/vilaos-gfx.vdrv" ]]; then
+    mkdir -p "${dest}/packages"
+    cp -f "${ROOT}/build/packages/vilaos-gfx.vdrv" "${dest}/packages/"
+  fi
+}
 
 fetch() {
   local url="$1" out="$2"
@@ -227,7 +271,7 @@ ls -lh "${BUILD}/bzImage"
 
 echo "==> Assembling rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,assets/screens,apps,data/apps,var/lib/vilaos,packages}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,assets/screens,apps,data/apps,var/lib/vilaos,packages,drivers/gfx}
 cp -f "${BUILD}/busybox" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
@@ -235,6 +279,8 @@ done
 cp -f "${UI_BIN}" "${ROOTFS}/bin/vilaos"
 cp -f "${PKG_BIN}" "${ROOTFS}/bin/vilaos-pkg"
 chmod 755 "${ROOTFS}/bin/vilaos" "${ROOTFS}/bin/vilaos-pkg"
+install_musl_runtime "${ROOTFS}"
+install_gfx_drivers "${ROOTFS}"
 cp -a "${ROOT}/assets/screens/." "${ROOTFS}/assets/screens/"
 cp -a "${ROOT}/apps/." "${ROOTFS}/apps/"
 if [[ -d "${ROOT}/build/packages" ]]; then
@@ -251,9 +297,10 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || {
   mknod /dev/ttyS0 c 4 64 2>/dev/null
   mkdir -p /dev/input
 }
-mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages
+mkdir -p /tmp /dev/input /apps /data/apps /var/lib/vilaos /packages /drivers/gfx /lib
 [ -e /dev/fb0 ] || mknod /dev/fb0 c 29 0 2>/dev/null
 [ -e /dev/tty0 ] || mknod /dev/tty0 c 4 0 2>/dev/null
+export LD_LIBRARY_PATH=/lib:/drivers/gfx/builtin
 cd /
 export HOME=/
 while true; do
@@ -272,7 +319,7 @@ ls -lh "${BUILD}/rootfs.cpio.gz"
 cat > "${BUILD}/run_qemu.sh" << EOF
 #!/usr/bin/env bash
 exec qemu-system-x86_64 \\
-  -m 32M \\
+  -m 256M \\
   -kernel "${BUILD}/bzImage" \\
   -initrd "${BUILD}/rootfs.cpio.gz" \\
   -append "console=ttyS0 quiet" \\
@@ -284,7 +331,7 @@ chmod 755 "${BUILD}/run_qemu.sh"
 cat > "${BUILD}/run_qemu_fb.sh" << EOF
 #!/usr/bin/env bash
 exec qemu-system-x86_64 \\
-  -m 32M \\
+  -m 256M \\
   -kernel "${BUILD}/bzImage" \\
   -initrd "${BUILD}/rootfs.cpio.gz" \\
   -append "console=tty0 vga=0x311" \\

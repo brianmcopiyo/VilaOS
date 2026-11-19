@@ -1,11 +1,11 @@
 param(
-    [int]$MemoryMB = 128
+    [int]$MemoryMB = 256
 )
 
 $ErrorActionPreference = "Stop"
 
-if ($MemoryMB -lt 32) {
-    throw "MemoryMB must be at least 32 (minimum capability target)."
+if ($MemoryMB -lt 256) {
+    throw "MemoryMB must be at least 256 (minimum capability target)."
 }
 
 $VmName = "VilaOS"

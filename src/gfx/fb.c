@@ -1,4 +1,7 @@
 #include "fb.h"
+#include "gfx_backend.h"
+#include "gfx_loader.h"
+#include "compose.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -87,6 +90,12 @@ int gfx_set_size(Gfx *g, int w, int h)
     g->w = w;
     g->h = h;
     gfx_update_metrics(g);
+    if (g->composer)
+        compose_resize(g->composer, w, h);
+    if (g->composer) {
+        g->compose_px = g->composer->px;
+        g->compose_pixels = g->composer->pixels;
+    }
 #ifdef PHONE_DESKTOP
     if (g->desktop) {
         if (need > g_argb_pixels || !g_argb) {
@@ -121,6 +130,8 @@ void gfx_dirty(Gfx *g, int x, int y, int w, int h)
     if (y + h > g->h)
         h = g->h - y;
     dirty_expand(&g->dirty, x, y, w, h);
+    if (g->composer)
+        compose_dirty(g->composer, x, y, w, h);
 }
 
 void gfx_dirty_all(Gfx *g)
@@ -132,6 +143,8 @@ void gfx_dirty_all(Gfx *g)
     g->dirty.x1 = g->w;
     g->dirty.y1 = g->h;
     g->dirty.valid = 1;
+    if (g->composer)
+        compose_dirty_all(g->composer);
 }
 
 uint16_t *gfx_pixels(Gfx *g)
@@ -146,6 +159,11 @@ void gfx_clear(Gfx *g, uint16_t color)
     size_t n = (size_t)g->w * (size_t)g->h;
     for (size_t i = 0; i < n; i++)
         g->back[i] = color;
+    if (g->composer) {
+        compose_begin(g->composer);
+        compose_clear(g->composer, compose_rgb565_to_argb(color));
+        compose_flush(g->composer, g->back, g->w, g->h);
+    }
     gfx_dirty_all(g);
 }
 
@@ -153,15 +171,21 @@ const char *gfx_format_label(Gfx *g, char *buf, size_t buf_sz)
 {
     if (!g || !buf || buf_sz == 0)
         return "";
-    const char *fmt = "RGB565";
-    if (g->fb_bpp == 32)
-        fmt = g->is_xrgb ? "XRGB8888" : "ARGB8888";
-    else if (g->fb_bpp == 24)
-        fmt = "RGB888";
-    else if (g->fb_bpp == 16)
-        fmt = "RGB565";
-    snprintf(buf, buf_sz, "FB %dx%d %s", g->w, g->h, fmt);
+#ifndef VILAOS_GFX_SO
+    gfx_loader_status(g, buf, buf_sz);
+#else
+    snprintf(buf, buf_sz, "%s %s [%s] cores=%d ram=%ldMB workers=%d",
+             g->drv_name[0] ? g->drv_name : "gfx",
+             g->drv_version[0] ? g->drv_version : "?",
+             g->backend[0] ? g->backend : "sw",
+             g->cores, g->ram_mb, g->workers);
+#endif
     return buf;
+}
+
+static uint32_t rgb565_to_xrgb(uint16_t c)
+{
+    return compose_rgb565_to_argb(c);
 }
 
 #if !defined(PHONE_DESKTOP) && !defined(PHONE_VFB)
@@ -185,7 +209,7 @@ static void gfx_fill_hw(Gfx *g, uint32_t color32, uint16_t color16)
     }
 }
 
-static int open_fbdev(Gfx *g)
+int gfx_backend_probe_fb(Gfx *g)
 {
     g->fb_fd = open("/dev/fb0", O_RDWR);
     if (g->fb_fd < 0)
@@ -240,13 +264,20 @@ static int open_fbdev(Gfx *g)
         return -1;
     }
 
+    str_copy(g->backend, sizeof(g->backend), "fb");
     gfx_fill_hw(g, 0xFF000000u, RGB565(0, 0, 0));
     return 0;
+}
+#else
+int gfx_backend_probe_fb(Gfx *g)
+{
+    (void)g;
+    return -1;
 }
 #endif
 
 #ifdef PHONE_DESKTOP
-static int open_sdl(Gfx *g)
+int gfx_backend_probe_sdl(Gfx *g)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         return -1;
@@ -264,27 +295,36 @@ static int open_sdl(Gfx *g)
     SDL_GetWindowSize(g_win, &w, &h);
     g->fb_w = w;
     g->fb_h = h;
+    str_copy(g->backend, sizeof(g->backend), "sdl");
     if (gfx_set_size(g, w, h) != 0)
         return -1;
     return 0;
 }
+#else
+int gfx_backend_probe_sdl(Gfx *g)
+{
+    (void)g;
+    return -1;
+}
 #endif
 
-int gfx_init(Gfx *g, int desktop)
+int gfx_backend_init_all(Gfx *g, int desktop)
 {
-    memset(g, 0, sizeof(*g));
+    if (!g)
+        return -1;
     g->fb_fd = -1;
+    g->dri_fd = -1;
     g->desktop = 0;
     g->font_scale = 1;
+    g->backend[0] = 0;
 
 #ifdef PHONE_DESKTOP
     (void)desktop;
-    if (open_sdl(g) == 0) {
+    if (gfx_backend_probe_sdl(g) == 0) {
         gfx_clear(g, COL_BG);
         g->resized = 0;
         return 0;
     }
-    fprintf(stderr, "SDL desktop backend failed\n");
     return -1;
 #elif defined(PHONE_VFB)
     (void)desktop;
@@ -295,22 +335,27 @@ int gfx_init(Gfx *g, int desktop)
     g->desktop = 1;
     g->fb_bpp = 16;
     g->is_xrgb = 0;
+    str_copy(g->backend, sizeof(g->backend), "vfb");
     if (gfx_set_size(g, 640, 480) != 0)
         return -1;
     g->fb_w = g->w;
     g->fb_h = g->h;
-    fprintf(stderr, "VFB writing %s (keys via stdin)\n", g_vfb_path);
     gfx_clear(g, COL_BG);
     g->resized = 0;
     return 0;
 #else
     (void)desktop;
-    if (open_fbdev(g) == 0) {
+    if (gfx_backend_probe_drm(g) == 0) {
         gfx_clear(g, COL_BG);
         g->resized = 0;
         return 0;
     }
-    fprintf(stderr, "fb0 unavailable, using software buffer only\n");
+    if (gfx_backend_probe_fb(g) == 0) {
+        gfx_clear(g, COL_BG);
+        g->resized = 0;
+        return 0;
+    }
+    str_copy(g->backend, sizeof(g->backend), "sw");
     g->fb_bpp = 16;
     g->is_xrgb = 0;
     if (gfx_set_size(g, 640, 480) != 0)
@@ -323,10 +368,10 @@ int gfx_init(Gfx *g, int desktop)
 #endif
 }
 
-void gfx_shutdown(Gfx *g)
+void gfx_backend_shutdown(Gfx *g)
 {
 #ifdef PHONE_DESKTOP
-    if (g->desktop) {
+    if (g && g->desktop) {
         free(g_argb);
         g_argb = NULL;
         g_argb_pixels = 0;
@@ -343,30 +388,27 @@ void gfx_shutdown(Gfx *g)
     }
 #endif
 #if !defined(PHONE_DESKTOP) && !defined(PHONE_VFB)
-    if (g->fb_map && g->fb_map_len) {
-        munmap(g->fb_map, g->fb_map_len);
-        g->fb_map = NULL;
-        g->fb_map_len = 0;
-    }
-    if (g->fb_fd >= 0) {
-        close(g->fb_fd);
-        g->fb_fd = -1;
+    if (g) {
+        if (g->fb_map && g->fb_map_len) {
+            munmap(g->fb_map, g->fb_map_len);
+            g->fb_map = NULL;
+            g->fb_map_len = 0;
+        }
+        if (g->fb_fd >= 0) {
+            close(g->fb_fd);
+            g->fb_fd = -1;
+        }
+        if (g->dri_fd >= 0) {
+            close(g->dri_fd);
+            g->dri_fd = -1;
+        }
     }
 #endif
-    free(g->back);
-    g->back = NULL;
-    g->back_pixels = 0;
-}
-
-static uint32_t rgb565_to_xrgb(uint16_t c)
-{
-    uint32_t r = (c >> 11) & 0x1F;
-    uint32_t gv = (c >> 5) & 0x3F;
-    uint32_t b = c & 0x1F;
-    r = (r << 3) | (r >> 2);
-    gv = (gv << 2) | (gv >> 4);
-    b = (b << 3) | (b >> 2);
-    return 0xFF000000u | (r << 16) | (gv << 8) | b;
+    if (g) {
+        free(g->back);
+        g->back = NULL;
+        g->back_pixels = 0;
+    }
 }
 
 #ifdef PHONE_VFB
@@ -389,9 +431,15 @@ static void vfb_write_ppm(Gfx *g)
 }
 #endif
 
-void gfx_present(Gfx *g)
+void gfx_backend_present(Gfx *g)
 {
-    if (!g || !g->dirty.valid || !g->back)
+    if (!g || !g->back)
+        return;
+
+    if (g->composer && g->composer->cmd_count > 0)
+        compose_flush(g->composer, g->back, g->w, g->h);
+
+    if (!g->dirty.valid)
         return;
 
     int x0 = clamp_i(g->dirty.x0, 0, g->w - 1);
@@ -458,7 +506,7 @@ void gfx_present(Gfx *g)
     g->dirty.valid = 0;
 }
 
-int gfx_poll_desktop(Gfx *g)
+int gfx_backend_poll_desktop(Gfx *g)
 {
 #ifdef PHONE_DESKTOP
     if (!g || !g->desktop)
@@ -486,4 +534,34 @@ int gfx_poll_desktop(Gfx *g)
     (void)g;
     return 0;
 #endif
+}
+
+#ifndef VILAOS_GFX_SO
+int gfx_init(Gfx *g, int desktop)
+{
+    if (!g)
+        return -1;
+    memset(g, 0, sizeof(*g));
+    g->fb_fd = -1;
+    g->dri_fd = -1;
+    return gfx_loader_init(g, desktop);
+}
+
+void gfx_shutdown(Gfx *g)
+{
+    gfx_loader_shutdown(g);
+}
+#endif
+
+void gfx_present(Gfx *g)
+{
+    if (g && g->drv && g->drv->present)
+        g->drv->present(g);
+    else
+        gfx_backend_present(g);
+}
+
+int gfx_poll_desktop(Gfx *g)
+{
+    return gfx_backend_poll_desktop(g);
 }

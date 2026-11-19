@@ -213,6 +213,14 @@ static int apply_nav(Screen *s, Gfx *g, InputMux *input, char *nav)
         g_host.in_app = 0;
         vsl_reset(&g_host.vsl);
     }
+    if (strstr(s->path, "settings.xml")) {
+        Widget *about = screen_find(s, "about2");
+        if (about) {
+            char gfx_status[MAX_TEXT];
+            gfx_format_label(g, gfx_status, sizeof(gfx_status));
+            str_copy(about->text, sizeof(about->text), gfx_status);
+        }
+    }
     screen_layout(s, g);
     input_set_dialer_mode(input, path_is_dialer(s->path));
     nav[0] = 0;
@@ -324,6 +332,11 @@ int main(int argc, char **argv)
         if (g_pid1)
             hang_forever();
         return 1;
+    }
+    {
+        char gfx_status[192];
+        gfx_format_label(&gfx, gfx_status, sizeof(gfx_status));
+        fprintf(stderr, "gfx: %s\n", gfx_status);
     }
 
     InputMux input;
