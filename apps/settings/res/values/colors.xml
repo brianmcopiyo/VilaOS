@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<resources>
+  <color name="bg" value="#F5EFE6"/>
+  <color name="surface" value="#EAE0D0"/>
+  <color name="border" value="#D4C5B0"/>
+  <color name="text" value="#1C1917"/>
+  <color name="secondary" value="#57534E"/>
+  <color name="accent" value="#EA580C"/>
+  <color name="on_accent" value="#FFFFFF"/>
+</resources>

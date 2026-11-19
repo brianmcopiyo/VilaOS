@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<screen id="settings_display" class="page" background="#F5EFE6">
+  <statusbar id="status"/>
+  <flex id="body" class="col gap-6 p-8" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
+    <label id="title" text="Display" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="16" font-weight="700" component="header"/>
+    <card class="col gap-4 p-8">
+      <label id="disp_res" text="Resolution" color="#1C1917" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+      <label id="disp_aspect" text="Aspect" color="#57534E" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+      <label id="disp_theme" text="Theme: Sunset" color="#1C1917" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+    </card>
+    <header id="sec_theme" text="Appearance"/>
+    <button id="btn_theme_sunset" text="Sunset Orange" icon="sun" icon-set="lucide" action="theme_sunset" background="#EA580C" color="#FFFFFF" width="100%" height="40" radius="10" component="button"/>
+    <button id="btn_theme_beige" text="Warm Beige surface" icon="palette" icon-set="lucide" action="theme_beige" background="#EAE0D0" color="#1C1917" width="100%" height="40" radius="10" component="button"/>
+    <button id="btn_text_size" text="Text: Normal" icon="type" icon-set="lucide" action="toggle_text" background="#EAE0D0" color="#1C1917" width="100%" height="40" radius="10" component="button"/>
+    <header id="sec_preview" text="Preview"/>
+    <card class="row items-center justify-between p-8">
+      <row id="preview_row" title="Sample row" subtitle="Icons and type" icon="sparkles" icon-set="lucide"/>
+      <badge id="preview_badge" text="Live" icon="check" icon-set="lucide"/>
+    </card>
+    <label id="preview_font" text="DM Sans / Inter / JetBrains Mono" color="#57534E" width="100%" height="wrap" font-family="JetBrains Mono" font-size="11"/>
+  </flex>
+  <softkeys left="Theme" center="OK" right="Back"
+            left-action="theme_cycle" center-action="ok" right-action="route:pop"/>
+</screen>

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<resources>
+  <dimen name="pad" value="8"/>
+  <dimen name="gap" value="6"/>
+  <dimen name="row_h" value="40"/>
+  <dimen name="btn_h" value="40"/>
+</resources>

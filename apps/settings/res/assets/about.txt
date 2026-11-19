@@ -1,1 +1,4 @@
-settings package assets
+VilaOS Settings
+Sunset Orange #EA580C
+Warm Beige #F5EFE6
+API and package manager for feature-phone shells.
