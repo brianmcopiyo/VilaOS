@@ -3,7 +3,7 @@
   <statusbar id="status"/>
   <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="6" align="stretch">
     <label id="title" text="Mom" color="#1C1917" width="100%" height="wrap"/>
-    <label id="mode_badge" text="T9: abc" value="2" width="auto" height="24" background="#EA580C" color="#FFFFFF" radius="12" component="notification_pill"/>
+    <label id="mode_badge" text="T9: abc" value="2" width="auto" height="24" background="#EA580C" color="#FFFFFF" radius="12" component="badge"/>
     <list id="thread" width="100%" height="fill" grow="1" min-height="100" padding="4" gap="4" radius="8" background="#EAE0D0" border-width="1" border-color="#D4C5B0">
       <button id="b1" text="Hey, are you free later?" background="#EAE0D0" color="#1C1917" action="none" radius="10" height="40"/>
       <button id="b2" text="Yes, after 5 works" background="#F0C4A0" color="#1C1917" action="none" radius="10" height="40"/>

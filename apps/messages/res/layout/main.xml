@@ -3,16 +3,16 @@
   <statusbar id="status"/>
   <flex id="body" class="col gap-16 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
     <card class="row items-center justify-between p-14">
-      <row id="status_summary" title="Inbox" subtitle="2 unread threads"/>
-      <badge text="2"/>
+      <row id="status_summary" title="Inbox" subtitle="2 unread threads" icon="messages" icon-set="phosphor"/>
+      <badge text="2" icon="bell" icon-set="lucide"/>
     </card>
     <list id="thread_list" width="100%" height="fill" grow="1" min-height="120" class="surface" padding="4" gap="4" overflow="scroll">
-      <row id="m1" title="Mom" subtitle="Call me later" action="route:push:res/layout/thread.xml"/>
-      <row id="m2" title="Work" subtitle="Meeting at 3" action="route:push:res/layout/thread.xml"/>
-      <row id="m3" title="Sam" subtitle="Lunch tomorrow?" action="route:push:res/layout/thread.xml"/>
-      <row id="m4" title="Ada" subtitle="Designs look great" action="route:push:res/layout/thread.xml"/>
+      <row id="m1" title="Mom" subtitle="Call me later" icon="messages" icon-set="lucide" action="route:push:res/layout/thread.xml"/>
+      <row id="m2" title="Work" subtitle="Meeting at 3" icon="messages" icon-set="lucide" action="route:push:res/layout/thread.xml"/>
+      <row id="m3" title="Sam" subtitle="Lunch tomorrow?" icon="messages" icon-set="tabler" action="route:push:res/layout/thread.xml"/>
+      <row id="m4" title="Ada" subtitle="Designs look great" icon="messages" icon-set="phosphor" action="route:push:res/layout/thread.xml"/>
     </list>
-    <button id="compose_btn" variant="primary" text="New message" action="route:push:res/layout/compose.xml" width="100%" height="40"/>
+    <button id="compose_btn" variant="primary" text="New message" icon="pen" icon-set="lucide" action="route:push:res/layout/compose.xml" width="100%" height="40" component="button"/>
   </flex>
   <softkeys left="New" center="Open" right="Back"
             left-action="route:push:res/layout/compose.xml"

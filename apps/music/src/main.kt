@@ -5,17 +5,17 @@ import app.VilaApp
 import app.require
 import audio.Audio
 import service.Service
-import ui.ActionButton
+import ui.Button
 import ui.Screen
 import ui.SoftKey
 import ui.Ui
 
 class MusicApp : VilaApp() {
-    private val playBtn = ActionButton(id = "btn_play", variant = "primary") {
+    private val playBtn = Button(id = "btn_play", variant = "primary") {
         Audio.play()
         Service.status("musicd", "svc_state")
     }
-    private val pauseBtn = ActionButton(id = "btn_pause", variant = "secondary") {
+    private val pauseBtn = Button(id = "btn_pause", variant = "secondary") {
         Audio.pause()
         Service.status("musicd", "svc_state")
     }

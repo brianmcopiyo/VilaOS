@@ -4,13 +4,13 @@ import app.Cap
 import app.VilaApp
 import app.require
 import contacts.Contacts
+import ui.Input
 import ui.Screen
 import ui.SoftKey
-import ui.TextInput
 import ui.Ui
 
 class ContactsApp : VilaApp() {
-    private val filter = TextInput(id = "filter", placeholder = "Search")
+    private val filter = Input(id = "filter", placeholder = "Search")
 
     override fun onStart(screen: Screen) {
         require(Cap.UI, Cap.CONTACTS, Cap.TELEPHONY)

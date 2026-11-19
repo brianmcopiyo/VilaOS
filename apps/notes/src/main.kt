@@ -4,13 +4,13 @@ import app.Cap
 import app.VilaApp
 import app.require
 import storage.Storage
+import ui.Input
 import ui.Screen
 import ui.SoftKey
-import ui.TextInput
 import ui.Ui
 
 class NotesApp : VilaApp() {
-    private val noteInput = TextInput(id = "note", placeholder = "Write a note")
+    private val noteInput = Input(id = "note", placeholder = "Write a note")
 
     override fun onStart(screen: Screen) {
         require(Cap.UI, Cap.STORAGE_APP)

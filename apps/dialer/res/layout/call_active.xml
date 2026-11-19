@@ -2,7 +2,7 @@
 <screen id="call_active" background="#F5EFE6">
   <statusbar id="status"/>
   <flex id="body" direction="column" x="0%" y="auto" width="100%" height="fill" padding="8" gap="8" align="stretch">
-    <label id="call_title" text="Active call" color="#57534E" width="100%" height="wrap" component="section_header"/>
+    <label id="call_title" text="Active call" color="#57534E" width="100%" height="wrap" component="header"/>
     <label id="call_name" text="Calling..." color="#1C1917" width="100%" height="40" value="1"/>
     <label id="call_number" text="" color="#57534E" width="100%" height="wrap"/>
     <label id="call_timer" text="00:00" color="#15803D" width="100%" height="wrap" value="1"/>

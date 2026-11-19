@@ -4,23 +4,23 @@ import app.Cap
 import app.VilaApp
 import app.require
 import messages.Messages
-import ui.ActionButton
-import ui.ListRow
+import ui.Button
+import ui.Input
+import ui.Row
 import ui.Screen
 import ui.SoftKey
-import ui.TextInput
 import ui.Ui
 
 class MessagesApp : VilaApp() {
-    private val composeInput = TextInput(id = "msg_input", placeholder = "Type message")
-    private val sendBtn = ActionButton(id = "send_btn", variant = "primary") {
+    private val composeInput = Input(id = "msg_input", placeholder = "Type message")
+    private val sendBtn = Button(id = "send_btn", variant = "primary") {
         val body = composeInput.value(screen)
         if (body.isNotBlank()) {
             Messages.send(body, "msgstatus")
             composeInput.clear(screen)
         }
     }
-    private val threadList = ListRow(id = "thread_list") { index ->
+    private val threadList = Row(id = "thread_list") { index ->
         Messages.openThread(index)
     }
 

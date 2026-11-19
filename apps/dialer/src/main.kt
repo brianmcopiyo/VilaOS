@@ -5,13 +5,13 @@ import app.VilaApp
 import app.require
 import contacts.Contacts
 import telephony.Telephony
-import ui.DialKeypad
+import ui.Keypad
 import ui.Screen
 import ui.SoftKey
 import ui.Ui
 
 class DialerApp : VilaApp() {
-    private val keypad = DialKeypad(id = "dialpad") { key ->
+    private val keypad = Keypad(id = "dialpad") { key ->
         Telephony.digit(key)
         refreshMatch()
     }
