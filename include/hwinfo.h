@@ -18,6 +18,7 @@ typedef struct {
     HwRamTier tier;
     int workers;
     size_t glyph_cache_bytes;
+    size_t icon_cache_bytes;
     size_t surface_pool_bytes;
     size_t cmd_buf_bytes;
     int tile_dirty;

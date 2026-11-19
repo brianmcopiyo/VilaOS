@@ -3,6 +3,7 @@
 #include "fb.h"
 #include "draw.h"
 #include "font.h"
+#include "icon.h"
 #include "screen.h"
 #include "input.h"
 #include "apprun.h"
@@ -362,6 +363,7 @@ int main(int argc, char **argv)
         gfx_format_label(&gfx, gfx_status, sizeof(gfx_status));
         fprintf(stderr, "gfx: %s\n", gfx_status);
     }
+    icon_init(&gfx);
 
     vapi_init();
 
@@ -387,6 +389,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "failed to load %s\n", start);
         if (g_pid1)
             hang_forever();
+        icon_shutdown();
         gfx_shutdown(&gfx);
         return 1;
     }
@@ -603,6 +606,7 @@ restart_loop:
 
     input_shutdown(&input);
     procman_shutdown(&g_procman);
+    icon_shutdown();
     gfx_shutdown(&gfx);
     return 0;
 }

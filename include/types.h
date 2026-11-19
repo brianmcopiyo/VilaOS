@@ -89,6 +89,7 @@ struct Widget {
     char text[MAX_TEXT];
     char action[MAX_PATH];
     char icon[MAX_ID];
+    char icon_set[MAX_ID];
     char component[MAX_ID];
     char font_family[MAX_ID];
     int16_t font_size;

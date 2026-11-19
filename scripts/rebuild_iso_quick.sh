@@ -81,7 +81,7 @@ install_musl_runtime() {
 
 ROOTFS="${WORK}/build/rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,assets/ui,assets/fonts,fonts,res/fonts,sdk/ui,apps,data/apps,var/lib/vilaos,packages,drivers/gfx/builtin}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,assets/ui,assets/fonts,assets/icons,fonts,icons,res/fonts,sdk/ui,apps,data/apps,var/lib/vilaos,packages,drivers/gfx/builtin}
 cp -f "${BB}" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
@@ -114,6 +114,10 @@ if [[ -d sdk/ui ]]; then cp -a sdk/ui/. "${ROOTFS}/sdk/ui/"; cp -a sdk/ui/. "${R
 if [[ -d assets/fonts ]]; then cp -a assets/fonts/. "${ROOTFS}/assets/fonts/"; fi
 if [[ -d fonts ]]; then cp -a fonts/. "${ROOTFS}/fonts/"; cp -a fonts/. "${ROOTFS}/assets/fonts/" 2>/dev/null || true; fi
 if [[ -d res/fonts ]]; then cp -a res/fonts/. "${ROOTFS}/res/fonts/"; fi
+if [[ -d icons ]]; then
+  cp -a icons/. "${ROOTFS}/icons/"
+  cp -a icons/. "${ROOTFS}/assets/icons/"
+fi
 cp -a apps/. "${ROOTFS}/apps/"
 cp -a build/packages/. "${ROOTFS}/packages/" 2>/dev/null || true
 

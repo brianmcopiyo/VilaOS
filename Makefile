@@ -19,6 +19,7 @@ SRC := \
 	src/gfx/draw.c \
 	src/gfx/font.c \
 	src/gfx/ttfont.c \
+	src/gfx/icon.c \
 	src/gfx/compose.c \
 	src/gfx/pool.c \
 	src/gfx/hwinfo.c \
@@ -76,6 +77,7 @@ PKG_OBJ := $(PKG_SRC:.c=.o)
 MUSICD_OBJ := $(MUSICD_SRC:.c=.o)
 
 src/gfx/ttfont.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter
+src/gfx/icon.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
 
 .PHONY: all clean native aarch64 musl desktop vfb install qemu-help iso vbox-help pkg sdk-pack gfx-drive
 

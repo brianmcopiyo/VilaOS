@@ -277,7 +277,7 @@ ls -lh "${BUILD}/bzImage"
 
 echo "==> Assembling rootfs"
 rm -rf "${ROOTFS}"
-mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,apps,data/apps,var/lib/vilaos,packages,drivers/gfx}
+mkdir -p "${ROOTFS}"/{bin,sbin,dev,proc,sys,tmp,lib,run/vilaos,assets/screens,assets/values,assets/components,assets/icons,icons,apps,data/apps,var/lib/vilaos,packages,drivers/gfx}
 cp -f "${BUILD}/busybox" "${ROOTFS}/bin/busybox"
 for a in sh ls cat mount umount mkdir mknod chmod chown sleep ps free dmesg tar; do
   ln -sf busybox "${ROOTFS}/bin/${a}"
@@ -291,6 +291,10 @@ install_gfx_drivers "${ROOTFS}"
 cp -a "${ROOT}/assets/screens/." "${ROOTFS}/assets/screens/"
 if [[ -d "${ROOT}/assets/values" ]]; then cp -a "${ROOT}/assets/values/." "${ROOTFS}/assets/values/"; fi
 if [[ -d "${ROOT}/assets/components" ]]; then cp -a "${ROOT}/assets/components/." "${ROOTFS}/assets/components/"; fi
+if [[ -d "${ROOT}/icons" ]]; then
+  cp -a "${ROOT}/icons/." "${ROOTFS}/icons/"
+  cp -a "${ROOT}/icons/." "${ROOTFS}/assets/icons/"
+fi
 cp -a "${ROOT}/apps/." "${ROOTFS}/apps/"
 if [[ -d "${ROOT}/build/packages" ]]; then
   cp -a "${ROOT}/build/packages/." "${ROOTFS}/packages/" || true
