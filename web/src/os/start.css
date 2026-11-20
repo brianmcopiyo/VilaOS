@@ -1,0 +1,94 @@
+.start {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--taskbar-h) + 12px);
+  z-index: 12;
+  width: min(420px, calc(100vw - 24px));
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(24px);
+  animation: start-in 0.26s var(--ease) both;
+}
+
+.start__brand {
+  margin: 0 0 2px;
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.start__tag {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.start__pinned {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.start__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.start__tile {
+  width: 100%;
+  padding: 14px 8px;
+  border-radius: 12px;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.start__tile:hover,
+.start__tile:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.start__glyph {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--font-brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.start__name {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.start__power {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.start__power:hover {
+  background: var(--danger);
+}

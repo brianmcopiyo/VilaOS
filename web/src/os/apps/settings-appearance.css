@@ -1,0 +1,167 @@
+/* Mirrors Chat-Room SettingsHub appearance tab layout/tokens */
+
+.app-section {
+  margin: 0 0 28px;
+}
+
+.app-section__head {
+  margin: 0 0 12px;
+}
+
+.app-section__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cr-fg);
+}
+
+.app-section__desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--cr-fg-muted);
+}
+
+.theme-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 640px) {
+  .theme-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.theme-row__label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cr-fg);
+}
+
+.theme-row__hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--cr-fg-muted);
+}
+
+.theme-toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--cr-border);
+  transition: background-color 160ms ease;
+}
+
+.theme-toggle.is-on {
+  background: var(--color-primary-500);
+}
+
+.theme-toggle__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(15 28 34 / 0.2);
+  transition: transform 160ms ease;
+}
+
+.theme-toggle.is-on .theme-toggle__knob {
+  transform: translateX(18px);
+}
+
+.theme-cards {
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .theme-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.theme-card {
+  border-radius: 0.75rem;
+  padding: 10px 12px;
+  text-align: left;
+  background: color-mix(in oklab, var(--cr-surface-muted) 50%, transparent);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.theme-card:hover {
+  background: var(--cr-surface-muted);
+}
+
+.theme-card.is-active {
+  background: var(--cr-surface-muted);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary-500) 40%, transparent);
+}
+
+.theme-card__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cr-fg);
+}
+
+.theme-card__copy {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--cr-fg-subtle);
+}
+
+.wallpaper-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .wallpaper-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.wallpaper-tile {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--cr-border);
+  text-align: left;
+  background: var(--cr-surface-elevated);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.wallpaper-tile:hover {
+  border-color: var(--cr-border-strong);
+}
+
+.wallpaper-tile.is-active {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary-500) 35%, transparent);
+}
+
+.wallpaper-tile__preview {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  background-color: var(--cr-surface-muted);
+  background-size: cover;
+  background-position: center;
+}
+
+.wallpaper-tile__label {
+  display: block;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cr-fg);
+}

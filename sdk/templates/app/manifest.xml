@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<app id="demo" name="Demo" version="1.0.0" version_code="1" icon="demo">
- <summary text="Demo Kotlin app"/>
- <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
- <capability name="ui"/>
- <capability name="storage.app"/>
-</app>

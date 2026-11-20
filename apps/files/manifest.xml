@@ -1,8 +1,0 @@
-﻿<?xml version="1.0"?>
-<app id="files" name="Files" version="1.0.0" version_code="1" icon="files">
- <summary text="Local storage browser"/>
- <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
- <capability name="ui"/>
- <capability name="storage.app"/>
- <capability name="storage.files"/>
-</app>

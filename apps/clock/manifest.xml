@@ -1,7 +1,0 @@
-﻿<?xml version="1.0"?>
-<app id="clock" name="Clock" version="1.0.0" version_code="1" icon="clock">
- <summary text="Alarms, stopwatch and timer"/>
- <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
- <capability name="ui"/>
- <capability name="system.clock"/>
-</app>

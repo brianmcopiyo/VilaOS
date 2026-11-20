@@ -1,0 +1,14 @@
+{
+  "name": "terminal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lightweight OS shell — shared React UI; Windows host + bootable ISO builds",
+  "scripts": {
+    "build:ui": "npm --prefix web run build",
+    "build:ui:win": "cmd /C \"set UI_TARGET=win&& npm --prefix web run build\"",
+    "build:ui:iso": "cmd /C \"set UI_TARGET=iso&& npm --prefix web run build\"",
+    "build:win": "mingw32-make -C winbuild",
+    "build:iso": "mingw32-make -C kernelbuild",
+    "build": "npm run build:win"
+  }
+}

@@ -1,0 +1,118 @@
+.desk {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.desk__wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(1100px 640px at 18% 12%, rgba(255, 255, 255, 0.42), transparent 55%),
+    radial-gradient(900px 560px at 86% 28%, rgba(70, 130, 180, 0.35), transparent 52%),
+    radial-gradient(800px 500px at 48% 100%, rgba(120, 150, 170, 0.35), transparent 55%),
+    linear-gradient(160deg, #8eabc0 0%, #6d8fa8 45%, #557892 100%);
+}
+
+.desk__wallpaper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.desk--dusk .desk__wallpaper {
+  background:
+    radial-gradient(1000px 580px at 22% 10%, rgba(255, 190, 140, 0.28), transparent 50%),
+    radial-gradient(900px 520px at 88% 30%, rgba(60, 90, 140, 0.4), transparent 55%),
+    linear-gradient(160deg, #6a7f9a 0%, #4a6078 48%, #33485e 100%);
+}
+
+.desk--night .desk__wallpaper {
+  background:
+    radial-gradient(900px 520px at 70% 18%, rgba(90, 130, 170, 0.28), transparent 50%),
+    linear-gradient(160deg, #2a3848 0%, #1b2530 55%, #121920 100%);
+}
+
+.desk__icons {
+  position: absolute;
+  top: 20px;
+  left: 16px;
+  z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(auto-fill, 92px);
+  grid-auto-columns: 88px;
+  gap: 4px 8px;
+  max-height: calc(100% - var(--taskbar-h) - 28px);
+  align-content: start;
+}
+
+.desk__icon {
+  width: 88px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  animation: icon-in 0.4s var(--ease) both;
+}
+
+.desk__icon:hover,
+.desk__icon:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
+}
+
+.desk__icon-tile {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #2f3540, #1a1d21);
+  color: #f4f6f8;
+  font-family: var(--font-brand);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s var(--ease);
+}
+
+.desk__icon:hover .desk__icon-tile {
+  transform: translateY(-2px);
+}
+
+.desk__icon-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.desk__stage {
+  position: absolute;
+  inset: 0 0 var(--taskbar-h) 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.desk__stage > * {
+  pointer-events: auto;
+}
+
+.desk__dim {
+  position: absolute;
+  inset: 0 0 var(--taskbar-h) 0;
+  z-index: 4;
+  background: rgba(18, 24, 32, 0.22);
+  border: none;
+  animation: rise 0.18s var(--ease) both;
+}

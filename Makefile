@@ -1,241 +1,26 @@
-APP      := vilaos
-PKG_APP  := vilaos-pkg
-MUSICD   := vilaos-musicd
-CC       ?= gcc
-CFLAGS   ?= -std=c11 -O2 -Wall -Wextra -Wpedantic -ffunction-sections -fdata-sections -D_DEFAULT_SOURCE
-LDFLAGS  ?= -Wl,--gc-sections
-CPPFLAGS := -Iinclude
-LIBS     :=
-LINUX_GFX_CFLAGS :=
-LINUX_GFX_LIBS :=
-MUSL_GFX_PREFIX ?= /root/vilaos-work/musl-gfx
-ifneq ($(OS),Windows_NT)
-LIBS     := -lm -ldl -lpthread
-LINUX_GFX_CFLAGS := $(shell pkg-config --cflags cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
-LINUX_GFX_LIBS := $(shell pkg-config --libs cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
-LINUX_GPU_CFLAGS := $(shell pkg-config --cflags gbm egl glesv2 2>/dev/null)
-LINUX_GPU_LIBS := $(shell pkg-config --libs gbm egl glesv2 2>/dev/null)
-ifneq ($(LINUX_GPU_CFLAGS),)
-LINUX_GFX_CFLAGS += $(LINUX_GPU_CFLAGS)
-endif
-ifneq ($(LINUX_GPU_LIBS),)
-LINUX_GFX_LIBS += $(LINUX_GPU_LIBS)
-endif
-ifneq ($(LINUX_GFX_CFLAGS),)
-CPPFLAGS += $(LINUX_GFX_CFLAGS) -DVILAOS_HAVE_LINUX_GFX
-LIBS += $(LINUX_GFX_LIBS)
-endif
-endif
+# Root orchestrator. Shared kernel: src/  Shared UI: web/
+# Windows host: winbuild/   Bootable ISO: kernelbuild/
 
-SRC := \
-	src/main.c \
-	src/core/util.c \
-	src/core/syspower.c \
-	src/core/contacts.c \
-	src/gfx/fb.c \
-	src/gfx/draw.c \
-	src/gfx/font.c \
-	src/gfx/ttfont.c \
-	src/gfx/icon.c \
-	src/gfx/compose.c \
-	src/gfx/compositor.c \
-	src/gfx/pool.c \
-	src/gfx/hwinfo.c \
-	src/gfx/linux_gfx.c \
-	src/gfx/linux_font.c \
-	src/gfx/linux_png.c \
-	src/driver/gfx/loader.c \
-	src/driver/gfx/builtin.c \
-	src/driver/gfx/backend_drm.c \
-	src/driver/gfx/linux_drm.c \
-	src/driver/gfx/linux_gpu.c \
-	src/proc/proctier.c \
-	src/proc/ipc.c \
-	src/proc/procman.c \
-	src/xml/parse.c \
-	src/xml_ui/res.c \
-	src/xml_ui/style.c \
-	src/xml_ui/attrs.c \
-	src/xml_ui/layout.c \
-	src/xml_ui/parse.c \
-	src/xml_ui/xaml.c \
-	src/ui/screen.c \
-	src/ui/touch.c \
-	src/ui/window.c \
-	src/ui/route.c \
-	src/input/input.c \
-	src/driver/input/pump.c \
-	src/driver/input/linux_evdev.c \
-	src/input/t9.c \
-	src/pkg/pkg.c \
-	src/api/vapi.c \
-	src/api/vapi_ui.c \
-	src/api/vapi_storage.c \
-	src/api/vapi_service.c \
-	src/api/vapi_phone.c \
-	src/api/vapi_system.c \
-	src/api/vapi_window.c \
-	src/api/vapi_pkg.c \
-	src/net/webbridge.c \
-	src/net/chromium_launch.c \
-	src/sdk/vsl.c \
-	src/sdk/bridge.c \
-	src/sdk/apprun.c
+.PHONY: all win iso ui-win ui-iso clean clean-win clean-iso
 
-PKG_SRC := \
-	src/pkg/vilaos_pkg_main.c \
-	src/pkg/pkg.c \
-	src/xml/parse.c \
-	src/core/util.c
+all: win
 
-MUSICD_SRC := \
-	src/proc/musicd.c \
-	src/proc/ipc.c \
-	src/core/util.c
-
-GFX_SO_SRC := \
-	src/driver/gfx/shared_entry.c \
-	src/driver/gfx/builtin.c \
-	src/driver/gfx/backend_drm.c \
-	src/driver/gfx/linux_drm.c \
-	src/driver/gfx/linux_gpu.c \
-	src/gfx/fb.c \
-	src/gfx/compose.c \
-	src/gfx/pool.c \
-	src/gfx/hwinfo.c \
-	src/gfx/linux_gfx.c \
-	src/gfx/linux_font.c \
-	src/gfx/linux_png.c \
-	src/core/util.c
-
-OBJ := $(SRC:.c=.o)
-PKG_OBJ := $(PKG_SRC:.c=.o)
-MUSICD_OBJ := $(MUSICD_SRC:.c=.o)
-
-src/gfx/ttfont.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter
-src/gfx/icon.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
-src/driver/gfx/linux_gpu.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-pedantic
-
-.PHONY: all clean native aarch64 musl desktop vfb install qemu-help iso vbox-help pkg sdk-pack gfx-drive musl-gfx-deps
-
-all: native pkg $(MUSICD)
-
-native: $(APP)
-
-$(APP): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LIBS)
-
-$(PKG_APP): $(PKG_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(PKG_OBJ) $(LDFLAGS)
-
-$(MUSICD): $(MUSICD_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(MUSICD_OBJ) $(LDFLAGS) $(LIBS)
-
-pkg: $(PKG_APP)
-
-%.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
-
-gfx-driver:
-	mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -shared -DVILAOS_GFX_SO \
-		-o build/libvilaos_gfx.so $(GFX_SO_SRC) $(LDFLAGS) $(LIBS)
-
-aarch64:
-	$(MAKE) clean
-	$(MAKE) CC=aarch64-linux-gnu-gcc APP=$(APP)-aarch64 PKG_APP=$(PKG_APP)-aarch64 MUSICD=$(MUSICD)-aarch64 all
-
-musl-gfx-deps:
-	bash scripts/build_musl_gfx_deps.sh $(MUSL_GFX_PREFIX)
-
-musl:
-	$(MAKE) clean
-	@GFX_ENV="$(MUSL_GFX_PREFIX)/vilaos-gfx.pc.env"; \
-	if [ -f "$$GFX_ENV" ]; then \
-		set -a; . "$$GFX_ENV"; set +a; \
-		echo "musl gfx: $$VILAOS_MUSL_GFX_CFLAGS"; \
-		echo "musl libs: $$VILAOS_MUSL_GFX_LIBS"; \
-		$(MAKE) CC=musl-gcc \
-			CPPFLAGS="-Iinclude $$VILAOS_MUSL_GFX_CFLAGS" \
-			CFLAGS="$(CFLAGS)" \
-			LDFLAGS="$(LDFLAGS)" \
-			LIBS="$$VILAOS_MUSL_GFX_LIBS -ldl -lpthread" \
-			APP=$(APP)-musl PKG_APP=$(PKG_APP)-musl MUSICD=$(MUSICD)-musl all; \
-		$(MAKE) CC=musl-gcc \
-			CPPFLAGS="-Iinclude $$VILAOS_MUSL_GFX_CFLAGS" \
-			CFLAGS="$(CFLAGS)" \
-			LDFLAGS="$(LDFLAGS)" \
-			LIBS="$$VILAOS_MUSL_GFX_LIBS -ldl -lpthread" \
-			gfx-driver; \
-	else \
-		echo "musl gfx deps missing at $$GFX_ENV; building without linux gfx"; \
-		$(MAKE) CC=musl-gcc \
-			CPPFLAGS="-Iinclude" \
-			CFLAGS="$(CFLAGS)" \
-			LDFLAGS="$(LDFLAGS)" \
-			LIBS="-lm -ldl -lpthread" \
-			APP=$(APP)-musl PKG_APP=$(PKG_APP)-musl MUSICD=$(MUSICD)-musl all; \
-		$(MAKE) CC=musl-gcc \
-			CPPFLAGS="-Iinclude" \
-			CFLAGS="$(CFLAGS)" \
-			LDFLAGS="$(LDFLAGS)" \
-			gfx-driver; \
-	fi
-
-desktop:
-	$(MAKE) clean
-	$(MAKE) CPPFLAGS="$(CPPFLAGS) -DPHONE_DESKTOP" \
-		CFLAGS="$(CFLAGS)" \
-		LIBS="-lSDL2 -lm -ldl -lpthread" \
-		APP=$(APP)-desktop MUSICD=$(MUSICD)-desktop
-
-vfb:
-	$(MAKE) clean
-	$(MAKE) CPPFLAGS="$(CPPFLAGS) -DPHONE_VFB" \
-		CFLAGS="$(CFLAGS)" \
-		LIBS="-lm -ldl -lpthread" \
-		APP=$(APP)-vfb MUSICD=$(MUSICD)-vfb
-
-sdk-pack:
-	bash scripts/pack_apps.sh
-
-install: $(APP) $(PKG_APP) $(MUSICD)
-	install -d $(DESTDIR)/usr/bin
-	install -d $(DESTDIR)/usr/share/vilaos/assets/screens
-	install -d $(DESTDIR)/usr/share/vilaos/assets/values
-	install -d $(DESTDIR)/usr/share/vilaos/assets/components
-	install -d $(DESTDIR)/usr/share/vilaos/assets/styles
-	install -d $(DESTDIR)/usr/share/vilaos/assets/ui
-	install -d $(DESTDIR)/apps
-	install -d $(DESTDIR)/drivers/gfx/builtin
-	install -d $(DESTDIR)/run/vilaos
-	install -m 755 $(APP) $(DESTDIR)/usr/bin/vilaos
-	install -m 755 $(PKG_APP) $(DESTDIR)/usr/bin/vilaos-pkg
-	install -m 755 $(MUSICD) $(DESTDIR)/usr/bin/vilaos-musicd
-	cp -a assets/screens/. $(DESTDIR)/usr/share/vilaos/assets/screens/
-	cp -a assets/values/. $(DESTDIR)/usr/share/vilaos/assets/values/ 2>/dev/null || true
-	cp -a assets/components/. $(DESTDIR)/usr/share/vilaos/assets/components/ 2>/dev/null || true
-	cp -a assets/styles/. $(DESTDIR)/usr/share/vilaos/assets/styles/ 2>/dev/null || true
-	cp -a assets/ui/. $(DESTDIR)/usr/share/vilaos/assets/ui/ 2>/dev/null || true
-	cp -a apps/. $(DESTDIR)/apps/
-	if [ -f build/libvilaos_gfx.so ]; then install -m 755 build/libvilaos_gfx.so $(DESTDIR)/drivers/gfx/builtin/; fi
-	if [ -d build/packages/vilaos-gfx-staging/builtin ]; then cp -a build/packages/vilaos-gfx-staging/. $(DESTDIR)/drivers/gfx/; fi
-
-qemu-help:
-	@echo "Run: ./scripts/build_qemu_image.sh"
-	@echo "Then: qemu-system-x86_64 -m 256M -kernel build/bzImage -initrd build/rootfs.cpio.gz -append \"console=ttyS0\" -nographic"
+win:
+	$(MAKE) -C winbuild
 
 iso:
-	bash scripts/build_vbox_iso.sh
+	$(MAKE) -C kernelbuild
 
-vbox-help:
-	@echo "WSL:   bash scripts/build_vbox_iso.sh"
-	@echo "WinPS: .\\scripts\\run_vbox.ps1"
+ui-win:
+	cmd /C "set UI_TARGET=win&& npm run build:ui"
 
-clean:
-	rm -f $(OBJ) $(PKG_OBJ) $(MUSICD_OBJ) $(APP) $(APP)-aarch64 $(APP)-musl $(APP)-desktop $(APP)-vfb
-	rm -f $(PKG_APP) $(PKG_APP)-aarch64 $(PKG_APP)-musl
-	rm -f $(MUSICD) $(MUSICD)-aarch64 $(MUSICD)-musl $(MUSICD)-desktop $(MUSICD)-vfb
-	rm -f phoneos phoneos-aarch64 phoneos-musl phoneos-desktop phoneos-vfb
-	rm -f build/libvilaos_gfx.so libvilaos_gfx.so
-	find src -name '*.o' -delete 2>/dev/null || true
+ui-iso:
+	cmd /C "set UI_TARGET=iso&& npm run build:ui"
+
+clean: clean-win clean-iso
+
+clean-win:
+	$(MAKE) -C winbuild clean
+
+clean-iso:
+	$(MAKE) -C kernelbuild clean

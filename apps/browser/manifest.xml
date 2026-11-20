@@ -1,8 +1,0 @@
-﻿<?xml version="1.0"?>
-<app id="browser" name="Browser" version="1.0.0" version_code="1" icon="browser">
- <summary text="Lightweight text and XML reader"/>
- <entry screen="res/layout/main.xml" script="bin/main.kbc"/>
- <capability name="ui"/>
- <capability name="storage.app"/>
- <capability name="network"/>
-</app>

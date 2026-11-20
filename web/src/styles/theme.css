@@ -1,0 +1,88 @@
+:root {
+  --ink: #1a1d21;
+  --ink-soft: #5c6570;
+  --surface: rgba(252, 252, 253, 0.78);
+  --surface-strong: rgba(252, 252, 253, 0.94);
+  --surface-solid: #f7f8fa;
+  --line: rgba(26, 29, 33, 0.1);
+  --accent: #2b6cb0;
+  --accent-soft: rgba(43, 108, 176, 0.16);
+  --danger: #c43c3c;
+  --shadow: 0 16px 40px rgba(20, 30, 45, 0.22);
+  --taskbar-h: 56px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font-ui: "Figtree", sans-serif;
+  --font-brand: "Syne", sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  background: #6b8499;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes start-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes icon-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

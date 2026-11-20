@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<component>
-  <list id="list" width="100%" height="fill" grow="1" min-height="100" padding="4" gap="4"
-        radius="8" background="#EAE0D0" border-width="1" border-color="#D4C5B0" overflow="scroll"/>
-</component>
