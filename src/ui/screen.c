@@ -225,6 +225,8 @@ static void draw_battery(Gfx *g, int x, int y, int pct)
 
 static void draw_statusbar(Gfx *g, Widget *w)
 {
+    if (!w || w->h <= 0 || w->w <= 0)
+        return;
     draw_fill(g, w->x, w->y, w->w, w->h, COL_BG);
     time_t t = time(NULL);
     struct tm tm_buf;
@@ -239,10 +241,11 @@ static void draw_statusbar(Gfx *g, Widget *w)
     st.size_px = 13;
     st.weight = 600;
     int th = font_char_h_style(g, &st);
-    int ty = (w->h - th) / 2;
-    font_draw_text_style(g, &st, g->pad, ty, clock, COL_TEXT, COL_BG, 1);
-    int icon_y = (w->h - 12) / 2;
-    int right = g->w - g->pad;
+    int ty = w->y + (w->h - th) / 2;
+    int pad = g->pad > 0 ? g->pad : 8;
+    font_draw_text_style(g, &st, w->x + pad, ty, clock, COL_TEXT, COL_BG, 1);
+    int icon_y = w->y + (w->h - 12) / 2;
+    int right = w->x + w->w - pad;
     draw_battery(g, right - 22, icon_y + 1, 86);
     right -= 30;
     draw_signal(g, right - 20, icon_y, 4);
@@ -259,14 +262,8 @@ static void draw_statusbar(Gfx *g, Widget *w)
 static void draw_softkeys(Gfx *g, Screen *s, Widget *w)
 {
     (void)s;
-    draw_fill(g, w->x, w->y, w->w, w->h, COL_BG);
-    int pill_w = clamp_i(g->w / 3, 96, 140);
-    int pill_h = 5;
-    if (g->softkey_h >= 36)
-        pill_h = 6;
-    int px = w->x + (w->w - pill_w) / 2;
-    int py = w->y + (w->h - pill_h) / 2;
-    draw_round_rect(g, px, py, pill_w, pill_h, pill_h / 2, COL_TEXT, 1);
+    if (!w || w->h <= 0 || w->w <= 0 || g->softkey_h <= 0)
+        return;
 }
 
 static void draw_app_icon(Gfx *g, Widget *w, int cx, int cy, int size, uint16_t fg)
@@ -578,7 +575,9 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             int tw = w->x + w->w - tx - 8;
             if (tw < 0)
                 tw = 0;
-            const char *sp = strchr(w->text, ' ');
+            const char *sp = strchr(w->text, '\n');
+            if (!sp)
+                sp = strchr(w->text, ' ');
             char title[64];
             char preview[96];
             title[0] = 0;
@@ -643,6 +642,9 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
     case W_INPUT: {
         uint16_t bg = w->focused ? COL_PANEL : (w->bg ? w->bg : COL_PANEL);
         uint16_t fg = w->fg ? w->fg : COL_TEXT;
+        int ph = (w->value == 1);
+        if (ph)
+            fg = COL_DIM;
         FontStyle in_st = widget_font_style(g, w, FONT_MONO);
         int ih = font_char_h_style(g, &in_st);
         int br = w->radius > 0 ? clamp_i(w->radius, 2, 12) : radius;
@@ -650,7 +652,7 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
         draw_round_rect(g, w->x, w->y, w->w, w->h, br, w->focused ? COL_ACCENT : COL_BORDER, 0);
         int pad = g->pad > 0 ? g->pad : 6;
         font_draw_text_style_clip(g, &in_st, w->x + pad, w->y + (w->h - ih) / 2, w->w - pad * 2, w->text, fg, bg, 1);
-        if (w->focused) {
+        if (w->focused && !ph) {
             int tw = font_text_w_style(g, &in_st, w->text);
             if (tw > w->w - pad * 2)
                 tw = w->w - pad * 2;
@@ -669,9 +671,9 @@ static void draw_widget(Screen *s, Gfx *g, Widget *w)
             compose_set_clip(g->composer, w->x + 1, w->y + 1, w->w - 2, w->h - 2);
         for (int i = 0; i < w->child_count; i++) {
             Widget *item = &s->widgets[w->children[i]];
-            if (!item->visible)
+            if (!item->visible || item->w <= 0 || item->h <= 0)
                 continue;
-            if (item->y < w->y || item->y + item->h > w->y + w->h)
+            if (item->y + item->h <= w->y || item->y >= w->y + w->h)
                 continue;
             if (item->x + item->w <= w->x || item->x >= w->x + w->w)
                 continue;
@@ -728,6 +730,26 @@ void screen_render(Screen *s, Gfx *g, const InputState *in)
     draw_cursor(g, in);
 }
 
+void screen_render_layer(Screen *s, Gfx *g, int ox, int oy)
+{
+    if (!s || !g)
+        return;
+    for (int i = 0; i < s->count; i++) {
+        s->widgets[i].x += ox;
+        s->widgets[i].y += oy;
+    }
+    if (s->root >= 0)
+        draw_widget(s, g, &s->widgets[s->root]);
+    else {
+        for (int i = 0; i < s->count; i++)
+            draw_widget(s, g, &s->widgets[i]);
+    }
+    for (int i = 0; i < s->count; i++) {
+        s->widgets[i].x -= ox;
+        s->widgets[i].y -= oy;
+    }
+}
+
 void screen_set_mode_badge(Screen *s, const char *mode)
 {
     Widget *b = screen_find(s, "mode_badge");
@@ -780,6 +802,10 @@ static int append_char(Screen *s, char ch)
     Widget *in = primary_input(s);
     if (!in)
         return 0;
+    if (in->value == 1) {
+        in->text[0] = 0;
+        in->value = 0;
+    }
     size_t n = strlen(in->text);
     if ((int)n < in->max_len && n + 1 < sizeof(in->text)) {
         in->text[n] = ch;

@@ -1,6 +1,38 @@
+fn reloadPackages
+  pkg.refresh
+  invoke renderAppGrid _ text:QuickSearchInput
+  invoke refreshTelemetry _
+endfn
+
+fn renderAppGrid filter
+  pkg.render DynamicAppGrid $filter
+endfn
+
+fn refreshTelemetry
+  vapi refreshTelemetry_memMb system.memory.mb
+  vapi refreshTelemetry_openCount window.count
+  vapi refreshTelemetry_pkgCount pkg.count
+  vapi refreshTelemetry_focusedTitle window.focused
+  concat _t0 $refreshTelemetry_memMb " MB"
+  ui.set_text SessionBadge $_t0
+  concat _t0 $refreshTelemetry_memMb " MB configured"
+  ui.set_subtitle RamRow $_t0
+  concat _t0 $refreshTelemetry_pkgCount " installed"
+  ui.set_subtitle PackagesRow $_t0
+  concat _t0 $refreshTelemetry_openCount " active"
+  ui.set_subtitle WindowsRow $_t0
+  concat _t0 $refreshTelemetry_pkgCount " packages · "
+  concat _t0 $_t0 $refreshTelemetry_openCount
+  concat _t0 $_t0 " open windows"
+  ui.set_text WorkspaceSubtitle $_t0
+  concat _t0 "Focused: " $refreshTelemetry_focusedTitle
+  ui.set_text ActiveWindowLabel $_t0
+endfn
+
 fn apps
   system.packages.list title
-  ui.set_text title Apps
+  ui.set_text title "App Launcher"
+  system.time clock
 endfn
 
 fn filter
@@ -8,34 +40,25 @@ fn filter
   if eq $filter_q ""
     invoke apps _
   else
-    concat _t0 "Apps: " $filter_q
-    ui.set_text title $_t0
+    concat _t1 "Apps: " $filter_q
+    ui.set_text title $_t1
   endif
 endfn
 
 fn home
   system.time clock
   clock.date date
-  ui.set_text statuspill VilaOS
-  ui.set_text drawer "Search apps"
-endfn
-
-fn loadPrefs
-  vapi loadPrefs_s storage.app.get sound
-  if ne $loadPrefs_s ""
-    let g_sound $loadPrefs_s
-  endif
-  vapi loadPrefs_v storage.app.get vibrate
-  if ne $loadPrefs_v ""
-    let g_vibrate $loadPrefs_v
-  endif
+  ui.set_text statuspill Ready
+  ui.set_text brand VilaOS
+  ui.set_text menu Apps
 endfn
 
 fn lock
   system.time clock
   clock.date date
-  ui.set_text note1 "2 messages"
-  ui.set_text note2 "1 missed call"
+  ui.set_text hint "Desktop session ready"
+  ui.set_text go "Open desktop"
+  ui.set_text unlock "Enter desktop"
 endfn
 
 fn tasks
@@ -69,102 +92,39 @@ fn panel sound vibrate
   storage.app.set vibrate $vibrate
 endfn
 
+on_click RefreshAppsBtn
+  invoke reloadPackages _
+end
+
+on_click HomeBtn
+  window.show_desktop
+end
+
+on_click ShowDesktopBtn
+  window.show_desktop
+end
+
 on_load
-  if eq $g_sound ""
-    let g_sound 1
-  endif
-  if eq $g_vibrate ""
-    let g_vibrate 1
-  endif
+  pkg.refresh
+  invoke reloadPackages _
   require ui
   require system.device
   require system.power
   require storage.app
   require storage.files
-  invoke loadPrefs _
+  window.sync_taskbar
 end
 
 on_tick
-  system.time clock
-  system.memory.info memory
-  clock.date date
-end
-
-on_action search
-  invoke filter _
-end
-
-on_action clear
-  invoke empty _
-end
-
-on_action unlock
-  ui.replace res/layout/home.xml
-end
-
-on_action shade
-  invoke panel _ $g_sound $g_vibrate
-  ui.push res/layout/shade.xml
-end
-
-on_action drawer
-  invoke apps _
-  ui.push res/layout/drawer.xml
-end
-
-on_action toggle_sound
-  if eq $g_sound 1
-    let g_sound 0
+  vapi _t2 pkg.poll
+  if ne $_t2 0
+    invoke reloadPackages _
   else
-    let g_sound 1
+    invoke renderAppGrid _ text:QuickSearchInput
   endif
-  invoke panel _ $g_sound $g_vibrate
+  invoke refreshTelemetry _
 end
 
-on_action toggle_vibrate
-  if eq $g_vibrate 1
-    let g_vibrate 0
-  else
-    let g_vibrate 1
-  endif
-  invoke panel _ $g_sound $g_vibrate
-end
-
-on_action power_menu
-  system.power.menu _
-end
-
-on_action recent_0
-  ui.pop _
-end
-
-on_action recent_1
-  ui.pop _
-end
-
-on_action recent_2
-  ui.pop _
-end
-
-on_action recent_3
-  ui.pop _
-end
-
-on_action recent_4
-  ui.pop _
-end
-
-on_action recent_5
-  ui.pop _
-end
-
-on_soft left
-  invoke filter _
-  invoke empty _
-end
-
-on_soft center
-end
-
-on_soft right
+on_tick
+  window.sync_taskbar
 end

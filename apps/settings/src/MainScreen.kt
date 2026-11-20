@@ -2,8 +2,7 @@ package settings
 
 import storage.Storage
 import system.System
-import ui.Ui
-
+import Ui
 class MainScreen {
     fun refresh() {
         System.deviceInfo("device")

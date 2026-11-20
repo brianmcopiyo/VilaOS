@@ -23,7 +23,10 @@ CAP = {
 
 SOFT = {"LEFT": "left", "CENTER": "center", "RIGHT": "right"}
 FORBIDDEN = {"Graphics", "Keyboard", "Font", "Draw"}
-BINDINGS = {"Keypad", "Input", "Button", "Row", "Card", "Badge", "Tile", "Header", "Text", "Icon", "List"}
+BINDINGS = {
+    "Keypad", "Input", "Button", "Row", "Card", "Badge", "Tile", "Header", "Text", "Icon",
+    "List", "Footer", "Grid", "Screen", "Stack", "Panel", "Window", "Taskbar", "Dashboard",
+}
 ROW_IDS = ("m1", "m2", "m3", "m4", "c1", "c2", "c3", "c4", "c5")
 RESERVED = {"key", "target", "event", "status"}
 MODS = {
@@ -45,7 +48,7 @@ LIST_CTORS = {"mutableListOf", "arrayListOf", "ArrayList", "listOf", "emptyList"
 BLANK = {"isBlank", "isEmpty", "isNotBlank", "isNotEmpty"}
 API_OBJS = {
     "Ui", "Storage", "Service", "Audio", "Telephony", "Messages", "Contacts",
-    "Clock", "System", "Action", "Widget", "Footer",
+    "Clock", "System", "Action", "Widget", "Footer", "WindowManager", "PackageManager",
 }
 CMP = {"==": "eq", "!=": "ne", "<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
 NEG = {
@@ -110,6 +113,7 @@ API = {
     ("Clock", "tick"): ("clock.tick", "i", 0),
     ("System", "deviceInfo"): ("system.device.info", "i", 0),
     ("System", "display"): ("system.display.info", "i", 0),
+    ("System", "graphics"): ("system.graphics.info", "i", 0),
     ("System", "memory"): ("system.memory.info", "i", 0),
     ("System", "storage"): ("system.storage.info", "i", 0),
     ("System", "input"): ("system.input.info", "i", 0),
@@ -123,6 +127,19 @@ API = {
     ("System", "powerMenu"): ("system.power.menu", "", 0),
     ("System", "powerOff"): ("system.power.off", "", 0),
     ("System", "powerRestart"): ("system.power.restart", "", 0),
+    ("System", "memoryMb"): ("system.memory.mb", "", 0),
+    ("WindowManager", "openApp"): ("window.open", "v", 1),
+    ("WindowManager", "toggleDrawer"): ("window.drawer", "", 0),
+    ("WindowManager", "showDesktop"): ("window.show_desktop", "", 0),
+    ("WindowManager", "syncTaskbar"): ("window.sync_taskbar", "", 0),
+    ("WindowManager", "windowCount"): ("window.count", "", 0),
+    ("WindowManager", "focusedTitle"): ("window.focused", "", 0),
+    ("PackageManager", "refresh"): ("pkg.refresh", "", 0),
+    ("PackageManager", "renderGrid"): ("pkg.render", "iv", 2),
+    ("PackageManager", "count"): ("pkg.count", "", 0),
+    ("PackageManager", "pollChanged"): ("pkg.poll", "", 0),
+    ("PackageManager", "listInstalled"): ("pkg.list", "", 0),
+    ("PackageManager", "find"): ("pkg.find", "v", 1),
 }
 
 
@@ -1799,7 +1816,7 @@ class Compiler:
         args = [a for _, a in e.args if not (a.k == "id" and a.name == "screen" and self.lookup("screen") is None)]
         if m == "attach":
             return UNIT
-        if m == "value":
+        if m == "value" or m == "text":
             return Val("text:" + b.id, "str")
         if m == "clear":
             self.dom("ui.clear_text", [lit_str(b.id, self.file, e.line)])
@@ -1809,6 +1826,15 @@ class Compiler:
                 self.err("setText takes one value", e.line)
             self.dom("ui.set_text", [lit_str(b.id, self.file, e.line), self.ex(args[0])])
             return UNIT
+        if m == "setSubtitle":
+            if len(args) != 1:
+                self.err("setSubtitle takes one value", e.line)
+            self.dom("ui.set_subtitle", [lit_str(b.id, self.file, e.line), self.ex(args[0])])
+            return UNIT
+        if m == "onTextChanged":
+            return UNIT
+        if m == "add":
+            return UNIT
         self.err("unsupported UI binding method '%s'" % m, e.line)
 
     def value_call(self, e, dst, want):
@@ -1817,6 +1843,11 @@ class Compiler:
         args = [a for _, a in e.args]
         v = self.ex(f.obj)
         if v.t == "screen":
+            if m == "loadXaml":
+                if len(args) != 1:
+                    self.err("loadXaml takes one path", e.line)
+                self.dom("ui.replace", [self.ex(args[0])])
+                return UNIT
             self.err("unsupported call on screen", e.line)
         if m == "toString":
             if v.t == "str":

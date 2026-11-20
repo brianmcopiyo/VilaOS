@@ -5,6 +5,7 @@
 #include "ttfont.h"
 #include "util.h"
 #include "fb.h"
+#include "linux_gpu.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,11 +84,24 @@ int gfx_loader_init(Gfx *g, int desktop)
     Composer *comp = (Composer *)calloc(1, sizeof(Composer));
     if (!comp)
         return -1;
-    if (compose_init(comp, 640, 480, &hw) != 0) {
-        free(comp);
-        return -1;
+    {
+        int cw = GFX_MIN_W;
+        int ch = GFX_MIN_H;
+        int ew = 0, eh = 0;
+        if (gfx_env_size(&ew, &eh) == 0) {
+            cw = ew;
+            ch = eh;
+        }
+        if (compose_init(comp, cw, ch, &hw) != 0) {
+            free(comp);
+            return -1;
+        }
     }
     g->composer = comp;
+    g->gfx_tier = GFX_TIER_NONE;
+    g->vram_mb = 0;
+    g->gpu_accel = 0;
+    g->gpu_name[0] = 0;
 
     const vilaos_gfx_driver_t *drv = NULL;
     char active[64];
@@ -166,12 +180,15 @@ void gfx_loader_status(const Gfx *g, char *buf, size_t n)
         buf[0] = 0;
         return;
     }
-    snprintf(buf, n, "%s %s [%s] cores=%d ram=%ldMB tier=%s workers=%d",
+    snprintf(buf, n, "%s %s [%s/%s] %dx%d gpu=%s vram=%ldMB cores=%d ram=%ldMB workers=%d",
              g->drv_name[0] ? g->drv_name : "gfx",
              g->drv_version[0] ? g->drv_version : "?",
              g->backend[0] ? g->backend : "sw",
+             linux_gpu_tier_name(g->gfx_tier),
+             g->w, g->h,
+             g->gpu_name[0] ? g->gpu_name : "-",
+             g->vram_mb,
              g->cores,
              g->ram_mb,
-             hwinfo_tier_name((HwRamTier)g->ram_tier),
              g->workers);
 }

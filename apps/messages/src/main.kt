@@ -4,13 +4,12 @@ import app.Cap
 import app.VilaApp
 import app.require
 import messages.Messages
-import ui.Button
-import ui.Input
-import ui.Row
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Button
+import Input
+import Row
+import Screen
+import SoftKey
+import Ui
 class MessagesApp : VilaApp() {
     private val composeInput = Input(id = "msg_input", placeholder = "Type message")
     private val sendBtn = Button(id = "send_btn", variant = "primary") {

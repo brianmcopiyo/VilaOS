@@ -5,11 +5,10 @@ import app.VilaApp
 import app.require
 import contacts.Contacts
 import telephony.Telephony
-import ui.Keypad
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Keypad
+import Screen
+import SoftKey
+import Ui
 class DialerApp : VilaApp() {
     private val keypad = Keypad(id = "dialpad") { key ->
         Telephony.digit(key)

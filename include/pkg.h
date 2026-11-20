@@ -58,4 +58,19 @@ int pkg_app_path(const char *id, char *out, size_t n);
 int pkg_data_path(const char *id, char *out, size_t n);
 int pkg_seed_from_dir(const char *apps_src_root, PkgRegistry *reg);
 
+typedef void (*PkgChangedFn)(void *user);
+
+int pkg_manager_init(void);
+int pkg_manager_refresh(void);
+const PkgRegistry *pkg_manager_registry(void);
+int pkg_manager_count(void);
+int pkg_manager_list_json(char *out, size_t out_n);
+int pkg_manager_get(int index, PkgApp *out);
+int pkg_manager_find(const char *id, PkgApp *out);
+int pkg_manager_on_changed(PkgChangedFn fn, void *user);
+int pkg_manager_poll_changed(void);
+void pkg_manager_notify_changed(void);
+int pkg_manager_fill_grid(Screen *s, const char *grid_id, const char *filter, const char *shell_id);
+int pkg_manager_caps_text(unsigned caps, char *buf, size_t n);
+
 #endif

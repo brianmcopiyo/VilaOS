@@ -4,11 +4,10 @@ import app.Cap
 import app.VilaApp
 import app.require
 import contacts.Contacts
-import ui.Input
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Input
+import Screen
+import SoftKey
+import Ui
 class ContactsApp : VilaApp() {
     private val filter = Input(id = "filter", placeholder = "Search")
 

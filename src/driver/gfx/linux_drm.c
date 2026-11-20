@@ -1,4 +1,6 @@
 #include "linux_gfx.h"
+#include "linux_drm_priv.h"
+#include "fb.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -50,8 +52,15 @@ static int pick_connector(int fd, drmModeRes *res, drmModeConnector **out_conn, 
             if (!crtc && res->count_crtcs > 0)
                 crtc = res->crtcs[0];
             if (crtc) {
+                int best = 0;
+                for (int m = 0; m < conn->count_modes; m++) {
+                    if (conn->modes[m].type & DRM_MODE_TYPE_PREFERRED) {
+                        best = m;
+                        break;
+                    }
+                }
                 *out_conn = conn;
-                *out_mode = conn->modes[0];
+                *out_mode = conn->modes[best];
                 *out_crtc = crtc;
                 return 0;
             }
@@ -67,9 +76,15 @@ int linux_drm_open(Gfx *g)
         return -1;
     linux_drm_close(g);
     memset(&g_drm, 0, sizeof(g_drm));
-    int fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
-    if (fd < 0)
-        fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
+    g_drm.fd = -1;
+    int fd = -1;
+    char path[64];
+    for (int i = 0; i < 16; i++) {
+        snprintf(path, sizeof(path), "/dev/dri/card%d", i);
+        fd = open(path, O_RDWR | O_CLOEXEC);
+        if (fd >= 0)
+            break;
+    }
     if (fd < 0)
         return -1;
     drmModeRes *res = drmModeGetResources(fd);
@@ -168,8 +183,16 @@ int linux_drm_open(Gfx *g)
     g->fb_stride = (int)creq.pitch;
     g->is_xrgb = 1;
     str_copy(g->backend, sizeof(g->backend), "drm");
+    g->gfx_tier = GFX_TIER_DRM;
+    g->gpu_accel = 0;
+    if (!g->gpu_name[0])
+        str_copy(g->gpu_name, sizeof(g->gpu_name), "drm-dumb");
     drmModeFreeConnector(conn);
     drmModeFreeResources(res);
+    if (gfx_set_size(g, w, h) != 0) {
+        linux_drm_close(g);
+        return -1;
+    }
     return 0;
 }
 
@@ -195,17 +218,22 @@ void linux_drm_close(Gfx *g)
             g->dri_fd = -1;
         g->fb_map = NULL;
         g->fb_map_len = 0;
+        if (g->gfx_tier == GFX_TIER_DRM)
+            g->gfx_tier = GFX_TIER_NONE;
     }
 }
 
 int linux_drm_present(Gfx *g)
 {
-    if (!g || !g_drm.map || !g->back || !g->dirty.valid)
+    if (!g || !g_drm.map || (!g->back && !g->compose_px))
         return -1;
-    int x0 = g->dirty.x0;
-    int y0 = g->dirty.y0;
-    int x1 = g->dirty.x1;
-    int y1 = g->dirty.y1;
+    int x0 = 0, y0 = 0, x1 = g->w, y1 = g->h;
+    if (g->dirty.valid) {
+        x0 = g->dirty.x0;
+        y0 = g->dirty.y0;
+        x1 = g->dirty.x1;
+        y1 = g->dirty.y1;
+    }
     if (x0 < 0)
         x0 = 0;
     if (y0 < 0)
@@ -216,24 +244,109 @@ int linux_drm_present(Gfx *g)
         y1 = g->h;
     int dst_w = g_drm.w;
     int dst_h = g_drm.h;
+    int use_argb = (g->compose_px && g->compose_pixels >= (size_t)g->w * (size_t)g->h);
     for (int y = y0; y < y1; y++) {
-        int dy = y * dst_h / g->h;
+        int dy = (g->h > 0) ? (y * dst_h / g->h) : y;
         if (dy < 0 || dy >= dst_h)
             continue;
         uint32_t *dst = (uint32_t *)((uint8_t *)g_drm.map + dy * g_drm.pitch);
         for (int x = x0; x < x1; x++) {
-            int dx = x * dst_w / g->w;
+            int dx = (g->w > 0) ? (x * dst_w / g->w) : x;
             if (dx < 0 || dx >= dst_w)
                 continue;
-            uint16_t c = g->back[y * g->w + x];
-            uint32_t r = ((c >> 11) & 0x1F) << 3;
-            uint32_t gg = ((c >> 5) & 0x3F) << 2;
-            uint32_t b = (c & 0x1F) << 3;
-            dst[dx] = 0xFF000000u | (r << 16) | (gg << 8) | b;
+            if (use_argb) {
+                dst[dx] = g->compose_px[y * g->w + x] | 0xFF000000u;
+            } else if (g->back) {
+                uint16_t c = g->back[y * g->w + x];
+                uint32_t r = ((c >> 11) & 0x1F) << 3;
+                uint32_t gg = ((c >> 5) & 0x3F) << 2;
+                uint32_t b = (c & 0x1F) << 3;
+                dst[dx] = 0xFF000000u | (r << 16) | (gg << 8) | b;
+            }
         }
     }
     drmModePageFlip(g_drm.fd, g_drm.crtc_id, g_drm.fb_id, 0, NULL);
     return 0;
+}
+
+int linux_drm_fd(const Gfx *g)
+{
+    (void)g;
+    return g_drm.fd;
+}
+
+uint32_t linux_drm_crtc_id(const Gfx *g)
+{
+    (void)g;
+    return g_drm.crtc_id;
+}
+
+uint32_t linux_drm_conn_id(const Gfx *g)
+{
+    (void)g;
+    return g_drm.conn_id;
+}
+
+int linux_drm_mode_size(const Gfx *g, int *w, int *h)
+{
+    (void)g;
+    if (g_drm.fd < 0)
+        return -1;
+    if (w)
+        *w = g_drm.w;
+    if (h)
+        *h = g_drm.h;
+    return 0;
+}
+
+int linux_drm_add_fb(Gfx *g, uint32_t handle, uint32_t pitch, uint32_t w, uint32_t h, uint32_t *fb_out)
+{
+    (void)g;
+    if (g_drm.fd < 0 || !fb_out)
+        return -1;
+    uint32_t fb = 0;
+    if (drmModeAddFB(g_drm.fd, w, h, 24, 32, pitch, handle, &fb) != 0)
+        return -1;
+    *fb_out = fb;
+    return 0;
+}
+
+int linux_drm_page_flip(Gfx *g, uint32_t fb_id)
+{
+    (void)g;
+    if (g_drm.fd < 0 || !fb_id)
+        return -1;
+    return drmModePageFlip(g_drm.fd, g_drm.crtc_id, fb_id, 0, NULL);
+}
+
+int linux_drm_poll_hotplug(Gfx *g)
+{
+    if (!g || g_drm.fd < 0)
+        return 0;
+    drmModeConnector *conn = drmModeGetConnector(g_drm.fd, g_drm.conn_id);
+    if (!conn)
+        return 0;
+    int changed = 0;
+    if (conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0) {
+        int best = 0;
+        for (int m = 0; m < conn->count_modes; m++) {
+            if (conn->modes[m].type & DRM_MODE_TYPE_PREFERRED) {
+                best = m;
+                break;
+            }
+        }
+        int nw = conn->modes[best].hdisplay;
+        int nh = conn->modes[best].vdisplay;
+        if (nw >= GFX_MIN_W && nh >= GFX_MIN_H && (nw != g_drm.w || nh != g_drm.h)) {
+            drmModeFreeConnector(conn);
+            linux_drm_close(g);
+            if (linux_drm_open(g) == 0)
+                changed = 1;
+            return changed;
+        }
+    }
+    drmModeFreeConnector(conn);
+    return changed;
 }
 
 #else
@@ -251,6 +364,51 @@ int linux_drm_present(Gfx *g)
 {
     (void)g;
     return -1;
+}
+int linux_drm_fd(const Gfx *g)
+{
+    (void)g;
+    return -1;
+}
+uint32_t linux_drm_crtc_id(const Gfx *g)
+{
+    (void)g;
+    return 0;
+}
+uint32_t linux_drm_conn_id(const Gfx *g)
+{
+    (void)g;
+    return 0;
+}
+int linux_drm_mode_size(const Gfx *g, int *w, int *h)
+{
+    (void)g;
+    if (w)
+        *w = 0;
+    if (h)
+        *h = 0;
+    return -1;
+}
+int linux_drm_add_fb(Gfx *g, uint32_t handle, uint32_t pitch, uint32_t w, uint32_t h, uint32_t *fb_out)
+{
+    (void)g;
+    (void)handle;
+    (void)pitch;
+    (void)w;
+    (void)h;
+    (void)fb_out;
+    return -1;
+}
+int linux_drm_page_flip(Gfx *g, uint32_t fb_id)
+{
+    (void)g;
+    (void)fb_id;
+    return -1;
+}
+int linux_drm_poll_hotplug(Gfx *g)
+{
+    (void)g;
+    return 0;
 }
 
 #endif

@@ -198,9 +198,29 @@ configure_kernel_tiny() {
   $cfg --disable CONFIG_KALLSYMS || true
   $cfg --disable CONFIG_KALLSYMS_ALL || true
   $cfg --disable CONFIG_MODULES || true
-  $cfg --disable CONFIG_DRM || true
+  $cfg --enable CONFIG_BLOCK || true
+  $cfg --enable CONFIG_BLK_DEV || true
+  $cfg --enable CONFIG_ATA || true
+  $cfg --enable CONFIG_ATA_PIIX || true
+  $cfg --enable CONFIG_ATA_GENERIC || true
+  $cfg --enable CONFIG_SATA_AHCI || true
+  $cfg --enable CONFIG_SCSI || true
+  $cfg --enable CONFIG_BLK_DEV_SR || true
+  $cfg --enable CONFIG_CHR_DEV_SG || true
+  $cfg --enable CONFIG_ISO9660_FS || true
+  $cfg --enable CONFIG_JOLIET || true
+  $cfg --enable CONFIG_ZISOFS || true
+  $cfg --enable CONFIG_NLS || true
+  $cfg --enable CONFIG_NLS_DEFAULT || true
+  $cfg --enable CONFIG_NLS_CODEPAGE_437 || true
+  $cfg --enable CONFIG_NLS_ISO8859_1 || true
+  $cfg --enable CONFIG_NLS_UTF8 || true
+  $cfg --enable CONFIG_DRM || true
+  $cfg --enable CONFIG_DRM_KMS_HELPER || true
+  $cfg --enable CONFIG_DRM_VMWGFX || true
+  $cfg --enable CONFIG_DRM_FBDEV_EMULATION || true
+  $cfg --enable CONFIG_FB_MODE_HELPERS || true
   $cfg --disable CONFIG_DRM_I915 || true
-  $cfg --disable CONFIG_DRM_FBDEV_EMULATION || true
   $cfg --disable CONFIG_SOUND || true
   $cfg --disable CONFIG_SND || true
   $cfg --enable CONFIG_NET || true
@@ -225,14 +245,11 @@ configure_kernel_tiny() {
   $cfg --disable CONFIG_HW_RANDOM || true
   $cfg --disable CONFIG_NVME_CORE || true
   $cfg --disable CONFIG_BLK_DEV_NVME || true
-  $cfg --disable CONFIG_ATA || true
-  $cfg --disable CONFIG_SATA_AHCI || true
-  $cfg --disable CONFIG_SCSI || true
   $cfg --disable CONFIG_MD || true
   $cfg --disable CONFIG_MDIO || true
   $cfg --disable CONFIG_MMC || true
   $cfg --disable CONFIG_VIRTUALIZATION || true
-  $cfg --disable CONFIG_HYPERVISOR_GUEST || true
+  $cfg --enable CONFIG_HYPERVISOR_GUEST || true
   $cfg --disable CONFIG_KVM_GUEST || true
   $cfg --disable CONFIG_IA32_EMULATION || true
   $cfg --disable CONFIG_X86_X32_ABI || true

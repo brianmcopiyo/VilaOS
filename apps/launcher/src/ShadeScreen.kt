@@ -2,8 +2,7 @@ package launcher
 
 import storage.Storage
 import system.System
-import ui.Ui
-
+import Ui
 class ShadeScreen {
     fun panel(sound: String, vibrate: String) {
         System.time("clock")

@@ -4,11 +4,10 @@ import app.Cap
 import app.VilaApp
 import app.require
 import storage.Storage
-import ui.Input
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Input
+import Screen
+import SoftKey
+import Ui
 class SettingsApp : VilaApp() {
     private var g_theme = "0"
     private var g_large = "0"

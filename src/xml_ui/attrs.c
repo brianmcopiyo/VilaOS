@@ -113,7 +113,7 @@ static void combine_title(Widget *w, const char *title, const char *subtitle)
         str_copy(buf, sizeof(buf), title);
     if (subtitle && subtitle[0]) {
         if (buf[0])
-            str_cat(buf, sizeof(buf), " ");
+            str_cat(buf, sizeof(buf), "\n");
         str_cat(buf, sizeof(buf), subtitle);
     }
     str_copy(w->text, sizeof(w->text), buf);
@@ -153,8 +153,11 @@ void xml_ui_apply_attrs(Widget *w, const XmlStart *el, const XmlUiResources *res
     if (!text && ((title && title[0]) || (subtitle && subtitle[0])))
         combine_title(w, title, subtitle);
     const char *hint = attr2(el, "hint", "placeholder");
-    if (hint && !w->text[0])
+    if (hint && !w->text[0]) {
         str_copy(w->text, sizeof(w->text), hint);
+        if (w->type == W_INPUT)
+            w->value = 1;
+    }
 
     const char *action = attr2(el, "action", "on-click");
     const char *route = xml_attr(el, "route");

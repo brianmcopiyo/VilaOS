@@ -1,7 +1,7 @@
 package app
 
-import ui.Screen
-import ui.SoftKey
+import Screen
+import SoftKey
 
 enum class Cap(val id: String) {
     UI("ui"),

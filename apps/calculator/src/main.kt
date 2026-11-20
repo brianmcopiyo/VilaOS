@@ -3,10 +3,9 @@ package calculator
 import app.Cap
 import app.VilaApp
 import app.require
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Screen
+import SoftKey
+import Ui
 class CalculatorApp : VilaApp() {
     private var g_acc = "0"
     private var g_cur = ""

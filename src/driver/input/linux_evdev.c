@@ -53,8 +53,8 @@ int linux_evdev_read(void *dev, InputEvent *out, InputMux *m)
     }
     if (rc != LIBEVDEV_READ_STATUS_SUCCESS)
         return 0;
-    int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-    int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+    int bw = m->state.bound_w > 0 ? m->state.bound_w : 0;
+    int bh = m->state.bound_h > 0 ? m->state.bound_h : 0;
     if (ev.type == EV_REL) {
         if (ev.code == REL_X)
             m->state.cursor_x = clamp_i(m->state.cursor_x + (int)ev.value, 0, bw - 1);

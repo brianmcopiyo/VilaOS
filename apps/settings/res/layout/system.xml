@@ -5,6 +5,7 @@
     <label id="title" text="System" color="#1C1917" width="100%" height="wrap" font-family="DM Sans" font-size="16" font-weight="700" component="header"/>
     <card class="col gap-4 p-8">
       <label id="sys_device" text="Device" color="#1C1917" width="100%" height="wrap" font-family="Inter" font-size="12"/>
+      <label id="sys_gfx" text="Graphics" color="#1C1917" width="100%" height="wrap" font-family="JetBrains Mono" font-size="11"/>
       <label id="sys_memory" text="Memory" color="#1C1917" width="100%" height="wrap" font-family="Inter" font-size="12"/>
       <label id="sys_storage" text="Storage" color="#1C1917" width="100%" height="wrap" font-family="Inter" font-size="12"/>
       <label id="sys_runtime" text="Runtime" color="#57534E" width="100%" height="wrap" font-family="JetBrains Mono" font-size="11"/>

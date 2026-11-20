@@ -139,11 +139,12 @@ int parse_dim(const char *s, int *out_val, int *out_unit)
     *out_unit = UNIT_AUTO;
     if (!s || !s[0])
         return 0;
-    if (str_eq(s, "auto") || str_eq(s, "wrap")) {
+    if (str_eq(s, "auto") || str_eq(s, "wrap") || str_eq(s, "Auto") || str_eq(s, "Wrap")) {
         *out_unit = UNIT_AUTO;
         return 0;
     }
-    if (str_eq(s, "fill") || str_eq(s, "flex") || str_eq(s, "*")) {
+    if (str_eq(s, "fill") || str_eq(s, "flex") || str_eq(s, "*") || str_eq(s, "Fill") ||
+        str_eq(s, "Flex")) {
         *out_unit = UNIT_FILL;
         return 0;
     }

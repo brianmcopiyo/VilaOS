@@ -1,8 +1,10 @@
 #include "xml_ui.h"
+#include "xaml_ui.h"
 #include "util.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef struct {
     Screen *s;
@@ -58,18 +60,17 @@ static int is_primitive_tag(const char *tag)
     static const char *const tags[] = {
         "screen", "vbox", "hbox", "column", "flex", "grid", "label", "text", "header",
         "badge", "icon", "button", "input", "list", "statusbar", "softkeys", "footer",
-        "tile", "row", "dock"
+        "tile", "row", "dock", "dashboard", "panel", "stack", "card", "window", "taskbar",
+        "dockpanel"
     };
+    char t[MAX_ID];
+    str_copy(t, sizeof(t), tag ? tag : "");
+    xaml_normalize_tag(t);
     for (size_t i = 0; i < sizeof(tags) / sizeof(tags[0]); i++) {
-        if (str_eq(tag, tags[i]))
+        if (str_eq(t, tags[i]))
             return 1;
     }
     return 0;
-}
-
-static int is_container_type(WidgetType t)
-{
-    return t == W_VBOX || t == W_HBOX || t == W_FLEX || t == W_GRID;
 }
 
 static int component_known(const BuildCtx *ctx, const char *name)
@@ -109,23 +110,47 @@ static void on_start(const XmlStart *el, void *user)
         return;
     }
 
-    WidgetType type = xml_ui_tag_type(el->tag);
+    char tag[MAX_ID];
+    str_copy(tag, sizeof(tag), el->tag);
+    xaml_normalize_tag(tag);
+    WidgetType type = xaml_tag_type(el->tag);
     int idx = push_widget(ctx, type);
     if (idx < 0)
         return;
     Widget *w = &s->widgets[idx];
-    xml_ui_apply_attrs(w, el, ctx->res);
+    xaml_apply_attrs(w, el, ctx->res);
     if (!w->component[0]) {
-        if (str_eq(el->tag, "text") || str_eq(el->tag, "header") || str_eq(el->tag, "badge") ||
-            str_eq(el->tag, "icon") || str_eq(el->tag, "footer") || str_eq(el->tag, "button") ||
-            str_eq(el->tag, "tile") || str_eq(el->tag, "row") || str_eq(el->tag, "dock"))
-            str_copy(w->component, sizeof(w->component), el->tag);
+        if (str_eq(tag, "text") || str_eq(tag, "header") || str_eq(tag, "badge") ||
+            str_eq(tag, "icon") || str_eq(tag, "footer") || str_eq(tag, "button") ||
+            str_eq(tag, "tile") || str_eq(tag, "row") || str_eq(tag, "dock") ||
+            str_eq(tag, "card") || str_eq(tag, "panel"))
+            str_copy(w->component, sizeof(w->component), tag);
     }
 
     if (w->type == W_BUTTON || w->type == W_INPUT)
         w->focusable = 1;
     if (w->type == W_FLEX)
         w->type = w->flex_dir == FLEX_ROW ? W_HBOX : W_VBOX;
+    if (w->type == W_SCREEN || str_eq(tag, "dashboard") || str_eq(tag, "window") ||
+        str_eq(tag, "taskbar")) {
+        if (w->parent < 0) {
+            w->type = W_SCREEN;
+            w->wu = UNIT_FILL;
+            w->hu = UNIT_FILL;
+            if (!w->bg_set) {
+                w->bg = COL_BG;
+                w->bg_set = 1;
+            }
+            s->root = idx;
+        } else {
+            w->type = W_VBOX;
+            w->flex_dir = FLEX_COL;
+            if (w->wu == UNIT_AUTO)
+                w->wu = UNIT_FILL;
+            if (str_eq(tag, "dashboard") && w->hu == UNIT_AUTO)
+                w->hu = UNIT_FILL;
+        }
+    }
 
     if (w->type == W_SOFTKEYS) {
         const char *l = xml_attr(el, "left");
@@ -159,15 +184,7 @@ static void on_end(const char *tag, void *user)
     BuildCtx *ctx = (BuildCtx *)user;
     if (ctx->sp <= 0)
         return;
-    Widget *top = &ctx->s->widgets[ctx->stack[ctx->sp - 1]];
-    if (tag && tag[0]) {
-        WidgetType t = xml_ui_tag_type(tag);
-        int both_containers = is_container_type(t) && is_container_type(top->type);
-        if (t != top->type && !both_containers && !str_eq(tag, "component") && !str_eq(tag, "include")) {
-            if (!component_known(ctx, tag))
-                return;
-        }
-    }
+    (void)tag;
     ctx->sp--;
 }
 

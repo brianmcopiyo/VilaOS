@@ -1,7 +1,6 @@
 package launcher
 
-import ui.Ui
-
+import Ui
 class RecentsScreen {
     fun tasks() {
         Ui.setText("title", "Recents")

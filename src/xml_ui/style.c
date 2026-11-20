@@ -338,12 +338,12 @@ static int grid_columns(const char *v)
     int tokens = 0;
     const char *q = v;
     while (*q) {
-        while (*q && isspace((unsigned char)*q))
+        while (*q && (isspace((unsigned char)*q) || *q == ','))
             q++;
         if (!*q)
             break;
         tokens++;
-        while (*q && !isspace((unsigned char)*q))
+        while (*q && !isspace((unsigned char)*q) && *q != ',')
             q++;
     }
     if (tokens > 1)
@@ -466,13 +466,24 @@ void xml_ui_style_apply_prop(Widget *w, const char *name, const char *value, con
         int c = grid_columns(value);
         if (c > 0)
             w->grid_cols = (int16_t)c;
+        {
+            const char *star = strchr(value, '*');
+            if (star) {
+                const char *p = star + 1;
+                while (*p && (isspace((unsigned char)*p) || *p == ','))
+                    p++;
+                int px = 0;
+                if (first_int(p, &px) && px > 0)
+                    w->max_w = (int16_t)px;
+            }
+        }
     } else if (str_eq(name, "rows") || str_eq(name, "grid-template-rows")) {
         int rws = 0;
         if (first_int(value, &rws))
             w->grid_rows = (int16_t)rws;
-    } else if (str_eq(name, "span") || str_eq(name, "grid-column"))
+    } else if (str_eq(name, "span") || str_eq(name, "grid-column-span"))
         w->col_span = (int16_t)span_value(value);
-    else if (str_eq(name, "grid-row"))
+    else if (str_eq(name, "grid-row-span"))
         w->row_span = (int16_t)span_value(value);
     else if (str_eq(name, "display")) {
         if (str_eq(value, "flex")) {

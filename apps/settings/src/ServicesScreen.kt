@@ -1,8 +1,7 @@
 package settings
 
 import service.Service
-import ui.Ui
-
+import Ui
 class ServicesScreen {
     fun refreshServices() {
         Service.status("musicd", "svc_music_state")

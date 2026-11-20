@@ -15,7 +15,14 @@ need_cmd() {
 }
 
 echo "==> Ensuring kernel + initramfs"
-bash "${ROOT}/scripts/build_qemu_image.sh"
+if [[ -x "${ROOT}/scripts/rebuild_iso_quick.sh" ]] && [[ -d /root/vilaos-work/src ]]; then
+  bash "${ROOT}/scripts/rebuild_iso_quick.sh"
+else
+  bash "${ROOT}/scripts/build_qemu_image.sh"
+  if [[ -d /root/vilaos-work/src/build/rootfs ]]; then
+    bash "${ROOT}/scripts/stage_wayland_rootfs.sh" /root/vilaos-work/src/build/rootfs || true
+  fi
+fi
 
 test -f "${BUILD}/bzImage"
 test -f "${BUILD}/rootfs.cpio.gz"

@@ -199,8 +199,8 @@ static void measure_widget(Screen *s, Gfx *g, Widget *w)
 {
     if (!w)
         return;
-    int rw = xml_ui_resolve_dim(w->sw, w->wu, 0, g->w, REF_W);
-    int rh = xml_ui_resolve_dim(w->sh, w->hu, 0, g->h, REF_H);
+    int rw = xml_ui_resolve_dim(w->sw, w->wu, 0, g->w, g->w);
+    int rh = xml_ui_resolve_dim(w->sh, w->hu, 0, g->h, g->h);
 
     if (w->type == W_VBOX || w->type == W_HBOX || w->type == W_FLEX) {
         if (w->type == W_VBOX)
@@ -242,7 +242,7 @@ static void arrange_list(Screen *s, Gfx *g, Widget *list)
     for (int i = 0; i < list->child_count; i++) {
         Widget *item = &s->widgets[list->children[i]];
         int item_h = item->meas_h > 0 ? item->meas_h : g->item_h;
-        int rh = xml_ui_resolve_dim(item->sh, item->hu, 0, g->h, REF_H);
+        int rh = xml_ui_resolve_dim(item->sh, item->hu, 0, g->h, g->h);
         if (rh > 0)
             item_h = rh;
         item->x = list->x + pad;
@@ -255,49 +255,31 @@ static void arrange_list(Screen *s, Gfx *g, Widget *list)
     }
 }
 
+static void arrange_widget(Screen *s, Gfx *g, Widget *w);
+
 static void arrange_grid(Screen *s, Gfx *g, Widget *grid)
 {
     int cols = grid_auto_cols(g, grid);
-    int pad = pad_px(g, grid->pad_t);
+    if (cols < 1)
+        cols = 1;
+    int pad_t = pad_px(g, grid->pad_t);
+    int pad_r = pad_px(g, grid->pad_r);
+    int pad_b = pad_px(g, grid->pad_b);
+    int pad_l = pad_px(g, grid->pad_l);
     int gap = scale_space(g, grid->gap > 0 ? grid->gap : g->pad);
+    int row_gap = scale_space(g, grid->row_gap > 0 ? grid->row_gap : gap);
+    int col_gap = scale_space(g, grid->col_gap > 0 ? grid->col_gap : gap);
+
+    int place_r[MAX_CHILDREN];
+    int place_c[MAX_CHILDREN];
+    int place_span[MAX_CHILDREN];
+    int place_idx[MAX_CHILDREN];
     int n = 0;
-    for (int i = 0; i < grid->child_count; i++) {
+    int cursor = 0;
+    int max_row = 0;
+    for (int i = 0; i < grid->child_count && n < MAX_CHILDREN; i++) {
         Widget *c = &s->widgets[grid->children[i]];
-        if (!c->visible)
-            continue;
-        if (c->type == W_BUTTON || c->type == W_LABEL)
-            n++;
-    }
-    if (n <= 0)
-        return;
-    int rows = (n + cols - 1) / cols;
-    int inner_w = grid->w - pad * 2 - gap * (cols > 1 ? cols - 1 : 0);
-    int inner_h = grid->h - pad * 2 - gap * (rows > 1 ? rows - 1 : 0);
-    if (inner_w < cols)
-        inner_w = cols;
-    if (inner_h < rows)
-        inner_h = rows;
-    int cell_w = inner_w / cols;
-    int cell_h = inner_h / rows;
-    if (cell_w < 1)
-        cell_w = 1;
-    if (cell_h < 1)
-        cell_h = 1;
-    float ar = g->aspect_ratio > 0.01f ? g->aspect_ratio : 1.0f;
-    if (ar > 1.3f && cell_h > cell_w + 12)
-        cell_h = cell_w + 8;
-    if (ar < 0.8f && cell_w > cell_h + 16)
-        cell_w = cell_h + 8;
-    int max_cell = cell_w < cell_h ? cell_w : cell_h;
-    if (max_cell > 96) {
-        cell_w = 96;
-        cell_h = 96;
-    }
-    int idx = 0;
-    int max_bottom = grid->y + pad;
-    for (int i = 0; i < grid->child_count; i++) {
-        Widget *c = &s->widgets[grid->children[i]];
-        if (c->type != W_BUTTON && c->type != W_LABEL)
+        if (is_chrome(c))
             continue;
         if (!c->visible) {
             c->focusable = 0;
@@ -305,27 +287,181 @@ static void arrange_grid(Screen *s, Gfx *g, Widget *grid)
             c->h = 0;
             continue;
         }
-        int r = idx / cols;
-        int col = idx % cols;
         int span = c->col_span > 0 ? c->col_span : 1;
-        if (col + span > cols)
-            span = cols - col;
-        c->w = cell_w * span + gap * (span - 1);
-        c->h = cell_h;
-        c->x = grid->x + pad + col * (cell_w + gap);
-        c->y = grid->y + pad + r * (cell_h + gap);
-        if (c->x + c->w > grid->x + grid->w - pad)
-            c->w = grid->x + grid->w - pad - c->x;
-        if (c->y + c->h > grid->y + grid->h - pad)
-            c->h = grid->y + grid->h - pad - c->y;
-        c->focusable = (c->type == W_BUTTON);
-        if (c->y + c->h > max_bottom)
-            max_bottom = c->y + c->h;
-        idx += span;
+        if (span > cols)
+            span = cols;
+        int col = cursor % cols;
+        if (col + span > cols) {
+            cursor += cols - col;
+            col = 0;
+        }
+        int r = cursor / cols;
+        place_idx[n] = grid->children[i];
+        place_r[n] = r;
+        place_c[n] = col;
+        place_span[n] = span;
+        if (r > max_row)
+            max_row = r;
+        cursor += span;
+        n++;
+    }
+    if (n <= 0)
+        return;
+    int rows = max_row + 1;
+    if (grid->grid_rows > rows)
+        rows = grid->grid_rows;
+
+    int inner_w = grid->w - pad_l - pad_r - col_gap * (cols > 1 ? cols - 1 : 0);
+    int inner_h = grid->h - pad_t - pad_b - row_gap * (rows > 1 ? rows - 1 : 0);
+    if (inner_w < cols)
+        inner_w = cols;
+    if (inner_h < rows)
+        inner_h = rows;
+
+    int only_tiles = 1;
+    for (int i = 0; i < n; i++) {
+        Widget *c = &s->widgets[place_idx[i]];
+        if (c->type != W_BUTTON && c->type != W_LABEL) {
+            only_tiles = 0;
+            break;
+        }
+        if (c->type == W_BUTTON && !c->icon[0] && !str_eq(c->component, "tile") &&
+            !str_eq(c->component, "launcher_tile")) {
+            only_tiles = 0;
+            break;
+        }
+    }
+
+    int col_w[16];
+    int row_h[16];
+    for (int c = 0; c < cols && c < 16; c++)
+        col_w[c] = 0;
+    for (int r = 0; r < rows && r < 16; r++)
+        row_h[r] = 0;
+
+    if (!only_tiles && cols == 2 && cols <= 16) {
+        int side = grid->max_w > 0 ? grid->max_w : (inner_w * 2 / 5);
+        if (side > inner_w / 2)
+            side = inner_w * 2 / 5;
+        if (side < 1)
+            side = inner_w / 3;
+        if (side < 1)
+            side = 1;
+        col_w[0] = inner_w - side;
+        col_w[1] = side;
+    } else {
+        int cw = inner_w / cols;
+        if (cw < 1)
+            cw = 1;
+        for (int c = 0; c < cols && c < 16; c++)
+            col_w[c] = cw;
+    }
+
+    if (!only_tiles && rows >= 3 && rows <= 16) {
+        for (int i = 0; i < n; i++) {
+            Widget *c = &s->widgets[place_idx[i]];
+            measure_widget(s, g, c);
+            int prefer = c->meas_h > 0 ? c->meas_h : intrinsic_h(g, c);
+            int pad_extra = pad_px(g, c->pad_t) + pad_px(g, c->pad_b) + 8;
+            prefer += pad_extra;
+            int r = place_r[i];
+            if (r == 0 || r == rows - 1) {
+                if (prefer > row_h[r])
+                    row_h[r] = prefer;
+            }
+        }
+        if (row_h[0] < 70)
+            row_h[0] = 70;
+        if (row_h[0] > 88)
+            row_h[0] = 88;
+        if (row_h[0] > inner_h / 4)
+            row_h[0] = inner_h / 4;
+        if (row_h[rows - 1] < 40)
+            row_h[rows - 1] = 40;
+        if (row_h[rows - 1] > 52)
+            row_h[rows - 1] = 52;
+        if (row_h[rows - 1] > inner_h / 6)
+            row_h[rows - 1] = inner_h / 6;
+        int fixed = 0;
+        for (int r = 0; r < rows; r++) {
+            if (r == 0 || r == rows - 1)
+                fixed += row_h[r];
+        }
+        int star = rows - 2;
+        int rem = inner_h - fixed;
+        if (rem < star)
+            rem = star;
+        int mid = star > 0 ? rem / star : rem;
+        for (int r = 1; r < rows - 1; r++)
+            row_h[r] = mid;
+    } else {
+        int rh = inner_h / rows;
+        if (rh < 1)
+            rh = 1;
+        for (int r = 0; r < rows && r < 16; r++)
+            row_h[r] = rh;
+    }
+
+    float ar = g->aspect_ratio > 0.01f ? g->aspect_ratio : 1.0f;
+    if (only_tiles) {
+        int cell_w = col_w[0];
+        int cell_h = row_h[0];
+        if (ar > 1.3f && cell_h > cell_w + 12)
+            cell_h = cell_w + 8;
+        if (ar < 0.8f && cell_w > cell_h + 16)
+            cell_w = cell_h + 8;
+        int max_cell = cell_w < cell_h ? cell_w : cell_h;
+        if (max_cell > 96) {
+            cell_w = 96;
+            cell_h = 96;
+        }
+        for (int c = 0; c < cols && c < 16; c++)
+            col_w[c] = cell_w;
+        for (int r = 0; r < rows && r < 16; r++)
+            row_h[r] = cell_h;
+    }
+
+    int col_x[16];
+    int row_y[16];
+    int x0 = grid->x + pad_l;
+    for (int c = 0; c < cols && c < 16; c++) {
+        col_x[c] = x0;
+        x0 += col_w[c] + (c + 1 < cols ? col_gap : 0);
+    }
+    int y0 = grid->y + pad_t;
+    for (int r = 0; r < rows && r < 16; r++) {
+        row_y[r] = y0;
+        y0 += row_h[r] + (r + 1 < rows ? row_gap : 0);
+    }
+
+    for (int i = 0; i < n; i++) {
+        Widget *c = &s->widgets[place_idx[i]];
+        int r = place_r[i];
+        int col = place_c[i];
+        int span = place_span[i];
+        int wsum = 0;
+        for (int k = 0; k < span && col + k < cols && col + k < 16; k++) {
+            wsum += col_w[col + k];
+            if (k + 1 < span)
+                wsum += col_gap;
+        }
+        c->w = wsum;
+        c->h = (r < 16) ? row_h[r] : 1;
+        c->x = (col < 16) ? col_x[col] : grid->x + pad_l;
+        c->y = (r < 16) ? row_y[r] : grid->y + pad_t;
+        if (c->x + c->w > grid->x + grid->w - pad_r)
+            c->w = grid->x + grid->w - pad_r - c->x;
+        if (c->y + c->h > grid->y + grid->h - pad_b)
+            c->h = grid->y + grid->h - pad_b - c->y;
+        if (c->w < 0)
+            c->w = 0;
+        if (c->h < 0)
+            c->h = 0;
+        if (c->type == W_BUTTON || c->type == W_INPUT)
+            c->focusable = 1;
+        arrange_widget(s, g, c);
     }
 }
-
-static void arrange_widget(Screen *s, Gfx *g, Widget *w);
 
 static void arrange_flex(Screen *s, Gfx *g, Widget *box)
 {
@@ -374,8 +510,8 @@ static void arrange_flex(Screen *s, Gfx *g, Widget *box)
         it->margin_main1 = scale_space(g, vertical ? c->margin_b : c->margin_r);
         it->margin_cross0 = scale_space(g, vertical ? c->margin_l : c->margin_t);
         it->margin_cross1 = scale_space(g, vertical ? c->margin_r : c->margin_b);
+        unsigned main_u = vertical ? c->hu : c->wu;
         {
-            unsigned main_u = vertical ? c->hu : c->wu;
             int auto_grow = (c->type == W_LIST || c->type == W_GRID || c->type == W_VBOX || c->type == W_HBOX ||
                              c->type == W_FLEX);
             if (c->grow > 0)
@@ -387,9 +523,15 @@ static void arrange_flex(Screen *s, Gfx *g, Widget *box)
             else
                 it->grow = 0;
         }
-        int want = vertical ? xml_ui_resolve_dim(c->sh, c->hu, box->h, g->h, REF_H)
-                            : xml_ui_resolve_dim(c->sw, c->wu, box->w, g->w, REF_W);
-        if (want > 0) {
+        int want = vertical ? xml_ui_resolve_dim(c->sh, c->hu, inner_h, g->h, g->h)
+                            : xml_ui_resolve_dim(c->sw, c->wu, inner_w, g->w, g->w);
+        int pct_fill = (main_u == UNIT_PCT && ((vertical && c->sh >= 100) || (!vertical && c->sw >= 100)));
+        if (pct_fill || main_u == UNIT_FILL) {
+            if (it->grow <= 0)
+                it->grow = 1;
+            it->base = 0;
+            it->fixed = 0;
+        } else if (want > 0) {
             it->base = want;
             it->fixed = 1;
             it->grow = 0;
@@ -450,27 +592,20 @@ static void arrange_flex(Screen *s, Gfx *g, Widget *box)
         main_sz = clamp_size(main_sz, scale_space(g, vertical ? c->min_h : c->min_w),
                              scale_space(g, vertical ? c->max_h : c->max_w));
 
-        int rem = (vertical ? content_y1 : content_x1) - edge - it->margin_main0 - it->margin_main1;
-        for (int j = i + 1; j < n; j++) {
-            rem -= items[j].margin_main0 + items[j].margin_main1;
-            if (items[j].grow == 0)
-                rem -= items[j].base;
-            else
-                rem -= items[j].base;
-            if (j + 1 < n || j > i)
-                rem -= gap;
-        }
-        if (rem < main_sz)
-            main_sz = rem > 0 ? rem : 0;
+        int avail = (vertical ? content_y1 : content_x1) - edge - it->margin_main0 - it->margin_main1;
+        if (avail < 0)
+            avail = 0;
+        if (main_sz > avail)
+            main_sz = avail;
 
         int cross_sz;
         if (vertical) {
-            int rw = xml_ui_resolve_dim(c->sw, c->wu, inner_w, g->w, REF_W);
+            int rw = xml_ui_resolve_dim(c->sw, c->wu, inner_w, g->w, g->w);
             cross_sz = rw > 0 ? rw : (inner_w - it->margin_cross0 - it->margin_cross1);
             if (box->align == ALIGN_STRETCH && (c->wu == UNIT_AUTO || c->wu == UNIT_FILL || rw <= 0))
                 cross_sz = inner_w - it->margin_cross0 - it->margin_cross1;
         } else {
-            int rh = xml_ui_resolve_dim(c->sh, c->hu, inner_h, g->h, REF_H);
+            int rh = xml_ui_resolve_dim(c->sh, c->hu, inner_h, g->h, g->h);
             cross_sz = rh > 0 ? rh : (inner_h - it->margin_cross0 - it->margin_cross1);
             if (box->align == ALIGN_STRETCH && (c->hu == UNIT_AUTO || c->hu == UNIT_FILL || rh <= 0))
                 cross_sz = inner_h - it->margin_cross0 - it->margin_cross1;
@@ -516,7 +651,10 @@ static void arrange_widget(Screen *s, Gfx *g, Widget *w)
 {
     if (!w)
         return;
-    if (w->type == W_VBOX || w->type == W_FLEX) {
+    if (w->type == W_SCREEN) {
+        w->flex_dir = FLEX_COL;
+        arrange_flex(s, g, w);
+    } else if (w->type == W_VBOX || w->type == W_FLEX) {
         if (w->type == W_VBOX)
             w->flex_dir = FLEX_COL;
         arrange_flex(s, g, w);
@@ -563,9 +701,12 @@ void xml_ui_layout(Screen *s, Gfx *g)
 
     Widget *root = &s->widgets[s->root];
     root->x = 0;
-    root->y = 0;
+    root->y = g->status_h;
     root->w = g->w;
-    root->h = g->h;
+    root->h = g->h - g->status_h - g->softkey_h;
+    if (root->h < 1)
+        root->h = g->h;
+    root->visible = 1;
 
     for (int i = 0; i < s->count; i++) {
         Widget *w = &s->widgets[i];
@@ -574,14 +715,21 @@ void xml_ui_layout(Screen *s, Gfx *g)
             w->y = 0;
             w->w = g->w;
             w->h = g->status_h;
-            w->visible = 1;
+            w->visible = g->status_h > 0 ? 1 : 0;
         } else if (w->type == W_SOFTKEYS) {
             w->x = 0;
             w->y = g->h - g->softkey_h;
             w->w = g->w;
             w->h = g->softkey_h;
-            w->visible = 1;
+            w->visible = g->softkey_h > 0 ? 1 : 0;
         }
+    }
+
+    if (root->type == W_SCREEN || root->type == W_VBOX || root->type == W_HBOX ||
+        root->type == W_FLEX || root->type == W_GRID) {
+        arrange_widget(s, g, root);
+        xml_ui_clip_children(s, root);
+        return;
     }
 
     for (int i = 0; i < root->child_count; i++) {
@@ -591,27 +739,22 @@ void xml_ui_layout(Screen *s, Gfx *g)
 
         measure_widget(s, g, c);
 
-        int rw = xml_ui_resolve_dim(c->sw, c->wu, g->w, g->w, REF_W);
-        int rh = xml_ui_resolve_dim(c->sh, c->hu, g->h, g->h, REF_H);
-        int rx = xml_ui_resolve_dim(c->sx, c->xu, g->w, g->w, REF_W);
-        int ry = xml_ui_resolve_dim(c->sy, c->yu, g->h, g->h, REF_H);
+        int rw = xml_ui_resolve_dim(c->sw, c->wu, g->w, g->w, g->w);
+        int rh = xml_ui_resolve_dim(c->sh, c->hu, root->h, g->h, g->h);
+        int rx = xml_ui_resolve_dim(c->sx, c->xu, g->w, g->w, g->w);
+        int ry = xml_ui_resolve_dim(c->sy, c->yu, root->h, g->h, g->h);
 
         if (c->wu == UNIT_AUTO || c->wu == UNIT_FILL || rw <= 0)
-            rw = g->w;
+            rw = root->w;
         if (c->hu == UNIT_AUTO || c->hu == UNIT_FILL || rh <= 0)
-            rh = g->h - g->status_h - g->softkey_h;
+            rh = root->h;
         if (c->xu == UNIT_AUTO)
             rx = 0;
         if (c->yu == UNIT_AUTO)
-            ry = g->status_h;
+            ry = 0;
 
-        if (ry < g->status_h)
-            ry = g->status_h;
-        if (ry + rh > g->h - g->softkey_h)
-            rh = g->h - g->softkey_h - ry;
-
-        c->x = rx + scale_space(g, c->margin_l);
-        c->y = ry + scale_space(g, c->margin_t);
+        c->x = root->x + rx + scale_space(g, c->margin_l);
+        c->y = root->y + ry + scale_space(g, c->margin_t);
         c->w = rw - scale_space(g, c->margin_l + c->margin_r);
         c->h = rh - scale_space(g, c->margin_t + c->margin_b);
         if (c->w < 0)

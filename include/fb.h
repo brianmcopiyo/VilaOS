@@ -6,6 +6,7 @@
 int gfx_init(Gfx *g, int desktop);
 void gfx_shutdown(Gfx *g);
 int gfx_set_size(Gfx *g, int w, int h);
+int gfx_env_size(int *w, int *h);
 void gfx_dirty(Gfx *g, int x, int y, int w, int h);
 void gfx_dirty_all(Gfx *g);
 void gfx_present(Gfx *g);

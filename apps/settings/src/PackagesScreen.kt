@@ -2,9 +2,8 @@ package settings
 
 import storage.Storage
 import system.System
-import ui.Action
-import ui.Ui
-
+import Action
+import Ui
 class PackagesScreen {
     fun refreshPackages() {
         System.packages("pkg_summary")

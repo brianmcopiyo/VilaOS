@@ -2,8 +2,7 @@ package settings
 
 import storage.Storage
 import system.System
-import ui.Ui
-
+import Ui
 class DisplayScreen {
     fun themeLabel(theme: String): String {
         if (theme == "1") {
@@ -31,6 +30,7 @@ class DisplayScreen {
 
     fun refreshDisplay(theme: String, large: String, icons: String) {
         System.display("disp_res")
+        System.graphics("disp_gfx")
         System.theme("disp_theme")
         Ui.setText("disp_theme", "Theme: " + themeLabel(theme))
         Ui.setText("disp_font", "Text: " + textLabel(large))

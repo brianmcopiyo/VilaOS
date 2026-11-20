@@ -146,6 +146,10 @@ void input_apply_char(Widget *w, char ch)
 {
     if (!w || w->type != W_INPUT || !ch)
         return;
+    if (w->value == 1) {
+        w->text[0] = 0;
+        w->value = 0;
+    }
     size_t n = strlen(w->text);
     if ((int)n >= w->max_len || n + 1 >= sizeof(w->text))
         return;
@@ -157,6 +161,11 @@ void input_backspace(Widget *w)
 {
     if (!w || w->type != W_INPUT)
         return;
+    if (w->value == 1) {
+        w->text[0] = 0;
+        w->value = 0;
+        return;
+    }
     size_t n = strlen(w->text);
     if (n > 0)
         w->text[n - 1] = 0;
@@ -386,10 +395,10 @@ int input_init(InputMux *m)
     m->epfd = -1;
     m->inotify_fd = -1;
     m->tty_fd = -1;
-    m->state.bound_w = REF_W;
-    m->state.bound_h = REF_H;
-    m->state.cursor_x = REF_W / 2;
-    m->state.cursor_y = REF_H / 2;
+    m->state.bound_w = 0;
+    m->state.bound_h = 0;
+    m->state.cursor_x = 0;
+    m->state.cursor_y = 0;
     m->state.cursor_visible = 0;
     t9_reset(&m->t9);
 
@@ -491,11 +500,12 @@ void input_set_dialer_mode(InputMux *m, int enabled)
 
 int input_tap_slop(const InputMux *m)
 {
-    int short_edge = PHONE_W;
+    int short_edge = 320;
     if (m) {
-        int w = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-        int h = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
-        short_edge = w < h ? w : h;
+        int w = m->state.bound_w > 0 ? m->state.bound_w : 0;
+        int h = m->state.bound_h > 0 ? m->state.bound_h : 0;
+        if (w > 0 && h > 0)
+            short_edge = w < h ? w : h;
     }
     return clamp_i(short_edge / 40, 8, 28);
 }
@@ -806,15 +816,15 @@ static int poll_sdl(InputMux *m, InputEvent *out)
                 m->state.alt = 0;
         }
         if (e.type == SDL_MOUSEMOTION) {
-            int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-            int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+            int bw = m->state.bound_w > 0 ? m->state.bound_w : 0;
+            int bh = m->state.bound_h > 0 ? m->state.bound_h : 0;
             m->state.cursor_x = clamp_i(e.motion.x, 0, bw - 1);
             m->state.cursor_y = clamp_i(e.motion.y, 0, bh - 1);
             show_cursor(m);
         }
         if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-            int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-            int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+            int bw = m->state.bound_w > 0 ? m->state.bound_w : 0;
+            int bh = m->state.bound_h > 0 ? m->state.bound_h : 0;
             m->state.cursor_x = clamp_i(e.button.x, 0, bw - 1);
             m->state.cursor_y = clamp_i(e.button.y, 0, bh - 1);
             show_cursor(m);
@@ -999,8 +1009,8 @@ int input_dev_read(InputMux *m, InputEvent *out, int timeout_ms)
 
         struct input_event iev;
         while (read(fd, &iev, sizeof(iev)) == (ssize_t)sizeof(iev)) {
-            int bw = m->state.bound_w > 0 ? m->state.bound_w : REF_W;
-            int bh = m->state.bound_h > 0 ? m->state.bound_h : REF_H;
+            int bw = m->state.bound_w > 0 ? m->state.bound_w : 0;
+            int bh = m->state.bound_h > 0 ? m->state.bound_h : 0;
             if (iev.type == EV_KEY) {
                 if (iev.code == KEY_LEFTSHIFT || iev.code == KEY_RIGHTSHIFT) {
                     if (iev.value == 0)

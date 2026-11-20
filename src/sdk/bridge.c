@@ -29,6 +29,8 @@ int bridge_set_text(VslRuntime *rt, const char *id, const char *text)
     if (!w)
         return -1;
     str_copy(w->text, sizeof(w->text), text ? text : "");
+    if (w->type == W_INPUT)
+        w->value = 0;
     return 0;
 }
 
@@ -40,6 +42,10 @@ int bridge_get_text(VslRuntime *rt, const char *id, char *out, size_t n)
     if (!w) {
         out[0] = 0;
         return -1;
+    }
+    if (w->type == W_INPUT && w->value == 1) {
+        out[0] = 0;
+        return 0;
     }
     str_copy(out, n, w->text);
     return 0;

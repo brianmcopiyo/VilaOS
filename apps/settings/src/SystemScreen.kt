@@ -5,6 +5,7 @@ import system.System
 class SystemScreen {
     fun refreshSystem() {
         System.deviceInfo("sys_device")
+        System.graphics("sys_gfx")
         System.memory("sys_memory")
         System.storage("sys_storage")
         System.runtime("sys_runtime")

@@ -3,10 +3,9 @@ package browser
 import app.Cap
 import app.VilaApp
 import app.require
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Screen
+import SoftKey
+import Ui
 class BrowserApp : VilaApp() {
     private fun add(a: Int, b: Int): Int {
         return a + b

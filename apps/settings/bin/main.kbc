@@ -97,24 +97,24 @@ fn refreshInput mode scroll taps
   storage.app.set taps $taps
 endfn
 
-fn refreshMain
-  system.device.info hub_device
-  system.api.version hub_api
-  system.display.info hub_display
-  system.input.info hub_input
-  system.storage.info hub_packages
-  system.memory.info hub_system
-  ui.set_text hub_services "Services musicd"
+fn refresh
+  system.device.info device
+  system.api.version api
+  system.display.info display
+  system.input.info input
+  system.storage.info packages
+  system.memory.info system
+  ui.set_text services "Services musicd"
 endfn
 
-fn searchMain
-  vapi searchMain_q ui.get_text search
-  if eq $searchMain_q ""
-    system.device.info hub_device
+fn search
+  vapi search_q ui.get_text search
+  if eq $search_q ""
+    system.device.info device
   else
-    concat _t6 "Filter: " $searchMain_q
-    ui.set_text hub_device $_t6
-    storage.app.set settings_filter $searchMain_q
+    concat _t6 "Filter: " $search_q
+    ui.set_text device $_t6
+    storage.app.set settings_filter $search_q
   endif
 endfn
 
@@ -208,7 +208,7 @@ fn loadPrefs
 endfn
 
 fn refreshAll
-  invoke refreshMain _
+  invoke refresh _
   invoke refreshDisplay _ $g_theme $g_large $g_icons
   invoke refreshInput _ $g_key_mode $g_scroll $g_taps
   invoke refreshPackages _
@@ -273,20 +273,20 @@ on_tick
   invoke refreshServices _
 end
 
-on_action hub_search
-  invoke searchMain _
+on_action search
+  invoke search _
 end
 
 on_action disp_theme_sunset
   let g_theme 0
   invoke refreshDisplay _ $g_theme $g_large $g_icons
-  invoke refreshMain _
+  invoke refresh _
 end
 
 on_action disp_theme_beige
   let g_theme 1
   invoke refreshDisplay _ $g_theme $g_large $g_icons
-  invoke refreshMain _
+  invoke refresh _
 end
 
 on_action disp_theme_cycle
@@ -296,7 +296,7 @@ on_action disp_theme_cycle
     let g_theme 0
   endif
   invoke refreshDisplay _ $g_theme $g_large $g_icons
-  invoke refreshMain _
+  invoke refresh _
 end
 
 on_action disp_toggle_text
@@ -329,7 +329,7 @@ on_action inp_cycle_mode
   mod _t10 $_t9 3
   tostr g_key_mode $_t10
   invoke refreshInput _ $g_key_mode $g_scroll $g_taps
-  invoke refreshMain _
+  invoke refresh _
 end
 
 on_action inp_cycle_scroll
@@ -421,7 +421,7 @@ on_action sys_shutdown
 end
 
 on_soft left
-  invoke searchMain _
+  invoke search _
 end
 
 on_soft center

@@ -5,12 +5,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#define REF_W 432
-#define REF_H 960
-#define PHONE_W 432
-#define PHONE_H 960
-#define MAX_FB_W 1920
-#define MAX_FB_H 1920
+#define MAX_FB_W 7680
+#define MAX_FB_H 4320
+#define GFX_MIN_W 64
+#define GFX_MIN_H 64
 
 #define MAX_WIDGETS 128
 #define MAX_TEXT 128
@@ -140,6 +138,13 @@ typedef struct {
 typedef struct Composer Composer;
 struct vilaos_gfx_driver;
 
+typedef enum {
+    GFX_TIER_NONE = 0,
+    GFX_TIER_FB = 1,
+    GFX_TIER_DRM = 2,
+    GFX_TIER_GPU = 3
+} GfxTier;
+
 typedef struct {
     uint16_t *back;
     size_t back_pixels;
@@ -165,12 +170,17 @@ typedef struct {
     char drv_name[64];
     char backend[32];
     char drv_version[32];
+    char gpu_name[64];
     int cores;
     long ram_mb;
     int ram_tier;
     int workers;
+    int gfx_tier;
+    long vram_mb;
+    int gpu_accel;
     Composer *composer;
     void *linux_gfx;
+    void *gpu;
 } Gfx;
 
 typedef struct {

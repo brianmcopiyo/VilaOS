@@ -6,7 +6,7 @@ $VBox = "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
 $VmName = "VilaOS"
 $LegacyNames = @("PhoneOS", "PhoneOS-32MB")
 $Distro = "PhoneOS-Build"
-$MemoryMB = 128
+$MemoryMB = 1024
 
 function Log($m) {
     $line = "$(Get-Date -Format o) $m"
@@ -59,7 +59,8 @@ try {
     Remove-VmIfExists -Name $VmName
 
     & $VBox createvm --name $VmName --ostype Linux_64 --register | Out-Null
-    & $VBox modifyvm $VmName --memory $MemoryMB --vram 8 --cpus 1 --acpi on --ioapic on --boot1 dvd --boot2 none --boot3 none --boot4 none --graphicscontroller vboxvga --accelerate3d off --mouse ps2 --keyboard ps2 --audio-driver none --nic1 none --usb off | Out-Null
+    & $VBox modifyvm $VmName --memory $MemoryMB --vram 128 --cpus 2 --acpi on --ioapic on --boot1 dvd --boot2 none --boot3 none --boot4 none --graphicscontroller vmsvga --accelerate3d on --mouse usbtablet --keyboard ps2 --audio-driver none --nic1 none --usb off | Out-Null
+    & $VBox setextradata $VmName "GUI/MaxGuestResolution" "any"
     & $VBox storagectl $VmName --name "IDE" --add ide --controller PIIX4 | Out-Null
     & $VBox storageattach $VmName --storagectl "IDE" --port 0 --device 0 --type dvddrive --medium $IsoPath | Out-Null
     & $VBox startvm $VmName --type gui | Out-Null

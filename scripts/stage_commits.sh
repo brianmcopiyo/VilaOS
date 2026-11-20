@@ -23,7 +23,7 @@ commit_staged "Add on-demand SVG icon rasterization with RAM-tiered cache and IS
 
 echo "=== 3/5 single-word components ==="
 git add scripts/rename_components.sh \
-  sdk/ui/ sdk/components/ sdk/kotlin/ui/Ui.kt sdk/ktc sdk/templates/app/src/main.kt \
+  sdk/ui/ sdk/components/ sdk/ktc sdk/templates/app/src/main.kt \
   assets/ui/ assets/components/ assets/screens/ \
   src/xml_ui/ src/ui/screen.c \
   apps/*/res/components/ apps/browser/res/components/ apps/calculator/res/components/ \
@@ -31,7 +31,7 @@ git add scripts/rename_components.sh \
   apps/files/res/components/ apps/messages/res/components/ apps/music/res/components/ \
   apps/notes/res/components/ apps/settings/res/components/
 git add -u sdk/ui sdk/components assets/ui assets/components assets/screens \
-  apps/*/res/components sdk/kotlin/ui/Ui.kt sdk/ktc sdk/templates
+  apps/*/res/components sdk/ui sdk/ktc sdk/templates
 commit_staged "Standardize UI components to single-word SDK and XML names."
 
 echo "=== 4/5 app wiring ==="

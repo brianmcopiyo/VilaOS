@@ -67,6 +67,31 @@ int vapi_ui(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *
             return VAPI_ERR_NOT_FOUND;
         return VAPI_OK;
     }
+    if (str_eq(op, "set_subtitle")) {
+        if (!a1 || !a1[0] || !ctx->screen)
+            return VAPI_ERR_INVALID_ARG;
+        Widget *w = screen_find(ctx->screen, a1);
+        if (!w)
+            return VAPI_ERR_NOT_FOUND;
+        char title[MAX_TEXT];
+        title[0] = 0;
+        const char *sp = strchr(w->text, ' ');
+        if (sp) {
+            size_t n = (size_t)(sp - w->text);
+            if (n >= sizeof(title))
+                n = sizeof(title) - 1;
+            memcpy(title, w->text, n);
+            title[n] = 0;
+        } else if (w->text[0]) {
+            str_copy(title, sizeof(title), w->text);
+        } else {
+            str_copy(title, sizeof(title), a1);
+        }
+        char buf[MAX_TEXT];
+        snprintf(buf, sizeof(buf), "%s %s", title, a2 ? a2 : "");
+        str_copy(w->text, sizeof(w->text), buf);
+        return VAPI_OK;
+    }
     if (str_eq(op, "append_text")) {
         if (!a1 || !a1[0])
             return VAPI_ERR_INVALID_ARG;

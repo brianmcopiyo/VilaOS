@@ -52,5 +52,7 @@ int vapi_messages(VapiCtx *ctx, const char *op, const char *a1, const char *a2, 
 int vapi_contacts(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
 int vapi_clock(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
 int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
+int vapi_window(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
+int vapi_pkg(VapiCtx *ctx, const char *op, const char *a1, const char *a2, char *out, size_t out_n);
 
 #endif

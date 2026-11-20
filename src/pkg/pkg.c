@@ -1,10 +1,12 @@
 #include "pkg.h"
 #include "util.h"
 #include "xml.h"
+#include "screen.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -368,7 +370,10 @@ int pkg_install(const char *vpkg_path, PkgRegistry *reg)
     }
     rm_tree(tmp);
     app.installed = 1;
-    return registry_upsert(reg, &app);
+    if (registry_upsert(reg, &app) != 0)
+        return -1;
+    pkg_manager_notify_changed();
+    return 0;
 #else
     (void)vpkg_path;
     (void)reg;
@@ -395,7 +400,10 @@ int pkg_remove(const char *id, PkgRegistry *reg)
             reg->apps[i] = reg->apps[i + 1];
         reg->count--;
     }
-    return pkg_registry_save(reg);
+    if (pkg_registry_save(reg) != 0)
+        return -1;
+    pkg_manager_notify_changed();
+    return 0;
 #else
     (void)id;
     (void)reg;
@@ -453,4 +461,275 @@ int pkg_seed_from_dir(const char *apps_src_root, PkgRegistry *reg)
     (void)reg;
     return -1;
 #endif
+}
+
+#define PKG_MAX_LISTENERS 8
+
+static PkgRegistry g_pkg_reg;
+static int g_pkg_ready;
+static int g_pkg_generation;
+static int g_pkg_seen_generation;
+static PkgChangedFn g_pkg_listeners[PKG_MAX_LISTENERS];
+static void *g_pkg_listener_users[PKG_MAX_LISTENERS];
+static int g_pkg_listener_count;
+
+int pkg_manager_caps_text(unsigned caps, char *buf, size_t n)
+{
+    if (!buf || n == 0)
+        return -1;
+    buf[0] = 0;
+    if (caps & PKG_CAP_UI)
+        str_cat(buf, n, "ui ");
+    if (caps & PKG_CAP_STORAGE)
+        str_cat(buf, n, "storage.app ");
+    if (caps & PKG_CAP_STORAGE_FILES)
+        str_cat(buf, n, "storage.files ");
+    if (caps & PKG_CAP_TELEPHONY)
+        str_cat(buf, n, "telephony ");
+    if (caps & PKG_CAP_MESSAGES)
+        str_cat(buf, n, "messages ");
+    if (caps & PKG_CAP_CONTACTS)
+        str_cat(buf, n, "contacts ");
+    if (caps & PKG_CAP_AUDIO)
+        str_cat(buf, n, "audio.bg ");
+    if (caps & PKG_CAP_CLOCK)
+        str_cat(buf, n, "system.clock ");
+    if (caps & PKG_CAP_SYSTEM_DEVICE)
+        str_cat(buf, n, "system.device ");
+    if (caps & PKG_CAP_SYSTEM_POWER)
+        str_cat(buf, n, "system.power ");
+    if (caps & PKG_CAP_NETWORK)
+        str_cat(buf, n, "network ");
+    if (caps & PKG_CAP_DISPLAY)
+        str_cat(buf, n, "display ");
+    if (!buf[0])
+        str_copy(buf, n, "none");
+    return 0;
+}
+
+void pkg_manager_notify_changed(void)
+{
+    if (g_pkg_ready)
+        pkg_registry_load(&g_pkg_reg);
+    g_pkg_generation++;
+    for (int i = 0; i < g_pkg_listener_count; i++) {
+        if (g_pkg_listeners[i])
+            g_pkg_listeners[i](g_pkg_listener_users[i]);
+    }
+}
+
+int pkg_manager_init(void)
+{
+    if (g_pkg_ready)
+        return 0;
+    memset(&g_pkg_reg, 0, sizeof(g_pkg_reg));
+    g_pkg_listener_count = 0;
+    g_pkg_generation = 0;
+    g_pkg_seen_generation = 0;
+    g_pkg_ready = 1;
+    pkg_registry_load(&g_pkg_reg);
+    if (g_pkg_reg.count == 0)
+        pkg_seed_from_dir("/apps", &g_pkg_reg);
+    g_pkg_generation = 1;
+    return g_pkg_reg.count;
+}
+
+int pkg_manager_refresh(void)
+{
+    if (!g_pkg_ready)
+        return pkg_manager_init();
+    pkg_registry_load(&g_pkg_reg);
+    if (g_pkg_reg.count == 0)
+        pkg_seed_from_dir("/apps", &g_pkg_reg);
+    return g_pkg_reg.count;
+}
+
+const PkgRegistry *pkg_manager_registry(void)
+{
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    return &g_pkg_reg;
+}
+
+int pkg_manager_count(void)
+{
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    return g_pkg_reg.count;
+}
+
+int pkg_manager_get(int index, PkgApp *out)
+{
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    if (!out || index < 0 || index >= g_pkg_reg.count)
+        return -1;
+    *out = g_pkg_reg.apps[index];
+    return 0;
+}
+
+int pkg_manager_find(const char *id, PkgApp *out)
+{
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    int idx = pkg_registry_find(&g_pkg_reg, id);
+    if (idx < 0)
+        return -1;
+    if (out)
+        *out = g_pkg_reg.apps[idx];
+    return 0;
+}
+
+int pkg_manager_list_json(char *out, size_t out_n)
+{
+    if (!out || out_n == 0)
+        return -1;
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    out[0] = 0;
+    str_cat(out, out_n, "[");
+    for (int i = 0; i < g_pkg_reg.count; i++) {
+        char caps[MAX_TEXT];
+        char item[256];
+        pkg_manager_caps_text(g_pkg_reg.apps[i].caps, caps, sizeof(caps));
+        snprintf(item, sizeof(item), "%s%s:%s:%s:%s",
+                 i ? ";" : "",
+                 g_pkg_reg.apps[i].id,
+                 g_pkg_reg.apps[i].name,
+                 g_pkg_reg.apps[i].version,
+                 g_pkg_reg.apps[i].icon[0] ? g_pkg_reg.apps[i].icon : g_pkg_reg.apps[i].id);
+        if (strlen(out) + strlen(item) + 2 < out_n)
+            str_cat(out, out_n, item);
+    }
+    str_cat(out, out_n, "]");
+    return g_pkg_reg.count;
+}
+
+int pkg_manager_on_changed(PkgChangedFn fn, void *user)
+{
+    if (!fn || g_pkg_listener_count >= PKG_MAX_LISTENERS)
+        return -1;
+    g_pkg_listeners[g_pkg_listener_count] = fn;
+    g_pkg_listener_users[g_pkg_listener_count] = user;
+    g_pkg_listener_count++;
+    return 0;
+}
+
+int pkg_manager_poll_changed(void)
+{
+    if (g_pkg_seen_generation == g_pkg_generation)
+        return 0;
+    g_pkg_seen_generation = g_pkg_generation;
+    return 1;
+}
+
+static int pkg_str_has(const char *hay, const char *needle)
+{
+    char a[128];
+    char b[64];
+    size_t i;
+    if (!needle || !needle[0])
+        return 1;
+    if (!hay)
+        return 0;
+    for (i = 0; hay[i] && i + 1 < sizeof(a); i++)
+        a[i] = (char)tolower((unsigned char)hay[i]);
+    a[i] = 0;
+    for (i = 0; needle[i] && i + 1 < sizeof(b); i++)
+        b[i] = (char)tolower((unsigned char)needle[i]);
+    b[i] = 0;
+    return strstr(a, b) != NULL;
+}
+
+static int pkg_alloc_button(Screen *s, Widget *grid, int grid_idx)
+{
+    if (!s || !grid || s->count >= MAX_WIDGETS || grid->child_count >= MAX_CHILDREN)
+        return -1;
+    int idx = s->count++;
+    Widget *w = &s->widgets[idx];
+    memset(w, 0, sizeof(*w));
+    w->type = W_BUTTON;
+    w->parent = grid_idx;
+    w->visible = 1;
+    w->focusable = 1;
+    w->bg = COL_BG;
+    w->fg = COL_TEXT;
+    w->border_c = COL_BORDER;
+    w->border = 1;
+    w->radius = 10;
+    w->pad_t = w->pad_b = 12;
+    w->pad_l = w->pad_r = 14;
+    w->bg_set = 1;
+    w->fg_set = 1;
+    w->col_span = 1;
+    w->row_span = 1;
+    w->xu = w->yu = w->wu = w->hu = UNIT_AUTO;
+    str_copy(w->component, sizeof(w->component), "tile");
+    grid->children[grid->child_count++] = idx;
+    return idx;
+}
+
+int pkg_manager_fill_grid(Screen *s, const char *grid_id, const char *filter, const char *shell_id)
+{
+    if (!s || !grid_id || !grid_id[0])
+        return -1;
+    if (!g_pkg_ready)
+        pkg_manager_init();
+    Widget *grid = screen_find(s, grid_id);
+    if (!grid || grid->type != W_GRID)
+        return -1;
+    int grid_idx = (int)(grid - s->widgets);
+    for (int i = 0; i < grid->child_count; i++) {
+        Widget *c = &s->widgets[grid->children[i]];
+        c->visible = 0;
+        c->focusable = 0;
+        c->text[0] = 0;
+        c->action[0] = 0;
+        c->icon[0] = 0;
+    }
+    int slot = 0;
+    int placed = 0;
+    for (int i = 0; i < g_pkg_reg.count; i++) {
+        const PkgApp *app = &g_pkg_reg.apps[i];
+        if (shell_id && shell_id[0] && str_eq(app->id, shell_id))
+            continue;
+        if (str_eq(app->id, "launcher") || str_eq(app->id, "init") || str_eq(app->id, "pid1"))
+            continue;
+        if (!pkg_str_has(app->name, filter) && !pkg_str_has(app->id, filter))
+            continue;
+        Widget *btn = NULL;
+        while (slot < grid->child_count) {
+            Widget *c = &s->widgets[grid->children[slot]];
+            slot++;
+            if (c->type == W_BUTTON) {
+                btn = c;
+                break;
+            }
+        }
+        if (!btn) {
+            int ni = pkg_alloc_button(s, grid, grid_idx);
+            if (ni < 0)
+                break;
+            btn = &s->widgets[ni];
+            slot = grid->child_count;
+        }
+        str_copy(btn->text, sizeof(btn->text), app->name[0] ? app->name : app->id);
+        str_copy(btn->icon, sizeof(btn->icon), app->icon[0] ? app->icon : app->id);
+        if (!btn->icon_set[0])
+            str_copy(btn->icon_set, sizeof(btn->icon_set), "lucide");
+        snprintf(btn->action, sizeof(btn->action), "app:%s", app->id);
+        btn->bg = COL_BG;
+        btn->fg = COL_TEXT;
+        btn->border_c = COL_BORDER;
+        btn->border = 1;
+        btn->radius = 10;
+        btn->bg_set = 1;
+        btn->fg_set = 1;
+        btn->visible = 1;
+        btn->focusable = 1;
+        placed++;
+    }
+    if (grid->grid_cols <= 0)
+        grid->grid_cols = 3;
+    return placed;
 }

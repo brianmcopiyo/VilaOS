@@ -62,7 +62,7 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
 
     if (str_eq(op, "display") || str_eq(op, "display.info")) {
         char buf[MAX_TEXT];
-        int w = REF_W, h = REF_H;
+        int w = 0, h = 0;
         if (ctx->gfx) {
             w = ctx->gfx->w;
             h = ctx->gfx->h;
@@ -74,9 +74,41 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
         set_out(ctx, a1, buf, out, out_n);
         return VAPI_OK;
     }
+    if (str_eq(op, "graphics") || str_eq(op, "graphics.info") || str_eq(op, "gpu") ||
+        str_eq(op, "gpu.info")) {
+        char buf[MAX_TEXT];
+        const char *tier = "none";
+        const char *backend = "sw";
+        const char *gpu = "-";
+        long vram = 0;
+        int accel = 0;
+        int w = 0, h = 0;
+        if (ctx->gfx) {
+            w = ctx->gfx->w;
+            h = ctx->gfx->h;
+            backend = ctx->gfx->backend[0] ? ctx->gfx->backend : "sw";
+            gpu = ctx->gfx->gpu_name[0] ? ctx->gfx->gpu_name : "-";
+            vram = ctx->gfx->vram_mb;
+            accel = ctx->gfx->gpu_accel;
+            if (ctx->gfx->gfx_tier == GFX_TIER_GPU)
+                tier = "gpu";
+            else if (ctx->gfx->gfx_tier == GFX_TIER_DRM)
+                tier = "drm";
+            else if (ctx->gfx->gfx_tier == GFX_TIER_FB)
+                tier = "fb";
+        }
+        if (accel)
+            snprintf(buf, sizeof(buf), "Tier %s HW accel  %s  %s  %dx%d  VRAM %ldMB", tier, backend,
+                     gpu, w, h, vram);
+        else
+            snprintf(buf, sizeof(buf), "tier %s fallback  %s  %s  %dx%d  VRAM %ldMB", tier, backend,
+                     gpu, w, h, vram);
+        set_out(ctx, a1, buf, out, out_n);
+        return VAPI_OK;
+    }
     if (str_eq(op, "device") || str_eq(op, "device.info")) {
         char buf[MAX_TEXT];
-        int w = REF_W, h = REF_H;
+        int w = 0, h = 0;
         if (ctx->gfx) {
             w = ctx->gfx->w;
             h = ctx->gfx->h;
@@ -106,6 +138,19 @@ int vapi_system(VapiCtx *ctx, const char *op, const char *a1, const char *a2, ch
         snprintf(buf, sizeof(buf), "%ld/%ld MB free  %dc  tier %s", avail_mb, total_mb, hw.cores,
                  hwinfo_tier_name(hw.tier));
         set_out(ctx, a1, buf, out, out_n);
+        return VAPI_OK;
+    }
+    if (str_eq(op, "memory.mb") || str_eq(op, "mb")) {
+        HwProfile hw;
+        long total_kb = 0, free_kb = 0, avail_kb = 0;
+        hwinfo_detect(&hw);
+        if (read_meminfo_kb(&total_kb, &free_kb, &avail_kb) != 0)
+            total_kb = hw.ram_kb;
+        long total_mb = total_kb / 1024;
+        if (total_mb < 1)
+            total_mb = hw.ram_mb;
+        if (out && out_n)
+            snprintf(out, out_n, "%ld", total_mb);
         return VAPI_OK;
     }
     if (str_eq(op, "storage") || str_eq(op, "storage.info")) {

@@ -30,5 +30,6 @@ void linux_png_free(uint8_t *rgba);
 int linux_drm_open(Gfx *g);
 void linux_drm_close(Gfx *g);
 int linux_drm_present(Gfx *g);
+int linux_drm_poll_hotplug(Gfx *g);
 
 #endif

@@ -13,6 +13,14 @@ ifneq ($(OS),Windows_NT)
 LIBS     := -lm -ldl -lpthread
 LINUX_GFX_CFLAGS := $(shell pkg-config --cflags cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
 LINUX_GFX_LIBS := $(shell pkg-config --libs cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
+LINUX_GPU_CFLAGS := $(shell pkg-config --cflags gbm egl glesv2 2>/dev/null)
+LINUX_GPU_LIBS := $(shell pkg-config --libs gbm egl glesv2 2>/dev/null)
+ifneq ($(LINUX_GPU_CFLAGS),)
+LINUX_GFX_CFLAGS += $(LINUX_GPU_CFLAGS)
+endif
+ifneq ($(LINUX_GPU_LIBS),)
+LINUX_GFX_LIBS += $(LINUX_GPU_LIBS)
+endif
 ifneq ($(LINUX_GFX_CFLAGS),)
 CPPFLAGS += $(LINUX_GFX_CFLAGS) -DVILAOS_HAVE_LINUX_GFX
 LIBS += $(LINUX_GFX_LIBS)
@@ -40,6 +48,7 @@ SRC := \
 	src/driver/gfx/builtin.c \
 	src/driver/gfx/backend_drm.c \
 	src/driver/gfx/linux_drm.c \
+	src/driver/gfx/linux_gpu.c \
 	src/proc/proctier.c \
 	src/proc/ipc.c \
 	src/proc/procman.c \
@@ -49,8 +58,10 @@ SRC := \
 	src/xml_ui/attrs.c \
 	src/xml_ui/layout.c \
 	src/xml_ui/parse.c \
+	src/xml_ui/xaml.c \
 	src/ui/screen.c \
 	src/ui/touch.c \
+	src/ui/window.c \
 	src/ui/route.c \
 	src/input/input.c \
 	src/driver/input/pump.c \
@@ -63,6 +74,10 @@ SRC := \
 	src/api/vapi_service.c \
 	src/api/vapi_phone.c \
 	src/api/vapi_system.c \
+	src/api/vapi_window.c \
+	src/api/vapi_pkg.c \
+	src/net/webbridge.c \
+	src/net/chromium_launch.c \
 	src/sdk/vsl.c \
 	src/sdk/bridge.c \
 	src/sdk/apprun.c
@@ -83,6 +98,7 @@ GFX_SO_SRC := \
 	src/driver/gfx/builtin.c \
 	src/driver/gfx/backend_drm.c \
 	src/driver/gfx/linux_drm.c \
+	src/driver/gfx/linux_gpu.c \
 	src/gfx/fb.c \
 	src/gfx/compose.c \
 	src/gfx/pool.c \
@@ -98,6 +114,7 @@ MUSICD_OBJ := $(MUSICD_SRC:.c=.o)
 
 src/gfx/ttfont.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter
 src/gfx/icon.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
+src/driver/gfx/linux_gpu.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-pedantic
 
 .PHONY: all clean native aarch64 musl desktop vfb install qemu-help iso vbox-help pkg sdk-pack gfx-drive musl-gfx-deps
 

@@ -1,0 +1,62 @@
+fn reloadPackages
+  pkg.refresh
+  invoke renderAppGrid _ text:QuickSearchInput
+  invoke refreshTelemetry _
+endfn
+
+fn renderAppGrid filter
+  pkg.render DynamicAppGrid $filter
+endfn
+
+fn refreshTelemetry
+  vapi refreshTelemetry_memMb system.memory.mb
+  vapi refreshTelemetry_openCount window.count
+  vapi refreshTelemetry_pkgCount pkg.count
+  vapi refreshTelemetry_focusedTitle window.focused
+  concat _t0 $refreshTelemetry_memMb " MB"
+  ui.set_text SessionBadge $_t0
+  concat _t0 $refreshTelemetry_memMb " MB configured"
+  ui.set_subtitle RamRow $_t0
+  concat _t0 $refreshTelemetry_pkgCount " installed"
+  ui.set_subtitle PackagesRow $_t0
+  concat _t0 $refreshTelemetry_openCount " active"
+  ui.set_subtitle WindowsRow $_t0
+  concat _t0 $refreshTelemetry_pkgCount " packages · "
+  concat _t0 $_t0 $refreshTelemetry_openCount
+  concat _t0 $_t0 " open windows"
+  ui.set_text WorkspaceSubtitle $_t0
+  concat _t0 "Focused: " $refreshTelemetry_focusedTitle
+  ui.set_text ActiveWindowLabel $_t0
+endfn
+
+on_click RefreshAppsBtn
+  invoke reloadPackages _
+end
+
+on_click HomeBtn
+  window.show_desktop
+end
+
+on_click ShowDesktopBtn
+  window.show_desktop
+end
+
+on_load
+  pkg.refresh
+  invoke reloadPackages _
+  window.sync_taskbar
+end
+
+on_tick
+  vapi _t1 pkg.poll
+  if ne $_t1 0
+    invoke reloadPackages _
+  else
+    invoke renderAppGrid _ text:QuickSearchInput
+  endif
+  invoke refreshTelemetry _
+end
+
+on_tick
+  window.sync_taskbar
+end

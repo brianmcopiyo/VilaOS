@@ -87,6 +87,10 @@ unsigned vapi_cap_required(const char *method)
         return 0;
     if (str_starts(method, "ui."))
         return PKG_CAP_UI;
+    if (str_starts(method, "window."))
+        return PKG_CAP_UI;
+    if (str_starts(method, "pkg."))
+        return PKG_CAP_UI;
     if (str_starts(method, "storage.files."))
         return PKG_CAP_STORAGE_FILES;
     if (str_starts(method, "storage."))
@@ -108,6 +112,7 @@ unsigned vapi_cap_required(const char *method)
     if (str_starts(method, "system.clock"))
         return PKG_CAP_CLOCK;
     if (str_starts(method, "system.device") || str_starts(method, "system.display") ||
+        str_starts(method, "system.graphics") || str_starts(method, "system.gpu") ||
         str_starts(method, "system.memory") || str_starts(method, "system.storage") ||
         str_starts(method, "system.input") || str_starts(method, "system.packages") ||
         str_starts(method, "system.runtime") || str_starts(method, "system.kernel") ||
@@ -194,6 +199,10 @@ int vapi_call(VapiCtx *ctx, const char *method, const char *a1, const char *a2, 
         return vapi_clock(ctx, op, a1, a2, out, out_n);
     if (str_eq(domain, "system"))
         return vapi_system(ctx, op, a1, a2, out, out_n);
+    if (str_eq(domain, "window"))
+        return vapi_window(ctx, op, a1, a2, out, out_n);
+    if (str_eq(domain, "pkg"))
+        return vapi_pkg(ctx, op, a1, a2, out, out_n);
     return VAPI_ERR_UNSUPPORTED;
 }
 

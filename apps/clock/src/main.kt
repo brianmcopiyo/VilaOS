@@ -4,10 +4,9 @@ import app.Cap
 import app.VilaApp
 import app.require
 import clock.Clock
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Screen
+import SoftKey
+import Ui
 class ClockApp : VilaApp() {
     private var g_sw_run = "0"
     private var g_sw_sec = "0"

@@ -1,10 +1,43 @@
 #include "apprun.h"
 #include "bridge.h"
 #include "util.h"
+#include "window.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static int resolve_app(AppHost *h, const char *id, PkgApp *app);
+
+static void sync_host_from_window(AppHost *h, OsWindow *win)
+{
+    if (!h || !win)
+        return;
+    h->current = win->app;
+    h->in_app = 1;
+    h->stack = win->stack;
+    h->vsl.screen = &win->screen;
+}
+
+static void save_host_to_window(AppHost *h, OsWindow *win)
+{
+    if (!h || !win)
+        return;
+    win->stack = h->stack;
+    win->app = h->current;
+}
+
+static void bind_shell_host(AppHost *h, Screen *desktop)
+{
+    PkgApp shell;
+    if (!h)
+        return;
+    resolve_app(h, h->shell_app[0] ? h->shell_app : "launcher", &shell);
+    h->current = shell;
+    h->in_app = 1;
+    if (desktop)
+        h->vsl.screen = desktop;
+}
 
 static int is_shell_app(const AppHost *h, const char *id)
 {
@@ -44,60 +77,20 @@ void apphost_clear_recents(AppHost *h)
     memset(h->recents, 0, sizeof(h->recents));
 }
 
-static int is_dock_app(const char *id)
-{
-    return str_eq(id, "dialer") || str_eq(id, "messages") || str_eq(id, "browser") ||
-           str_eq(id, "settings");
-}
-
-static int skip_home_app(const AppHost *h, const char *id, int home_grid)
-{
-    if (is_shell_app(h, id))
-        return 1;
-    if (home_grid && is_dock_app(id))
-        return 1;
-    return 0;
-}
-
-static int fill_app_grid(AppHost *h, Screen *s, const char *grid_id)
-{
-    Widget *grid = screen_find(s, grid_id);
-    if (!grid || grid->type != W_GRID)
-        return 0;
-    int home_grid = str_eq(grid_id, "launcher");
-    int wi = 0;
-    for (int i = 0; i < grid->child_count; i++) {
-        Widget *b = &s->widgets[grid->children[i]];
-        if (b->type != W_BUTTON)
-            continue;
-        while (wi < h->reg.count && skip_home_app(h, h->reg.apps[wi].id, home_grid))
-            wi++;
-        if (wi >= h->reg.count) {
-            b->visible = 0;
-            b->focusable = 0;
-            continue;
-        }
-        const PkgApp *a = &h->reg.apps[wi++];
-        str_copy(b->text, sizeof(b->text), a->name);
-        str_copy(b->icon, sizeof(b->icon), a->icon[0] ? a->icon : a->id);
-        if (str_eq(b->icon, "music") || str_eq(a->id, "music"))
-            str_copy(b->icon_set, sizeof(b->icon_set), "tabler");
-        else if (!b->icon_set[0])
-            str_copy(b->icon_set, sizeof(b->icon_set), "lucide");
-        snprintf(b->action, sizeof(b->action), "app:%s", a->id);
-        b->border = 0;
-        b->visible = 1;
-        b->focusable = 1;
-    }
-    return 0;
-}
-
 int apphost_refresh_launcher(AppHost *h, Screen *s)
 {
     if (!h || !s)
         return -1;
-    fill_app_grid(h, s, "launcher");
-    fill_app_grid(h, s, "drawer");
+    pkg_manager_refresh();
+    {
+        const PkgRegistry *reg = pkg_manager_registry();
+        if (reg)
+            h->reg = *reg;
+    }
+    const char *shell = h->shell_app[0] ? h->shell_app : "launcher";
+    pkg_manager_fill_grid(s, "DynamicAppGrid", "", shell);
+    pkg_manager_fill_grid(s, "launcher", "", shell);
+    pkg_manager_fill_grid(s, "drawer", "", shell);
     return 0;
 }
 
@@ -143,11 +136,19 @@ int apphost_init(AppHost *h)
     memset(h, 0, sizeof(*h));
     str_copy(h->shell_app, sizeof(h->shell_app), "launcher");
     str_copy(h->shell_path, sizeof(h->shell_path), "app:launcher");
-    h->unlocked = 0;
+    h->unlocked = 1;
     route_reset(&h->stack);
-    pkg_registry_load(&h->reg);
-    if (h->reg.count == 0)
-        pkg_seed_from_dir("/apps", &h->reg);
+    pkg_manager_init();
+    {
+        const PkgRegistry *reg = pkg_manager_registry();
+        if (reg)
+            h->reg = *reg;
+        else {
+            pkg_registry_load(&h->reg);
+            if (h->reg.count == 0)
+                pkg_seed_from_dir("/apps", &h->reg);
+        }
+    }
     return 0;
 }
 
@@ -179,10 +180,14 @@ static void after_layout(AppHost *h, Screen *s, Gfx *g)
 {
     if (!h || !s)
         return;
-    if (strstr(s->path, "home.xml") || strstr(s->path, "drawer.xml"))
+    if (strstr(s->path, "home.xml") || strstr(s->path, "drawer.xml") ||
+        strstr(s->path, "desktop.xaml") || strstr(s->path, "dashboard.xaml"))
         apphost_refresh_launcher(h, s);
     if (strstr(s->path, "recents.xml"))
         apphost_refresh_recents(h, s);
+    if (strstr(s->path, "home.xml") || strstr(s->path, "desktop.xaml") ||
+        strstr(s->path, "dashboard.xaml") || strstr(s->path, "taskbar.xaml"))
+        wm_sync_taskbar(&g_wm, s);
     if (g)
         screen_layout(s, g);
     apphost_update_softkeys(h, s);
@@ -238,8 +243,13 @@ static int load_layout(AppHost *h, Screen *s, Gfx *g, const PkgApp *app, const c
 
 static int resolve_app(AppHost *h, const char *id, PkgApp *app)
 {
-    int idx = pkg_registry_find(&h->reg, id);
     memset(app, 0, sizeof(*app));
+    if (!id || !id[0])
+        return -1;
+    pkg_manager_refresh();
+    if (pkg_manager_find(id, app) == 0)
+        return 0;
+    int idx = pkg_registry_find(&h->reg, id);
     if (idx >= 0) {
         *app = h->reg.apps[idx];
         return 0;
@@ -254,6 +264,23 @@ static int resolve_app(AppHost *h, const char *id, PkgApp *app)
         str_copy(app->icon, sizeof(app->icon), id);
     }
     return 0;
+}
+
+static void build_script_path(const PkgApp *app, char *script, size_t n)
+{
+    snprintf(script, n, "%s/%s/%s", PKG_APPS_ROOT, app->id,
+             app->entry_script[0] ? app->entry_script : "bin/main.kbc");
+    FILE *probe = fopen(script, "r");
+    if (!probe) {
+        snprintf(script, n, "%s/%s/bin/main.kbc", PKG_APPS_ROOT, app->id);
+        probe = fopen(script, "r");
+    }
+    if (!probe) {
+        snprintf(script, n, "%s/%s/src/main.kt", PKG_APPS_ROOT, app->id);
+        probe = fopen(script, "r");
+    }
+    if (probe)
+        fclose(probe);
 }
 
 static int softkey_clearable_input(const Widget *w)
@@ -299,10 +326,9 @@ int apphost_open_shell(AppHost *h, Screen *s, Gfx *g, const char *layout)
     char rel[MAX_PATH];
     if (layout && layout[0])
         normalize_layout_rel(layout, rel, sizeof(rel));
-    else if (h->unlocked)
-        str_copy(rel, sizeof(rel), "res/layout/home.xml");
     else
-        normalize_layout_rel(app.entry_screen, rel, sizeof(rel));
+        str_copy(rel, sizeof(rel), "xaml/desktop.xaml");
+    h->unlocked = 1;
     route_reset(&h->stack);
     route_push(&h->stack, app.id, rel, -1, NULL);
     return load_layout(h, s, g, &app, rel, -1);
@@ -313,33 +339,81 @@ int apphost_open_app(AppHost *h, Screen *s, Gfx *g, const char *id)
     if (!h || !s || !id)
         return -1;
     if (is_shell_app(h, id))
-        return apphost_open_shell(h, s, g, h->unlocked ? "res/layout/home.xml" : NULL);
+        return apphost_open_shell(h, s, g, "xaml/desktop.xaml");
+
+    OsWindow *prev = wm_focused(&g_wm);
+    if (prev && !is_shell_app(h, prev->app_id))
+        save_host_to_window(h, prev);
+
     PkgApp app;
     resolve_app(h, id, &app);
     apphost_push_recent(h, id);
-    route_reset(&h->stack);
+
+    OsWindow *existing = wm_find_app(&g_wm, id);
+    if (existing) {
+        wm_focus(&g_wm, existing->id);
+        sync_host_from_window(h, existing);
+        if (existing->script[0])
+            vsl_load(&h->vsl, &existing->app, &existing->screen, existing->script);
+        wm_sync_taskbar(&g_wm, g_wm.desktop ? g_wm.desktop : s);
+        return 0;
+    }
+
+    char script[MAX_PATH];
+    build_script_path(&app, script, sizeof(script));
+    int wid = wm_open(&g_wm, &app, script, app.name[0] ? app.name : app.id);
+    OsWindow *win = wm_find(&g_wm, wid);
+    if (!win)
+        return -1;
+
     char rel[MAX_PATH];
     normalize_layout_rel(app.entry_screen, rel, sizeof(rel));
-    route_push(&h->stack, app.id, rel, -1, NULL);
-    return load_layout(h, s, g, &app, rel, -1);
+    route_reset(&win->stack);
+    route_push(&win->stack, app.id, rel, -1, NULL);
+    h->stack = win->stack;
+    int rc = load_layout(h, &win->screen, g, &app, rel, -1);
+    win->stack = h->stack;
+    str_copy(win->script, sizeof(win->script), script);
+    wm_layout_window(&g_wm, win);
+    wm_sync_taskbar(&g_wm, g_wm.desktop ? g_wm.desktop : s);
+    return rc;
 }
 
 int apphost_route_push(AppHost *h, Screen *s, Gfx *g, const char *layout)
 {
     if (!h || !h->in_app || !layout)
         return -1;
+    Screen *target = s;
+    OsWindow *win = NULL;
+    if (!is_shell_app(h, h->current.id)) {
+        win = wm_find_app(&g_wm, h->current.id);
+        if (win)
+            target = &win->screen;
+    }
     char rel[MAX_PATH];
     normalize_layout_rel(layout, rel, sizeof(rel));
-    route_save_focus(&h->stack, s ? s->focus : -1);
+    route_save_focus(&h->stack, target ? target->focus : -1);
     if (route_push(&h->stack, h->current.id, rel, -1, NULL) != 0)
         return -1;
-    return load_layout(h, s, g, &h->current, rel, -1);
+    int rc = load_layout(h, target, g, &h->current, rel, -1);
+    if (win) {
+        win->stack = h->stack;
+        wm_layout_window(&g_wm, win);
+    }
+    return rc;
 }
 
 int apphost_route_replace(AppHost *h, Screen *s, Gfx *g, const char *layout)
 {
     if (!h || !h->in_app || !layout)
         return -1;
+    Screen *target = s;
+    OsWindow *win = NULL;
+    if (!is_shell_app(h, h->current.id)) {
+        win = wm_find_app(&g_wm, h->current.id);
+        if (win)
+            target = &win->screen;
+    }
     char rel[MAX_PATH];
     normalize_layout_rel(layout, rel, sizeof(rel));
     if (strstr(rel, "home.xml") && is_shell_app(h, h->current.id))
@@ -349,7 +423,18 @@ int apphost_route_replace(AppHost *h, Screen *s, Gfx *g, const char *layout)
     } else {
         route_replace(&h->stack, rel, -1, NULL);
     }
-    return load_layout(h, s, g, &h->current, rel, -1);
+    int rc = load_layout(h, target, g, &h->current, rel, -1);
+    if (win) {
+        win->stack = h->stack;
+        wm_layout_window(&g_wm, win);
+    }
+    if (is_shell_app(h, h->current.id) &&
+        (strstr(rel, "home.xml") || strstr(rel, "desktop.xaml")) && g_wm.desktop) {
+        wm_set_work_area(&g_wm, 24, 8, g && g->w > 48 ? g->w - 48 : (g ? g->w : 0),
+                         g && g->h > 64 ? g->h - 64 : (g ? g->h : 0));
+        wm_sync_taskbar(&g_wm, g_wm.desktop);
+    }
+    return rc;
 }
 
 int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_sz)
@@ -367,12 +452,17 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
                 out_nav[0] = 0;
             return 0;
         }
+        wm_close_app(&g_wm, h->current.id);
+        bind_shell_host(h, g_wm.desktop ? g_wm.desktop : s);
         route_reset(&h->stack);
-        h->in_app = 0;
+        if (g_wm.desktop) {
+            route_push(&h->stack, h->current.id, "xaml/desktop.xaml", -1, NULL);
+            wm_sync_taskbar(&g_wm, g_wm.desktop);
+        }
         vsl_reset(&h->vsl);
         if (out_nav)
-            str_copy(out_nav, out_sz, h->shell_path);
-        return 1;
+            out_nav[0] = 0;
+        return 2;
     }
     RouteFrame discarded;
     route_pop(&h->stack, &discarded);
@@ -383,15 +473,28 @@ int apphost_route_pop(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_s
                 out_nav[0] = 0;
             return 0;
         }
+        wm_close_app(&g_wm, h->current.id);
+        bind_shell_host(h, g_wm.desktop ? g_wm.desktop : s);
         route_reset(&h->stack);
-        h->in_app = 0;
+        wm_sync_taskbar(&g_wm, g_wm.desktop ? g_wm.desktop : s);
         vsl_reset(&h->vsl);
         if (out_nav)
-            str_copy(out_nav, out_sz, h->shell_path);
-        return 1;
+            out_nav[0] = 0;
+        return 2;
     }
-    if (load_layout(h, s, g, &h->current, top->layout, top->focus) != 0)
+    Screen *target = s;
+    OsWindow *win = NULL;
+    if (!is_shell_app(h, h->current.id)) {
+        win = wm_find_app(&g_wm, h->current.id);
+        if (win)
+            target = &win->screen;
+    }
+    if (load_layout(h, target, g, &h->current, top->layout, top->focus) != 0)
         return -1;
+    if (win) {
+        win->stack = h->stack;
+        wm_layout_window(&g_wm, win);
+    }
     if (out_nav)
         out_nav[0] = 0;
     return 2;
@@ -401,21 +504,29 @@ int apphost_route_home(AppHost *h, Screen *s, Gfx *g, char *out_nav, size_t out_
 {
     if (!h)
         return -1;
-    const char *layout = h->unlocked ? "res/layout/home.xml" : "res/layout/lock.xml";
+    OsWindow *prev = wm_focused(&g_wm);
+    if (prev && !is_shell_app(h, prev->app_id))
+        save_host_to_window(h, prev);
+    wm_handle_action(&g_wm, "wm:show_desktop");
+    Screen *desktop = g_wm.desktop ? g_wm.desktop : s;
+    const char *layout = "xaml/desktop.xaml";
+    h->unlocked = 1;
     if (h->in_app && is_shell_app(h, h->current.id)) {
         route_reset(&h->stack);
         route_push(&h->stack, h->current.id, layout, -1, NULL);
-        if (load_layout(h, s, g, &h->current, layout, -1) != 0)
+        if (load_layout(h, desktop, g, &h->current, layout, -1) != 0)
             return -1;
+        wm_sync_taskbar(&g_wm, desktop);
         if (out_nav)
             out_nav[0] = 0;
         return 2;
     }
-    if (apphost_open_shell(h, s, g, layout) != 0) {
+    if (apphost_open_shell(h, desktop, g, layout) != 0) {
         if (out_nav)
             str_copy(out_nav, out_sz, h->shell_path);
         return 1;
     }
+    wm_sync_taskbar(&g_wm, desktop);
     if (out_nav)
         out_nav[0] = 0;
     return 2;
@@ -493,9 +604,28 @@ int apphost_handle_action(AppHost *h, Screen *s, Gfx *g, const char *action, cha
     if (str_eq(action, "power_restart"))
         return 31;
 
+    if (str_starts(action, "wm:")) {
+        OsWindow *prev = wm_focused(&g_wm);
+        if (prev && !is_shell_app(h, prev->app_id))
+            save_host_to_window(h, prev);
+        int wrc = wm_handle_action(&g_wm, action);
+        OsWindow *now = wm_focused(&g_wm);
+        if (now) {
+            sync_host_from_window(h, now);
+            if (now->script[0])
+                vsl_load(&h->vsl, &now->app, &now->screen, now->script);
+        } else {
+            bind_shell_host(h, g_wm.desktop ? g_wm.desktop : s);
+        }
+        wm_sync_taskbar(&g_wm, g_wm.desktop ? g_wm.desktop : s);
+        if (out_nav)
+            out_nav[0] = 0;
+        return wrc >= 0 ? 2 : -1;
+    }
+
     if (str_eq(action, "unlock") && h->in_app && is_shell_app(h, h->current.id)) {
         h->unlocked = 1;
-        if (apphost_route_replace(h, s, g, "res/layout/home.xml") == 0) {
+        if (apphost_route_replace(h, s, g, "xaml/desktop.xaml") == 0) {
             if (out_nav)
                 out_nav[0] = 0;
             return 2;

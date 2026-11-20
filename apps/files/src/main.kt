@@ -4,10 +4,9 @@ import app.Cap
 import app.VilaApp
 import app.require
 import storage.Storage
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Screen
+import SoftKey
+import Ui
 class FilesApp : VilaApp() {
     override fun onStart(screen: Screen) {
         require(Cap.UI, Cap.STORAGE_FILES)

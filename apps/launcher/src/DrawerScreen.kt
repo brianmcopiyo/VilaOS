@@ -1,12 +1,12 @@
 package launcher
 
 import system.System
-import ui.Ui
-
+import Ui
 class DrawerScreen {
     fun apps() {
         System.packages("title")
-        Ui.setText("title", "Apps")
+        Ui.setText("title", "App Launcher")
+        System.time("clock")
     }
 
     fun filter() {

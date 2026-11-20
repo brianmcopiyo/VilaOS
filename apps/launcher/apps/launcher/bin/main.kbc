@@ -1,0 +1,140 @@
+fn refreshTelemetry
+  vapi refreshTelemetry_memMb system.memory.mb
+  vapi refreshTelemetry_openCount window.count
+  vapi refreshTelemetry_focusedTitle window.focused
+  concat _t0 $refreshTelemetry_memMb " MB"
+  ui.set_text SessionBadge $_t0
+  concat _t0 $refreshTelemetry_memMb " MB configured"
+  ui.set_subtitle RamRow $_t0
+  concat _t0 $refreshTelemetry_openCount " active"
+  ui.set_subtitle WindowsRow $_t0
+  concat _t0 $refreshTelemetry_openCount " open windows · Desktop shell ready"
+  ui.set_text WorkspaceSubtitle $_t0
+  concat _t0 "Focused: " $refreshTelemetry_focusedTitle
+  ui.set_text ActiveWindowLabel $_t0
+endfn
+
+fn apps
+  system.packages.list title
+  ui.set_text title "App Launcher"
+  system.time clock
+endfn
+
+fn filter
+  vapi filter_q ui.get_text search
+  if eq $filter_q ""
+    invoke apps _
+  else
+    concat _t1 "Apps: " $filter_q
+    ui.set_text title $_t1
+  endif
+endfn
+
+fn home
+  system.time clock
+  clock.date date
+  ui.set_text statuspill Ready
+  ui.set_text brand VilaOS
+  ui.set_text menu Apps
+endfn
+
+fn lock
+  system.time clock
+  clock.date date
+  ui.set_text hint "Desktop session ready"
+  ui.set_text go "Open desktop"
+  ui.set_text unlock "Enter desktop"
+endfn
+
+fn tasks
+  ui.set_text title Recents
+endfn
+
+fn empty
+  ui.set_text r0 "— cleared"
+  ui.set_text r1 "— cleared"
+  ui.set_text r2 "— cleared"
+  ui.set_text r3 "— cleared"
+  ui.set_text r4 "— cleared"
+  ui.set_text r5 "— cleared"
+endfn
+
+fn panel sound vibrate
+  system.time clock
+  system.device.info device
+  system.memory.info memory
+  if eq $sound 1
+    ui.set_text sound "Sound: On"
+  else
+    ui.set_text sound "Sound: Off"
+  endif
+  if eq $vibrate 1
+    ui.set_text vibrate "Vibrate: On"
+  else
+    ui.set_text vibrate "Vibrate: Off"
+  endif
+  storage.app.set sound $sound
+  storage.app.set vibrate $vibrate
+endfn
+
+on_click LaunchFilesBtn
+  window.open files
+  invoke refreshTelemetry _
+end
+
+on_click LaunchBrowserBtn
+  window.open browser
+  invoke refreshTelemetry _
+end
+
+on_click LaunchMessagesBtn
+  window.open messages
+  invoke refreshTelemetry _
+end
+
+on_click LaunchSettingsBtn
+  window.open settings
+  invoke refreshTelemetry _
+end
+
+on_click LaunchMusicBtn
+  window.open music
+  invoke refreshTelemetry _
+end
+
+on_click LaunchNotesBtn
+  window.open notes
+  invoke refreshTelemetry _
+end
+
+on_click OpenSettingsBtn
+  window.open settings
+  invoke refreshTelemetry _
+end
+
+on_click LauncherToggleBtn
+  window.drawer
+end
+
+on_click HomeBtn
+  window.show_desktop
+end
+
+on_click ShowDesktopBtn
+  window.show_desktop
+end
+
+on_load
+  ui.replace xaml/desktop.xaml
+  invoke refreshTelemetry _
+  require ui
+  require system.device
+  require system.power
+  require storage.app
+  require storage.files
+  window.sync_taskbar
+end
+
+on_tick
+  window.sync_taskbar
+end

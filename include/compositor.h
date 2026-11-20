@@ -5,8 +5,7 @@
 #include "screen.h"
 #include "input.h"
 #include "fb.h"
-
-#include <pthread.h>
+#include "window.h"
 
 #define COMPOSITOR_CURSOR_W 16
 #define COMPOSITOR_CURSOR_H 16
@@ -14,6 +13,7 @@
 typedef struct {
     Gfx *gfx;
     Screen *screen;
+    WindowManager *wm;
     InputMux *input;
     pthread_mutex_t mu;
     pthread_cond_t cv;
@@ -37,7 +37,7 @@ typedef struct {
     int under_valid;
 } DisplayCompositor;
 
-int compositor_start(DisplayCompositor *c, Gfx *gfx, Screen *screen, InputMux *input);
+int compositor_start(DisplayCompositor *c, Gfx *gfx, Screen *screen, WindowManager *wm, InputMux *input);
 void compositor_stop(DisplayCompositor *c);
 void compositor_lock(DisplayCompositor *c);
 void compositor_unlock(DisplayCompositor *c);

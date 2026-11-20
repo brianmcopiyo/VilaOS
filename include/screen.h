@@ -7,6 +7,7 @@ int screen_init(Screen *s);
 int screen_load(Screen *s, const char *path);
 void screen_layout(Screen *s, Gfx *g);
 void screen_render(Screen *s, Gfx *g, const InputState *in);
+void screen_render_layer(Screen *s, Gfx *g, int ox, int oy);
 Widget *screen_widget(Screen *s, int idx);
 Widget *screen_find(Screen *s, const char *id);
 int screen_focus_first(Screen *s);

@@ -1,6 +1,7 @@
 #include "fb.h"
 #include "gfx_backend.h"
 #include "gfx_loader.h"
+#include "linux_gpu.h"
 #include "compose.h"
 #include "linux_gfx.h"
 #include "util.h"
@@ -59,27 +60,38 @@ static void gfx_update_metrics(Gfx *g)
 {
     g->font_scale = 1;
     g->aspect_ratio = (g->h > 0) ? ((float)g->w / (float)g->h) : 1.0f;
-    g->status_h = 32;
-    g->softkey_h = 36;
+    g->status_h = 0;
+    g->softkey_h = 0;
     g->pad = 12;
     g->item_h = 40;
     if (g->h >= 800) {
-        g->status_h = 36;
-        g->softkey_h = 40;
         g->pad = 14;
         g->item_h = 44;
     }
     if (g->h < 160) {
-        g->status_h = 18;
-        g->softkey_h = 22;
         g->item_h = 28;
         g->pad = 6;
     }
 }
 
+int gfx_env_size(int *w, int *h)
+{
+    const char *ew = getenv("VILAOS_FB_W");
+    const char *eh = getenv("VILAOS_FB_H");
+    int rw = ew && ew[0] ? atoi(ew) : 0;
+    int rh = eh && eh[0] ? atoi(eh) : 0;
+    if (rw < GFX_MIN_W || rh < GFX_MIN_H)
+        return -1;
+    if (w)
+        *w = rw;
+    if (h)
+        *h = rh;
+    return 0;
+}
+
 int gfx_set_size(Gfx *g, int w, int h)
 {
-    if (!g || w < 64 || h < 64)
+    if (!g || w < GFX_MIN_W || h < GFX_MIN_H)
         return -1;
     if (w > MAX_FB_W)
         w = MAX_FB_W;
@@ -225,6 +237,8 @@ static void gfx_fill_hw(Gfx *g, uint32_t color32, uint16_t color16)
 
 int gfx_backend_probe_fb(Gfx *g)
 {
+    if (getenv("VILAOS_HEADLESS_UI"))
+        return -1;
     g->fb_fd = open("/dev/fb0", O_RDWR);
     if (g->fb_fd < 0)
         return -1;
@@ -238,23 +252,10 @@ int gfx_backend_probe_fb(Gfx *g)
         return -1;
     }
 
-    if (vinfo.xres < 64 || vinfo.yres < 64 || vinfo.bits_per_pixel < 16) {
-        vinfo.xres = 640;
-        vinfo.yres = 480;
-        vinfo.xres_virtual = 640;
-        vinfo.yres_virtual = 480;
-        vinfo.bits_per_pixel = 16;
-        vinfo.red.offset = 11;
-        vinfo.red.length = 5;
-        vinfo.green.offset = 5;
-        vinfo.green.length = 6;
-        vinfo.blue.offset = 0;
-        vinfo.blue.length = 5;
-        vinfo.transp.offset = 0;
-        vinfo.transp.length = 0;
-        ioctl(g->fb_fd, FBIOPUT_VSCREENINFO, &vinfo);
-        ioctl(g->fb_fd, FBIOGET_VSCREENINFO, &vinfo);
-        ioctl(g->fb_fd, FBIOGET_FSCREENINFO, &finfo);
+    if (vinfo.xres < GFX_MIN_W || vinfo.yres < GFX_MIN_H || vinfo.bits_per_pixel < 16) {
+        close(g->fb_fd);
+        g->fb_fd = -1;
+        return -1;
     }
 
     g->fb_w = (int)vinfo.xres;
@@ -262,18 +263,10 @@ int gfx_backend_probe_fb(Gfx *g)
     g->fb_bpp = (int)vinfo.bits_per_pixel;
     g->fb_stride = (int)finfo.line_length;
     g->is_xrgb = (g->fb_bpp == 32);
-    {
-        int lw = g->fb_w;
-        int lh = g->fb_h;
-        if (lw != PHONE_W || lh != PHONE_H) {
-            lw = PHONE_W;
-            lh = PHONE_H;
-        }
-        if (gfx_set_size(g, lw, lh) != 0) {
-            close(g->fb_fd);
-            g->fb_fd = -1;
-            return -1;
-        }
+    if (gfx_set_size(g, g->fb_w, g->fb_h) != 0) {
+        close(g->fb_fd);
+        g->fb_fd = -1;
+        return -1;
     }
 
     g->fb_map_len = (size_t)finfo.smem_len;
@@ -287,6 +280,10 @@ int gfx_backend_probe_fb(Gfx *g)
     }
 
     str_copy(g->backend, sizeof(g->backend), "fb");
+    g->gfx_tier = GFX_TIER_FB;
+    g->gpu_accel = 0;
+    if (!g->gpu_name[0])
+        str_copy(g->gpu_name, sizeof(g->gpu_name), "framebuffer");
     gfx_fill_hw(g, 0xFF000000u, RGB565(0, 0, 0));
     return 0;
 }
@@ -303,8 +300,21 @@ int gfx_backend_probe_sdl(Gfx *g)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         return -1;
-    g_win = SDL_CreateWindow("VilaOS", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             PHONE_W, PHONE_H, SDL_WINDOW_RESIZABLE);
+    int iw = 0, ih = 0;
+    if (gfx_env_size(&iw, &ih) != 0) {
+        SDL_DisplayMode dm;
+        memset(&dm, 0, sizeof(dm));
+        if (SDL_GetDesktopDisplayMode(0, &dm) != 0 || dm.w < GFX_MIN_W || dm.h < GFX_MIN_H)
+            return -1;
+        iw = dm.w * 3 / 4;
+        ih = dm.h * 3 / 4;
+        if (iw < GFX_MIN_W)
+            iw = dm.w;
+        if (ih < GFX_MIN_H)
+            ih = dm.h;
+    }
+    g_win = SDL_CreateWindow("VilaOS", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, iw, ih,
+                             SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!g_win)
         return -1;
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_ACCELERATED);
@@ -358,8 +368,13 @@ int gfx_backend_init_all(Gfx *g, int desktop)
     g->fb_bpp = 16;
     g->is_xrgb = 0;
     str_copy(g->backend, sizeof(g->backend), "vfb");
-    if (gfx_set_size(g, PHONE_W, PHONE_H) != 0)
-        return -1;
+    {
+        int vw = 0, vh = 0;
+        if (gfx_env_size(&vw, &vh) != 0)
+            return -1;
+        if (gfx_set_size(g, vw, vh) != 0)
+            return -1;
+    }
     g->fb_w = g->w;
     g->fb_h = g->h;
     gfx_clear(g, COL_BG);
@@ -367,26 +382,29 @@ int gfx_backend_init_all(Gfx *g, int desktop)
     return 0;
 #else
     (void)desktop;
-    if (gfx_backend_probe_drm(g) == 0) {
-        gfx_clear(g, COL_BG);
+    {
+        int sw = 0, sh = 0;
+        if (gfx_env_size(&sw, &sh) != 0) {
+            sw = 1280;
+            sh = 800;
+        }
+        str_copy(g->backend, sizeof(g->backend), "headless");
+        str_copy(g->gpu_name, sizeof(g->gpu_name), "chromium");
+        g->gfx_tier = GFX_TIER_NONE;
+        g->gpu_accel = 0;
+        g->fb_bpp = 32;
+        g->is_xrgb = 1;
+        g->fb_fd = -1;
+        g->dri_fd = -1;
+        g->fb_map = NULL;
+        g->fb_map_len = 0;
+        if (gfx_set_size(g, sw, sh) != 0)
+            return -1;
+        g->fb_w = g->w;
+        g->fb_h = g->h;
         g->resized = 0;
         return 0;
     }
-    if (gfx_backend_probe_fb(g) == 0) {
-        gfx_clear(g, COL_BG);
-        g->resized = 0;
-        return 0;
-    }
-    str_copy(g->backend, sizeof(g->backend), "sw");
-    g->fb_bpp = 16;
-    g->is_xrgb = 0;
-    if (gfx_set_size(g, PHONE_W, PHONE_H) != 0)
-        return -1;
-    g->fb_w = g->w;
-    g->fb_h = g->h;
-    gfx_clear(g, COL_BG);
-    g->resized = 0;
-    return 0;
 #endif
 }
 
@@ -411,6 +429,12 @@ void gfx_backend_shutdown(Gfx *g)
 #endif
 #if !defined(PHONE_DESKTOP) && !defined(PHONE_VFB)
     if (g) {
+        if (linux_gpu_active(g))
+            linux_gpu_close(g);
+#if defined(VILAOS_HAVE_LINUX_GFX)
+        else if (g->gfx_tier == GFX_TIER_DRM || g->dri_fd >= 0)
+            linux_drm_close(g);
+#endif
         if (g->fb_map && g->fb_map_len) {
             munmap(g->fb_map, g->fb_map_len);
             g->fb_map = NULL;
@@ -424,6 +448,7 @@ void gfx_backend_shutdown(Gfx *g)
             close(g->dri_fd);
             g->dri_fd = -1;
         }
+        g->gfx_tier = GFX_TIER_NONE;
     }
 #endif
     if (g) {
@@ -457,6 +482,10 @@ void gfx_backend_present(Gfx *g)
 {
     if (!g || !g->back)
         return;
+    if (str_eq(g->backend, "headless") || getenv("VILAOS_HEADLESS_UI")) {
+        g->dirty.valid = 0;
+        return;
+    }
 
     if (g->composer && g->composer->cmd_count > 0)
         compose_flush(g->composer, g->back, g->w, g->h);
@@ -618,10 +647,10 @@ int gfx_backend_poll_desktop(Gfx *g)
              e.window.event == SDL_WINDOWEVENT_RESIZED)) {
             int w = e.window.data1;
             int h = e.window.data2;
-            if (w < 64)
-                w = 64;
-            if (h < 64)
-                h = 64;
+            if (w < GFX_MIN_W)
+                w = GFX_MIN_W;
+            if (h < GFX_MIN_H)
+                h = GFX_MIN_H;
             g->fb_w = w;
             g->fb_h = h;
             gfx_set_size(g, w, h);
@@ -653,13 +682,23 @@ void gfx_shutdown(Gfx *g)
 
 void gfx_present(Gfx *g)
 {
+    if (!g)
+        return;
+    if (str_eq(g->backend, "headless") || getenv("VILAOS_HEADLESS_UI")) {
+        g->dirty.valid = 0;
+        return;
+    }
 #if defined(VILAOS_HAVE_LINUX_GFX)
-    if (g && g->dri_fd >= 0 && linux_drm_present(g) == 0) {
+    if (linux_gpu_active(g) && linux_gpu_present(g) == 0) {
+        g->dirty.valid = 0;
+        return;
+    }
+    if (g->gfx_tier == GFX_TIER_DRM && g->dri_fd >= 0 && linux_drm_present(g) == 0) {
         g->dirty.valid = 0;
         return;
     }
 #endif
-    if (g && g->drv && g->drv->present)
+    if (g->drv && g->drv->present)
         g->drv->present(g);
     else
         gfx_backend_present(g);
@@ -667,5 +706,11 @@ void gfx_present(Gfx *g)
 
 int gfx_poll_desktop(Gfx *g)
 {
+#if defined(VILAOS_HAVE_LINUX_GFX)
+    if (g && linux_gpu_active(g))
+        linux_gpu_poll_hotplug(g);
+    else if (g && g->gfx_tier == GFX_TIER_DRM)
+        linux_drm_poll_hotplug(g);
+#endif
     return gfx_backend_poll_desktop(g);
 }

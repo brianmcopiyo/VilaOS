@@ -1,0 +1,252 @@
+:root {
+  --warm-beige: #F5EFE6;
+  --soft-sand: #EAE0D0;
+  --hairline: #D4C5B0;
+  --ink: #1C1917;
+  --muted: #57534E;
+  --sunset: #EA580C;
+  --white: #FFFFFF;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--warm-beige);
+  color: var(--ink);
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+  font-size: 13px;
+  user-select: none;
+}
+* {
+  box-sizing: border-box;
+}
+#root {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+.desktop-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--warm-beige);
+}
+.workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  padding: 12px;
+}
+.taskbar {
+  flex: 0 0 auto;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--soft-sand);
+  border-top: 1px solid var(--hairline);
+  z-index: 10000;
+}
+.taskbar .slot {
+  min-width: 72px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--warm-beige);
+  color: var(--ink);
+  font-size: 12px;
+}
+.taskbar .slot.active {
+  border-color: var(--sunset);
+  box-shadow: inset 0 -2px 0 var(--sunset);
+}
+.taskbar .start {
+  background: var(--sunset);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  height: 32px;
+  padding: 0 14px;
+  font-weight: 700;
+}
+.taskbar .clock, .taskbar .health {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.start-menu {
+  position: absolute;
+  left: 10px;
+  bottom: 56px;
+  width: 280px;
+  max-height: 70vh;
+  overflow: auto;
+  background: var(--soft-sand);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 10px;
+  z-index: 10001;
+}
+.start-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0 0 6px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--warm-beige);
+  color: var(--ink);
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.app-tile {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--soft-sand);
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 84px;
+}
+.app-tile:hover {
+  border-color: var(--sunset);
+}
+.app-tile .name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+.app-tile .sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--warm-beige);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 180px;
+  min-height: 140px;
+  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.12);
+}
+.window.focused {
+  border-color: var(--sunset);
+}
+.window .titlebar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--soft-sand);
+  border-bottom: 1px solid var(--hairline);
+  cursor: move;
+  gap: 6px;
+}
+.window.focused .titlebar {
+  background: var(--sunset);
+  color: var(--white);
+  border-bottom-color: var(--sunset);
+}
+.window .titlebar .title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.window .titlebar button {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+.window.focused .titlebar button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.window .client {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  background: var(--warm-beige);
+}
+.window .resize {
+  position: absolute;
+  z-index: 2;
+}
+.window .resize.e { right: 0; top: 28px; bottom: 0; width: 6px; cursor: ew-resize; }
+.window .resize.s { left: 0; right: 0; bottom: 0; height: 6px; cursor: ns-resize; }
+.window .resize.se { right: 0; bottom: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.window .resize.w { left: 0; top: 28px; bottom: 0; width: 6px; cursor: ew-resize; }
+.window .resize.n { left: 0; right: 0; top: 0; height: 6px; cursor: ns-resize; }
+.window .resize.ne { right: 0; top: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.window .resize.nw { left: 0; top: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.window .resize.sw { left: 0; bottom: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.ui-panel, .ui-card {
+  background: var(--soft-sand);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 12px;
+}
+.ui-stack {
+  display: flex;
+}
+.ui-grid {
+  display: grid;
+}
+.ui-button {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--soft-sand);
+  color: var(--ink);
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: var(--sunset);
+  color: var(--white);
+}
+.ui-input {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--warm-beige);
+  color: var(--ink);
+  padding: 8px;
+  font-size: 12px;
+}
+.ui-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+.ui-row .title { font-weight: 700; color: var(--ink); }
+.ui-row .subtitle { font-size: 11px; color: var(--muted); }
+.ui-text { color: var(--ink); }
+.hidden { display: none !important; }

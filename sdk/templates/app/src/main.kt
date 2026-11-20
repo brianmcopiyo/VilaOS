@@ -3,10 +3,10 @@ package example
 import app.Cap
 import app.VilaApp
 import app.require
-import ui.Button
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
+import Button
+import Screen
+import SoftKey
+import Ui
 
 class ExampleApp : VilaApp() {
     private val okBtn = Button(id = "ok_btn", variant = "primary") {

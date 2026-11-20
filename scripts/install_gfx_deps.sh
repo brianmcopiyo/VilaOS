@@ -13,8 +13,15 @@ apt-get install -y -qq \
   libpng-dev \
   libdrm-dev \
   libevdev-dev \
-  wget xz-utils tar
+  libgbm-dev \
+  libegl-dev \
+  libgles2-dev \
+  wget xz-utils ta
 pkg-config --exists cairo pixman-1 freetype2 libpng libdrm libevdev
-for p in cairo pixman-1 freetype2 libpng libdrm libevdev; do
-  echo "$p: $(pkg-config --modversion "$p")"
+for p in cairo pixman-1 freetype2 libpng libdrm libevdev gbm egl glesv2; do
+  if pkg-config --exists "$p" 2>/dev/null; then
+    echo "$p: $(pkg-config --modversion "$p")"
+  else
+    echo "$p: optional missing"
+  fi
 done

@@ -2,8 +2,7 @@ package settings
 
 import storage.Storage
 import system.System
-import ui.Ui
-
+import Ui
 class InputScreen {
     fun keyLabel(mode: String): String {
         if (mode == "1") {

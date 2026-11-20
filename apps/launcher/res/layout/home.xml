@@ -1,28 +1,40 @@
 <?xml version="1.0"?>
 <screen id="home" class="page" background="#F5EFE6">
-  <statusbar id="status"/>
-  <flex id="body" class="col gap-10 p-16" x="0%" y="auto" width="100%" height="fill" align-items="stretch">
-    <label id="clock" text="00:00" color="#1C1917" width="100%" height="wrap" value="1" font-family="JetBrains Mono" font-size="42" font-weight="500" text-align="center"/>
-    <label id="date" text="Today" color="#57534E" width="100%" height="wrap" font-family="DM Sans" font-size="14" font-weight="600" text-align="center"/>
-    <badge id="statuspill" text="VilaOS" value="2" background="#EA580C" color="#FFFFFF" radius="12" height="24" width="auto"/>
-    <grid id="launcher" width="100%" height="fill" grow="1" gap="12" padding="4" columns="4">
-      <button id="tile0" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile1" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile2" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile3" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile4" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile5" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile6" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-      <button id="tile7" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="18" border-width="0" component="tile" font-family="Inter" font-size="11"/>
-    </grid>
-    <button id="drawer" text="Search apps" icon="search" icon-set="lucide" action="route:push:res/layout/drawer.xml" background="#EAE0D0" color="#57534E" width="100%" height="40" radius="20" border-width="0" component="button" font-family="Inter" font-size="13"/>
-    <hbox id="dock" width="100%" height="72" gap="8" padding="8" background="#EAE0D0" radius="28" border-width="0">
-      <button id="dock0" text="" icon="phone" icon-set="lucide" action="app:dialer" background="#FFFFFF" color="#1C1917" radius="18" border-width="0" grow="1" component="dock"/>
-      <button id="dock1" text="" icon="messages" icon-set="phosphor" action="app:messages" background="#FFFFFF" color="#1C1917" radius="18" border-width="0" grow="1" component="dock"/>
-      <button id="dock2" text="" icon="browser" icon-set="lucide" action="app:browser" background="#FFFFFF" color="#1C1917" radius="18" border-width="0" grow="1" component="dock"/>
-      <button id="dock3" text="" icon="settings" icon-set="tabler" action="app:settings" background="#FFFFFF" color="#1C1917" radius="18" border-width="0" grow="1" component="dock"/>
+  <flex id="shell" class="col gap-0" x="0%" y="0%" width="100%" height="fill" align-items="stretch">
+    <hbox id="topbar" width="100%" height="36" gap="8" padding="6" background="#EAE0D0" border-width="0" align-items="center">
+      <button id="menu" text="Apps" icon="grid" icon-set="lucide" action="route:push:res/layout/drawer.xml" background="#EA580C" color="#FFFFFF" width="88" height="24" radius="8" border-width="0" component="button" font-family="Inter" font-size="12"/>
+      <label id="brand" text="VilaOS" color="#1C1917" width="auto" height="wrap" font-family="DM Sans" font-size="14" font-weight="700"/>
+      <label id="clock" text="00:00" color="#1C1917" width="fill" height="wrap" grow="1" value="1" font-family="JetBrains Mono" font-size="14" font-weight="500" text-align="center"/>
+      <badge id="statuspill" text="Ready" value="2" background="#EA580C" color="#FFFFFF" radius="8" height="20" width="auto"/>
+      <button id="quick" text="" icon="sliders" icon-set="lucide" action="route:push:res/layout/shade.xml" background="#F5EFE6" color="#1C1917" width="28" height="24" radius="8" border-width="0" component="button"/>
+      <button id="power" text="" icon="power" icon-set="lucide" action="power_menu" background="#F5EFE6" color="#1C1917" width="28" height="24" radius="8" border-width="0" component="button"/>
+    </hbox>
+    <flex id="body" class="col gap-8 p-12" width="100%" height="fill" grow="1" align-items="stretch">
+      <label id="date" text="Today" color="#57534E" width="100%" height="wrap" font-family="DM Sans" font-size="13" font-weight="600"/>
+      <grid id="launcher" width="100%" height="fill" grow="1" gap="10" padding="4" columns="6">
+        <button id="tile0" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile1" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile2" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile3" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile4" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile5" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile6" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile7" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile8" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile9" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile10" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+        <button id="tile11" text="App" icon="app" icon-set="lucide" action="none" background="#EAE0D0" color="#1C1917" radius="14" border-width="0" component="tile" font-family="Inter" font-size="11"/>
+      </grid>
+    </flex>
+    <hbox id="taskbar" width="100%" height="48" gap="6" padding="6" background="#EAE0D0" border-width="0">
+      <button id="start" text="" icon="home" icon-set="lucide" action="home" background="#EA580C" color="#FFFFFF" width="36" height="36" radius="10" border-width="0" component="button"/>
+      <button id="tb0" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="tb1" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="tb2" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="tb3" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="tb4" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="tb5" text="App" icon="app" icon-set="lucide" action="none" background="#F5EFE6" color="#1C1917" height="36" radius="10" border-width="0" grow="1" component="button" font-family="Inter" font-size="11"/>
+      <button id="showdesk" text="" icon="panel-bottom" icon-set="lucide" action="wm:show_desktop" background="#F5EFE6" color="#1C1917" width="36" height="36" radius="10" border-width="0" component="button"/>
     </hbox>
   </flex>
-  <softkeys left="" center="" right=""
-            left-action="back" center-action="home" right-action="route:push:res/layout/recents.xml"/>
 </screen>

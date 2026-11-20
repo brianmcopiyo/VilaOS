@@ -1,0 +1,55 @@
+<Dashboard Background="#F5EFE6" Padding="0" x:Name="DesktopRoot" xmlns="http://schemas.vilaos.dev/xaml">
+  <Stack Orientation="Vertical" Spacing="0" Width="100%" Height="Fill" Grow="1">
+    <Dashboard Background="#F5EFE6" Grow="1" Padding="12" Width="100%" Height="Fill" x:Name="DesktopDashboard">
+      <Grid ColumnSpacing="12" Columns="*,260" RowSpacing="10" Rows="Auto,*,Auto" Width="100%" Height="Fill" Grow="1">
+        <Panel Background="#EAE0D0" BorderBrush="#D4C5B0" BorderThickness="1" CornerRadius="12" GridColumnSpan="2" Padding="12">
+          <Grid Columns="*,Auto">
+            <Stack Orientation="Vertical" Spacing="2">
+              <Text FontSize="18" FontWeight="Bold" Foreground="#1C1917" Text="Desktop Workspace" x:Name="WorkspaceTitle"/>
+              <Text FontSize="12" Foreground="#57534E" Text="Dynamic package workspace" x:Name="WorkspaceSubtitle"/>
+            </Stack>
+            <Stack Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Badge Background="#EA580C" CornerRadius="999" Foreground="#FFFFFF" Padding="10,4" Text="1024 MB" x:Name="SessionBadge"/>
+              <Button Background="#EA580C" Content="Refresh" CornerRadius="8" Foreground="#FFFFFF" Padding="12,6" x:Name="RefreshAppsBtn"/>
+            </Stack>
+          </Grid>
+        </Panel>
+        <Card Background="#EAE0D0" BorderBrush="#D4C5B0" BorderThickness="1" CornerRadius="12" Padding="12" x:Name="QuickAppsCard">
+          <Stack Orientation="Vertical" Spacing="8" Width="100%" Height="Fill" Grow="1">
+            <Row Subtitle="Discovered from installed .vpkg packages" Title="Installed Applications" x:Name="InstalledHeaderRow"/>
+            <Grid ColumnSpacing="8" Columns="*,*,*" RowSpacing="8" Grow="1" Height="Fill" x:Name="DynamicAppGrid"/>
+          </Stack>
+        </Card>
+        <Card Background="#EAE0D0" BorderBrush="#D4C5B0" BorderThickness="1" CornerRadius="12" Padding="12" x:Name="SystemCard">
+          <Stack Orientation="Vertical" Spacing="8" Width="100%" Height="Fill" Grow="1">
+            <Row Subtitle="Live host and compositor state" Title="System Overview"/>
+            <Row Subtitle="1024 MB allocated" Title="Memory" Height="32" x:Name="RamRow"/>
+            <Row Subtitle="0 installed" Title="Packages" Height="32" x:Name="PackagesRow"/>
+            <Row Subtitle="0 active" Title="Open Windows" Height="32" x:Name="WindowsRow"/>
+            <List Spacing="4" Height="1" x:Name="TelemetryList"/>
+          </Stack>
+        </Card>
+        <Panel Background="#EAE0D0" BorderBrush="#D4C5B0" BorderThickness="1" CornerRadius="10" GridColumnSpan="2" Padding="10,6">
+          <Grid Columns="*,Auto">
+            <Input Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" CornerRadius="8" Foreground="#1C1917" Padding="8,4" Placeholder="Filter installed apps..." x:Name="QuickSearchInput"/>
+            <Text FontSize="12" Foreground="#57534E" Margin="10,0,0,0" Text="Focused: None" VerticalAlignment="Center" x:Name="ActiveWindowLabel"/>
+          </Grid>
+        </Panel>
+      </Grid>
+    </Dashboard>
+    <Taskbar Background="#EAE0D0" BorderBrush="#D4C5B0" BorderThickness="1" Height="44" Padding="8,4" Width="100%" x:Name="DesktopTaskbar">
+      <Grid Columns="Auto,*,Auto" ColumnSpacing="8" Width="100%" Height="100%">
+        <Button Action="home" Background="#EA580C" Content="Home" CornerRadius="8" Foreground="#FFFFFF" Padding="12,6" x:Name="HomeBtn"/>
+        <Stack Orientation="Horizontal" Spacing="4" x:Name="TaskButtons">
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb0"/>
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb1"/>
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb2"/>
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb3"/>
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb4"/>
+          <Button Action="none" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="" CornerRadius="8" Foreground="#1C1917" Padding="8,4" x:Name="tb5"/>
+        </Stack>
+        <Button Action="wm:show_desktop" Background="#F5EFE6" BorderBrush="#D4C5B0" BorderThickness="1" Content="Desktop" CornerRadius="8" Foreground="#1C1917" Padding="12,6" x:Name="ShowDesktopBtn"/>
+      </Grid>
+    </Taskbar>
+  </Stack>
+</Dashboard>

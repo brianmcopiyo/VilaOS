@@ -5,11 +5,10 @@ import app.VilaApp
 import app.require
 import audio.Audio
 import service.Service
-import ui.Button
-import ui.Screen
-import ui.SoftKey
-import ui.Ui
-
+import Button
+import Screen
+import SoftKey
+import Ui
 class MusicApp : VilaApp() {
     private val playBtn = Button(id = "btn_play", variant = "primary") {
         Audio.play()

@@ -3,6 +3,7 @@
 #include "fb.h"
 #include "util.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 static int builtin_init(Gfx *g, int desktop)
@@ -22,7 +23,8 @@ static int builtin_query_caps(Gfx *g, vilaos_gfx_caps_t *out)
                 VILAOS_GFX_CAP_FB | VILAOS_GFX_CAP_THREADS;
     if (g && g->desktop)
         out->caps |= VILAOS_GFX_CAP_SDL;
-    if (g && str_eq(g->backend, "drm"))
+    if (g && (g->gfx_tier == GFX_TIER_DRM || g->gfx_tier == GFX_TIER_GPU ||
+              str_eq(g->backend, "drm") || str_starts(g->backend, "gpu")))
         out->caps |= VILAOS_GFX_CAP_DRM;
     out->max_w = MAX_FB_W;
     out->max_h = MAX_FB_H;
@@ -48,6 +50,11 @@ static uint32_t *builtin_acquire(Gfx *g, int *w, int *h, int *stride_px)
 
 static void builtin_present(Gfx *g)
 {
+    if (g && (str_eq(g->backend, "headless") || getenv("VILAOS_HEADLESS_UI"))) {
+        if (g)
+            g->dirty.valid = 0;
+        return;
+    }
     gfx_backend_present(g);
 }
 
