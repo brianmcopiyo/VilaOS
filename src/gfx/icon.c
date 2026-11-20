@@ -1,6 +1,7 @@
 #include "icon.h"
 #include "draw.h"
 #include "hwinfo.h"
+#include "linux_gfx.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -142,12 +143,15 @@ static int resolve_path(const char *set, const char *name, char *path, size_t n)
         "/assets/icons",
         NULL
     };
+    const char *exts[] = { "png", "svg", NULL };
     for (int i = 0; roots[i]; i++) {
-        snprintf(path, n, "%s/%s/%s.svg", roots[i], set, name);
-        FILE *f = fopen(path, "rb");
-        if (f) {
-            fclose(f);
-            return 0;
+        for (int e = 0; exts[e]; e++) {
+            snprintf(path, n, "%s/%s/%s.%s", roots[i], set, name, exts[e]);
+            FILE *f = fopen(path, "rb");
+            if (f) {
+                fclose(f);
+                return 0;
+            }
         }
     }
     return -1;
@@ -252,6 +256,50 @@ static IconEntry *rasterize(const char *set, const char *name, int size, uint16_
     char path[MAX_PATH];
     if (resolve_path(set, name, path, sizeof(path)) != 0)
         return NULL;
+    size_t plen = strlen(path);
+    if (plen > 4 && (str_eq(path + plen - 4, ".png") || str_eq(path + plen - 4, ".PNG"))) {
+        uint8_t *png_rgba = NULL;
+        int pw = 0, ph = 0;
+        if (linux_png_load(path, &png_rgba, &pw, &ph) == 0 && png_rgba && pw > 0 && ph > 0) {
+            size_t bytes = (size_t)size * (size_t)size * 4u;
+            cache_evict(bytes);
+            if (g_cache_n >= ICON_MAX_ENTRIES) {
+                linux_png_free(png_rgba);
+                return NULL;
+            }
+            uint8_t *rgba = (uint8_t *)calloc(1, bytes);
+            if (!rgba) {
+                linux_png_free(png_rgba);
+                return NULL;
+            }
+            for (int y = 0; y < size; y++) {
+                int sy = y * ph / size;
+                for (int x = 0; x < size; x++) {
+                    int sx = x * pw / size;
+                    uint8_t *src = png_rgba + ((size_t)sy * (size_t)pw + (size_t)sx) * 4u;
+                    uint8_t *dst = rgba + ((size_t)y * (size_t)size + (size_t)x) * 4u;
+                    dst[0] = src[0];
+                    dst[1] = src[1];
+                    dst[2] = src[2];
+                    dst[3] = src[3];
+                }
+            }
+            linux_png_free(png_rgba);
+            IconEntry *e = &g_cache[g_cache_n++];
+            memset(e, 0, sizeof(*e));
+            str_copy(e->set, sizeof(e->set), set);
+            str_copy(e->name, sizeof(e->name), name);
+            e->size = size;
+            e->color = color;
+            e->rgba = rgba;
+            e->bytes = bytes;
+            e->used = ++g_clock;
+            e->valid = 1;
+            g_cache_bytes += bytes;
+            return e;
+        }
+        linux_png_free(png_rgba);
+    }
     char *svg = load_svg_text(path, NULL);
     if (!svg)
         return NULL;

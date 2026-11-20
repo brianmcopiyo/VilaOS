@@ -170,6 +170,7 @@ typedef struct {
     int ram_tier;
     int workers;
     Composer *composer;
+    void *linux_gfx;
 } Gfx;
 
 typedef struct {

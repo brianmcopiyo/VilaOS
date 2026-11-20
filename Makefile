@@ -6,8 +6,17 @@ CFLAGS   ?= -std=c11 -O2 -Wall -Wextra -Wpedantic -ffunction-sections -fdata-sec
 LDFLAGS  ?= -Wl,--gc-sections
 CPPFLAGS := -Iinclude
 LIBS     :=
+LINUX_GFX_CFLAGS :=
+LINUX_GFX_LIBS :=
+MUSL_GFX_PREFIX ?= /root/vilaos-work/musl-gfx
 ifneq ($(OS),Windows_NT)
 LIBS     := -lm -ldl -lpthread
+LINUX_GFX_CFLAGS := $(shell pkg-config --cflags cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
+LINUX_GFX_LIBS := $(shell pkg-config --libs cairo pixman-1 freetype2 libpng libdrm libevdev 2>/dev/null)
+ifneq ($(LINUX_GFX_CFLAGS),)
+CPPFLAGS += $(LINUX_GFX_CFLAGS) -DVILAOS_HAVE_LINUX_GFX
+LIBS += $(LINUX_GFX_LIBS)
+endif
 endif
 
 SRC := \
@@ -24,9 +33,13 @@ SRC := \
 	src/gfx/compositor.c \
 	src/gfx/pool.c \
 	src/gfx/hwinfo.c \
+	src/gfx/linux_gfx.c \
+	src/gfx/linux_font.c \
+	src/gfx/linux_png.c \
 	src/driver/gfx/loader.c \
 	src/driver/gfx/builtin.c \
 	src/driver/gfx/backend_drm.c \
+	src/driver/gfx/linux_drm.c \
 	src/proc/proctier.c \
 	src/proc/ipc.c \
 	src/proc/procman.c \
@@ -40,6 +53,8 @@ SRC := \
 	src/ui/touch.c \
 	src/ui/route.c \
 	src/input/input.c \
+	src/driver/input/pump.c \
+	src/driver/input/linux_evdev.c \
 	src/input/t9.c \
 	src/pkg/pkg.c \
 	src/api/vapi.c \
@@ -67,10 +82,14 @@ GFX_SO_SRC := \
 	src/driver/gfx/shared_entry.c \
 	src/driver/gfx/builtin.c \
 	src/driver/gfx/backend_drm.c \
+	src/driver/gfx/linux_drm.c \
 	src/gfx/fb.c \
 	src/gfx/compose.c \
 	src/gfx/pool.c \
 	src/gfx/hwinfo.c \
+	src/gfx/linux_gfx.c \
+	src/gfx/linux_font.c \
+	src/gfx/linux_png.c \
 	src/core/util.c
 
 OBJ := $(SRC:.c=.o)
@@ -80,7 +99,7 @@ MUSICD_OBJ := $(MUSICD_SRC:.c=.o)
 src/gfx/ttfont.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter
 src/gfx/icon.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable
 
-.PHONY: all clean native aarch64 musl desktop vfb install qemu-help iso vbox-help pkg sdk-pack gfx-drive
+.PHONY: all clean native aarch64 musl desktop vfb install qemu-help iso vbox-help pkg sdk-pack gfx-drive musl-gfx-deps
 
 all: native pkg $(MUSICD)
 
@@ -103,24 +122,48 @@ pkg: $(PKG_APP)
 gfx-driver:
 	mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -shared -DVILAOS_GFX_SO \
-		-o build/libvilaos_gfx.so $(GFX_SO_SRC) $(LDFLAGS) -lm -ldl -lpthread
-	bash scripts/pack_gfx_driver.sh
+		-o build/libvilaos_gfx.so $(GFX_SO_SRC) $(LDFLAGS) $(LIBS)
 
 aarch64:
 	$(MAKE) clean
 	$(MAKE) CC=aarch64-linux-gnu-gcc APP=$(APP)-aarch64 PKG_APP=$(PKG_APP)-aarch64 MUSICD=$(MUSICD)-aarch64 all
 
+musl-gfx-deps:
+	bash scripts/build_musl_gfx_deps.sh $(MUSL_GFX_PREFIX)
+
 musl:
 	$(MAKE) clean
-	$(MAKE) CC=musl-gcc \
-		CFLAGS="$(CFLAGS)" \
-		LDFLAGS="$(LDFLAGS)" \
-		LIBS="-lm -ldl -lpthread" \
-		APP=$(APP)-musl PKG_APP=$(PKG_APP)-musl MUSICD=$(MUSICD)-musl all
-	$(MAKE) CC=musl-gcc \
-		CFLAGS="$(CFLAGS)" \
-		LDFLAGS="$(LDFLAGS)" \
-		gfx-drive
+	@GFX_ENV="$(MUSL_GFX_PREFIX)/vilaos-gfx.pc.env"; \
+	if [ -f "$$GFX_ENV" ]; then \
+		set -a; . "$$GFX_ENV"; set +a; \
+		echo "musl gfx: $$VILAOS_MUSL_GFX_CFLAGS"; \
+		echo "musl libs: $$VILAOS_MUSL_GFX_LIBS"; \
+		$(MAKE) CC=musl-gcc \
+			CPPFLAGS="-Iinclude $$VILAOS_MUSL_GFX_CFLAGS" \
+			CFLAGS="$(CFLAGS)" \
+			LDFLAGS="$(LDFLAGS)" \
+			LIBS="$$VILAOS_MUSL_GFX_LIBS -ldl -lpthread" \
+			APP=$(APP)-musl PKG_APP=$(PKG_APP)-musl MUSICD=$(MUSICD)-musl all; \
+		$(MAKE) CC=musl-gcc \
+			CPPFLAGS="-Iinclude $$VILAOS_MUSL_GFX_CFLAGS" \
+			CFLAGS="$(CFLAGS)" \
+			LDFLAGS="$(LDFLAGS)" \
+			LIBS="$$VILAOS_MUSL_GFX_LIBS -ldl -lpthread" \
+			gfx-driver; \
+	else \
+		echo "musl gfx deps missing at $$GFX_ENV; building without linux gfx"; \
+		$(MAKE) CC=musl-gcc \
+			CPPFLAGS="-Iinclude" \
+			CFLAGS="$(CFLAGS)" \
+			LDFLAGS="$(LDFLAGS)" \
+			LIBS="-lm -ldl -lpthread" \
+			APP=$(APP)-musl PKG_APP=$(PKG_APP)-musl MUSICD=$(MUSICD)-musl all; \
+		$(MAKE) CC=musl-gcc \
+			CPPFLAGS="-Iinclude" \
+			CFLAGS="$(CFLAGS)" \
+			LDFLAGS="$(LDFLAGS)" \
+			gfx-driver; \
+	fi
 
 desktop:
 	$(MAKE) clean

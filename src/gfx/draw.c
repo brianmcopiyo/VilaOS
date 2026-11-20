@@ -1,10 +1,15 @@
 #include "draw.h"
 #include "fb.h"
 #include "compose.h"
+#include "linux_gfx.h"
 #include "util.h"
 
 void draw_pixel(Gfx *g, int x, int y, uint16_t c)
 {
+    if (linux_gfx_ready(g)) {
+        linux_gfx_pixel(g, x, y, c);
+        return;
+    }
     if (!g || !g->back || x < 0 || y < 0 || x >= g->w || y >= g->h)
         return;
     g->back[y * g->w + x] = c;
@@ -15,6 +20,10 @@ void draw_pixel(Gfx *g, int x, int y, uint16_t c)
 
 void draw_fill(Gfx *g, int x, int y, int w, int h, uint16_t c)
 {
+    if (linux_gfx_ready(g)) {
+        linux_gfx_fill(g, x, y, w, h, c);
+        return;
+    }
     if (!g || !g->back || w <= 0 || h <= 0)
         return;
     if (x < 0) {
@@ -60,6 +69,10 @@ void draw_vline(Gfx *g, int x, int y, int h, uint16_t c)
 
 void draw_rect(Gfx *g, int x, int y, int w, int h, uint16_t c)
 {
+    if (linux_gfx_ready(g)) {
+        linux_gfx_rect(g, x, y, w, h, c);
+        return;
+    }
     if (w <= 0 || h <= 0)
         return;
     draw_hline(g, x, y, w, c);
@@ -72,6 +85,10 @@ void draw_line(Gfx *g, int x0, int y0, int x1, int y1, uint16_t c)
 {
     if (!g)
         return;
+    if (linux_gfx_ready(g)) {
+        linux_gfx_line(g, x0, y0, x1, y1, c);
+        return;
+    }
     if (g->composer) {
         compose_line_aa(g->composer, x0, y0, x1, y1, compose_rgb565_to_argb(c));
         compose_flush(g->composer, g->back, g->w, g->h);
@@ -112,6 +129,10 @@ void draw_round_rect(Gfx *g, int x, int y, int w, int h, int r, uint16_t c, int 
 {
     if (w <= 0 || h <= 0)
         return;
+    if (linux_gfx_ready(g)) {
+        linux_gfx_round_rect(g, x, y, w, h, r, c, fill);
+        return;
+    }
     if (g && g->composer) {
         compose_round_rect(g->composer, x, y, w, h, r, compose_rgb565_to_argb(c), fill);
         compose_flush(g->composer, g->back, g->w, g->h);
@@ -198,6 +219,10 @@ void draw_pixel_aa(Gfx *g, int x, int y, uint16_t c, uint8_t cover)
 {
     if (!g || cover == 0)
         return;
+    if (linux_gfx_ready(g)) {
+        linux_gfx_pixel_aa(g, x, y, c, cover);
+        return;
+    }
     if (cover >= 255) {
         draw_pixel(g, x, y, c);
         return;

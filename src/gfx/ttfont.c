@@ -1,6 +1,7 @@
 #include "ttfont.h"
 #include "draw.h"
 #include "fb.h"
+#include "linux_gfx.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -294,6 +295,7 @@ static unsigned next_codepoint(const char **pp)
 int font_system_init(const HwProfile *hw)
 {
     font_system_shutdown();
+    linux_font_init();
     size_t budget = 256u * 1024u;
     int slots = TT_CACHE_SLOTS_MIN;
     if (hw) {
@@ -378,6 +380,7 @@ int font_system_init(const HwProfile *hw)
 
 void font_system_shutdown(void)
 {
+    linux_font_shutdown();
     if (g_cache) {
         for (int i = 0; i < g_cache_slots; i++)
             cache_free_slot(&g_cache[i]);
@@ -486,7 +489,20 @@ int font_tt_text_w(const FontStyle *style, const char *text)
 void font_tt_draw_text(Gfx *g, const FontStyle *style, int x, int y, const char *text,
                        uint16_t fg, uint16_t bg, int opaque)
 {
-    if (!g || !style || !text || !g_ready)
+    if (!g || !style || !text)
+        return;
+    if (linux_font_ready()) {
+        const char *path = "/assets/fonts/Inter-Regular.ttf";
+        if (style->face == FONT_FACE_DISPLAY)
+            path = "/assets/fonts/Inter-Bold.ttf";
+        else if (style->face == FONT_FACE_MONO)
+            path = "/assets/fonts/JetBrainsMono-Regular.ttf";
+        if (style->weight >= 600)
+            path = "/assets/fonts/Inter-Bold.ttf";
+        linux_font_draw(g, path, style->size_px, style->weight, x, y, text, fg, bg, opaque, 0);
+        return;
+    }
+    if (!g_ready)
         return;
     int cx = x;
     const char *p = text;

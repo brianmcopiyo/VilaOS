@@ -2,6 +2,7 @@
 #include "gfx_backend.h"
 #include "gfx_loader.h"
 #include "compose.h"
+#include "linux_gfx.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -103,6 +104,12 @@ int gfx_set_size(Gfx *g, int w, int h)
         g->compose_px = g->composer->px;
         g->compose_pixels = g->composer->pixels;
     }
+#if defined(VILAOS_HAVE_LINUX_GFX)
+    if (!g->linux_gfx)
+        linux_gfx_init(g);
+    else
+        linux_gfx_resize(g, w, h);
+#endif
 #ifdef PHONE_DESKTOP
     if (g->desktop) {
         if (need > g_argb_pixels || !g_argb) {
@@ -646,6 +653,12 @@ void gfx_shutdown(Gfx *g)
 
 void gfx_present(Gfx *g)
 {
+#if defined(VILAOS_HAVE_LINUX_GFX)
+    if (g && g->dri_fd >= 0 && linux_drm_present(g) == 0) {
+        g->dirty.valid = 0;
+        return;
+    }
+#endif
     if (g && g->drv && g->drv->present)
         g->drv->present(g);
     else

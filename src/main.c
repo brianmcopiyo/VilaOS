@@ -447,6 +447,8 @@ restart_loop:
                 compositor_unlock(&g_comp);
             need_frame = 1;
             last_tick = t;
+            if (has_comp)
+                compositor_request(&g_comp);
         }
 
         InputEvent ev;
@@ -458,7 +460,9 @@ restart_loop:
         int arc = 0;
 
         if (got) {
-            need_frame = 1;
+            int pointer_only = (ev.kind == IE_TOUCH_MOVE);
+            if (!pointer_only)
+                need_frame = 1;
             int heavy = (ev.kind == IE_OK || ev.kind == IE_HOME || ev.kind == IE_BACK ||
                          ev.kind == IE_SOFT_LEFT || ev.kind == IE_SOFT_RIGHT || ev.kind == IE_POWER ||
                          ev.kind == IE_CLICK || ev.kind == IE_TOUCH_UP || ev.kind == IE_TOUCH_DOWN ||
@@ -581,6 +585,8 @@ restart_loop:
                 char tap_nav[MAX_PATH];
                 tap_nav[0] = 0;
                 int tr = screen_handle_touch(&screen, &gfx, &input, &ev, tap_nav, sizeof(tap_nav));
+                if (ev.kind == IE_TOUCH_MOVE && input.gesture_scroll == 1)
+                    need_frame = 1;
                 if (ev.kind == IE_TOUCH_UP && tr >= 11 && tr <= 13) {
                     int side = tr - 10;
                     arc = run_soft(&screen, &gfx, side, tap_nav, nav, sizeof(nav));

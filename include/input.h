@@ -3,7 +3,10 @@
 
 #include "types.h"
 
+#include <pthread.h>
+
 #define INPUT_MAX_TOUCH_SLOTS 8
+#define INPUT_Q_MAX 64
 
 typedef enum {
     IE_NONE = 0,
@@ -84,6 +87,19 @@ typedef struct {
     int gesture_last_x;
     int gesture_target;
     uint64_t gesture_start_ms;
+    pthread_t pump_thr;
+    pthread_mutex_t pump_mu;
+    pthread_cond_t pump_cv;
+    int pump_run;
+    int pump_started;
+    InputEvent q[INPUT_Q_MAX];
+    int q_head;
+    int q_tail;
+    int q_count;
+    uint32_t pointer_gen;
+    int coalesce_x;
+    int coalesce_y;
+    int coalesce_vis;
 } InputMux;
 
 int input_init(InputMux *m);
@@ -94,5 +110,6 @@ void input_apply_char(Widget *w, char ch);
 void input_backspace(Widget *w);
 void input_mode_label(const InputMux *m, char *buf, size_t n);
 int input_tap_slop(const InputMux *m);
+uint32_t input_pointer_gen(const InputMux *m);
 
 #endif

@@ -1,4 +1,5 @@
 #include "compositor.h"
+#include "draw.h"
 #include "util.h"
 
 #include <pthread.h>
@@ -48,6 +49,77 @@ static int clock_second(void)
     return (int)(time(NULL) % 60);
 }
 
+static void read_pointer(const InputMux *input, int *x, int *y, int *on, uint32_t *gen)
+{
+    *x = 0;
+    *y = 0;
+    *on = 0;
+    *gen = 0;
+    if (!input)
+        return;
+    if (input->pump_started) {
+        *x = input->coalesce_x;
+        *y = input->coalesce_y;
+        *on = input->coalesce_vis;
+        *gen = input->pointer_gen;
+    } else {
+        *x = input->state.cursor_x;
+        *y = input->state.cursor_y;
+        *on = input->state.cursor_visible;
+        *gen = input->pointer_gen;
+    }
+}
+
+static void save_underlay(DisplayCompositor *c, Gfx *gfx, int x, int y)
+{
+    if (!c || !gfx || !gfx->back)
+        return;
+    for (int row = 0; row < COMPOSITOR_CURSOR_H; row++) {
+        int sy = y + row;
+        for (int col = 0; col < COMPOSITOR_CURSOR_W; col++) {
+            int sx = x + col;
+            uint16_t pix = COL_BG;
+            if (sx >= 0 && sy >= 0 && sx < gfx->w && sy < gfx->h)
+                pix = gfx->back[sy * gfx->w + sx];
+            c->cursor_under[row * COMPOSITOR_CURSOR_W + col] = pix;
+        }
+    }
+    c->under_x = x;
+    c->under_y = y;
+    c->under_valid = 1;
+}
+
+static void restore_underlay(DisplayCompositor *c, Gfx *gfx)
+{
+    if (!c || !gfx || !gfx->back || !c->under_valid)
+        return;
+    int ox = c->under_x;
+    int oy = c->under_y;
+    for (int row = 0; row < COMPOSITOR_CURSOR_H; row++) {
+        int sy = oy + row;
+        for (int col = 0; col < COMPOSITOR_CURSOR_W; col++) {
+            int sx = ox + col;
+            if (sx < 0 || sy < 0 || sx >= gfx->w || sy >= gfx->h)
+                continue;
+            gfx->back[sy * gfx->w + sx] = c->cursor_under[row * COMPOSITOR_CURSOR_W + col];
+        }
+    }
+    gfx_dirty(gfx, ox, oy, COMPOSITOR_CURSOR_W, COMPOSITOR_CURSOR_H);
+    c->under_valid = 0;
+}
+
+static void paint_cursor(Gfx *gfx, int x, int y)
+{
+    if (!gfx)
+        return;
+    draw_line(gfx, x, y, x + 8, y + 8, COL_ACCENT);
+    draw_line(gfx, x, y, x, y + 12, COL_ACCENT);
+    draw_line(gfx, x, y + 12, x + 4, y + 9, COL_ACCENT);
+    draw_line(gfx, x + 4, y + 9, x + 8, y + 8, COL_ACCENT);
+    draw_pixel(gfx, x + 1, y + 1, COL_TEXT);
+    gfx_dirty(gfx, x, y, COMPOSITOR_CURSOR_W, COMPOSITOR_CURSOR_H);
+}
+
 static void *compositor_main(void *arg)
 {
     DisplayCompositor *c = (DisplayCompositor *)arg;
@@ -68,18 +140,19 @@ static void *compositor_main(void *arg)
                 int sec = clock_second();
                 if (sec != c->last_sec) {
                     c->last_sec = sec;
+                    c->content_dirty = 1;
                     c->dirty = 1;
                 }
-                if (c->input) {
-                    int cx = c->input->state.cursor_x;
-                    int cy = c->input->state.cursor_y;
-                    int on = c->input->state.cursor_visible;
-                    if (cx != c->cursor_x || cy != c->cursor_y || on != c->cursor_on) {
-                        c->cursor_x = cx;
-                        c->cursor_y = cy;
-                        c->cursor_on = on;
-                        c->dirty = 1;
-                    }
+                int cx, cy, on;
+                uint32_t gen;
+                read_pointer(c->input, &cx, &cy, &on, &gen);
+                if (gen != c->pointer_gen || cx != c->cursor_x || cy != c->cursor_y || on != c->cursor_on) {
+                    c->cursor_x = cx;
+                    c->cursor_y = cy;
+                    c->cursor_on = on;
+                    c->pointer_gen = gen;
+                    c->cursor_dirty = 1;
+                    c->dirty = 1;
                 }
             }
 #endif
@@ -88,20 +161,61 @@ static void *compositor_main(void *arg)
             pthread_mutex_unlock(&c->mu);
             break;
         }
-        c->dirty = 0;
+
         int force = c->force_full;
+        int do_content = c->content_dirty || force;
+        int do_cursor = c->cursor_dirty || do_content;
+        c->dirty = 0;
+        c->content_dirty = 0;
+        c->cursor_dirty = 0;
         c->force_full = 0;
+
         Gfx *gfx = c->gfx;
         Screen *screen = c->screen;
         InputMux *input = c->input;
-        if (force && gfx)
-            gfx_dirty_all(gfx);
-        if (screen && gfx)
-            screen_render(screen, gfx, input ? &input->state : NULL);
-        pthread_mutex_unlock(&c->mu);
+        int cx = c->cursor_x;
+        int cy = c->cursor_y;
+        int on = c->cursor_on;
+        int prev_x = c->prev_cursor_x;
+        int prev_y = c->prev_cursor_y;
+        int prev_on = c->prev_cursor_on;
 
-        if (gfx)
+        if (do_content && screen && gfx) {
+            if (force)
+                gfx_dirty_all(gfx);
+            InputState blank;
+            memset(&blank, 0, sizeof(blank));
+            if (input)
+                blank = input->state;
+            blank.cursor_visible = 0;
+            screen_render(screen, gfx, &blank);
+            c->under_valid = 0;
+            if (on) {
+                save_underlay(c, gfx, cx, cy);
+                paint_cursor(gfx, cx, cy);
+            }
+            c->prev_cursor_x = cx;
+            c->prev_cursor_y = cy;
+            c->prev_cursor_on = on;
+            pthread_mutex_unlock(&c->mu);
             gfx_present(gfx);
+        } else if (do_cursor && gfx) {
+            if (prev_on || c->under_valid)
+                restore_underlay(c, gfx);
+            if (prev_on)
+                gfx_dirty(gfx, prev_x, prev_y, COMPOSITOR_CURSOR_W, COMPOSITOR_CURSOR_H);
+            if (on) {
+                save_underlay(c, gfx, cx, cy);
+                paint_cursor(gfx, cx, cy);
+            }
+            c->prev_cursor_x = cx;
+            c->prev_cursor_y = cy;
+            c->prev_cursor_on = on;
+            pthread_mutex_unlock(&c->mu);
+            gfx_present(gfx);
+        } else {
+            pthread_mutex_unlock(&c->mu);
+        }
 
         int64_t now = mono_ns();
         next_frame += FRAME_NS;
@@ -125,13 +239,14 @@ int compositor_start(DisplayCompositor *c, Gfx *gfx, Screen *screen, InputMux *i
     c->input = input;
     c->running = 1;
     c->dirty = 1;
+    c->content_dirty = 1;
     c->force_full = 1;
     c->last_sec = clock_second();
-    if (input) {
-        c->cursor_x = input->state.cursor_x;
-        c->cursor_y = input->state.cursor_y;
-        c->cursor_on = input->state.cursor_visible;
-    }
+    if (input)
+        read_pointer(input, &c->cursor_x, &c->cursor_y, &c->cursor_on, &c->pointer_gen);
+    c->prev_cursor_x = c->cursor_x;
+    c->prev_cursor_y = c->cursor_y;
+    c->prev_cursor_on = 0;
     pthread_mutexattr_t mattr;
     pthread_mutexattr_init(&mattr);
     pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
@@ -197,6 +312,7 @@ void compositor_request(DisplayCompositor *c)
         return;
     pthread_mutex_lock(&c->mu);
     c->dirty = 1;
+    c->content_dirty = 1;
     pthread_cond_signal(&c->cv);
     pthread_mutex_unlock(&c->mu);
 }
@@ -207,6 +323,7 @@ void compositor_request_full(DisplayCompositor *c)
         return;
     pthread_mutex_lock(&c->mu);
     c->dirty = 1;
+    c->content_dirty = 1;
     c->force_full = 1;
     pthread_cond_signal(&c->cv);
     pthread_mutex_unlock(&c->mu);
@@ -216,15 +333,16 @@ void compositor_note_input(DisplayCompositor *c)
 {
     if (!c || !c->input)
         return;
-    int cx = c->input->state.cursor_x;
-    int cy = c->input->state.cursor_y;
-    int on = c->input->state.cursor_visible;
+    int cx, cy, on;
+    uint32_t gen;
+    read_pointer(c->input, &cx, &cy, &on, &gen);
     pthread_mutex_lock(&c->mu);
-    int changed = (cx != c->cursor_x || cy != c->cursor_y || on != c->cursor_on);
-    if (changed) {
+    if (gen != c->pointer_gen || cx != c->cursor_x || cy != c->cursor_y || on != c->cursor_on) {
         c->cursor_x = cx;
         c->cursor_y = cy;
         c->cursor_on = on;
+        c->pointer_gen = gen;
+        c->cursor_dirty = 1;
         c->dirty = 1;
         pthread_cond_signal(&c->cv);
     }

@@ -37,8 +37,9 @@ ln -sfn /usr/include/asm-generic /usr/include/x86_64-linux-musl/asm 2>/dev/null 
 ln -sfn /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm
 
 cd "${WORK}"
+bash scripts/build_musl_gfx_deps.sh /root/vilaos-work/musl-gfx || true
 make clean
-make musl
+make musl MUSL_GFX_PREFIX=/root/vilaos-work/musl-gfx
 strip --strip-unneeded vilaos-musl vilaos-pkg-musl vilaos-musicd-musl
 bash scripts/pack_apps.sh
 bash scripts/pack_gfx_driver.sh

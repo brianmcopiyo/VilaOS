@@ -1,4 +1,5 @@
 #include "input.h"
+#include "input_pump.h"
 #include "t9.h"
 #include "util.h"
 
@@ -414,6 +415,8 @@ int input_init(InputMux *m)
         }
     }
     scan_devices(m);
+    if (input_pump_start(m) != 0)
+        fprintf(stderr, "input pump start failed\n");
 #elif defined(PHONE_VFB) && !defined(_WIN32)
     if (isatty(STDIN_FILENO)) {
         tcgetattr(STDIN_FILENO, &g_old_term);
@@ -431,6 +434,7 @@ int input_init(InputMux *m)
 void input_shutdown(InputMux *m)
 {
 #if !defined(PHONE_DESKTOP) && !defined(PHONE_VFB)
+    input_pump_stop(m);
     for (int i = 0; i < m->fd_count; i++) {
         if (m->grabbed[i])
             ioctl(m->fds[i], EVIOCGRAB, 0);
@@ -906,12 +910,17 @@ static int poll_stdin(InputMux *m, InputEvent *out)
 }
 #endif
 
+uint32_t input_pointer_gen(const InputMux *m)
+{
+    return m ? m->pointer_gen : 0;
+}
+
 int input_poll(InputMux *m, InputEvent *out, int timeout_ms)
 {
     memset(out, 0, sizeof(*out));
-    hide_cursor_if_idle(m);
 
 #ifdef PHONE_DESKTOP
+    hide_cursor_if_idle(m);
     (void)timeout_ms;
     if (poll_sdl(m, out))
         return 1;
@@ -919,6 +928,7 @@ int input_poll(InputMux *m, InputEvent *out, int timeout_ms)
         t9_commit(&m->t9);
     return 0;
 #elif defined(PHONE_VFB)
+    hide_cursor_if_idle(m);
     (void)timeout_ms;
 #ifdef _WIN32
     Sleep(timeout_ms > 0 ? (DWORD)timeout_ms : 1);
@@ -931,6 +941,26 @@ int input_poll(InputMux *m, InputEvent *out, int timeout_ms)
         t9_commit(&m->t9);
     return 0;
 #else
+    if (m->pump_started)
+        return input_pump_pop(m, out, timeout_ms);
+
+    hide_cursor_if_idle(m);
+    if (m->t9.len > 0 && !t9_pending(&m->t9, now_ms()))
+        t9_commit(&m->t9);
+
+    return input_dev_read(m, out, timeout_ms);
+#endif
+}
+
+int input_dev_read(InputMux *m, InputEvent *out, int timeout_ms)
+{
+#if defined(PHONE_DESKTOP) || defined(PHONE_VFB)
+    (void)m;
+    (void)out;
+    (void)timeout_ms;
+    return 0;
+#else
+    memset(out, 0, sizeof(*out));
     if (m->t9.len > 0 && !t9_pending(&m->t9, now_ms()))
         t9_commit(&m->t9);
 
