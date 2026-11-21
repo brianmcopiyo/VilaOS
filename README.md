@@ -16,9 +16,9 @@ winbuild/            Windows WebView2 host + vendored libs
   src/               main.c, native.cpp
   libs/              webview + WebView2
   bin/               shell.exe, ui/, WebView2Loader.dll
-kernelbuild/         Freestanding kernel + ISO staging
-  src/               boot.S, kmain.c
-  iso_root/          GRUB config, kernel.bin, ui/
+kernelbuild/         Debian live ISO + Chromium kiosk
+  tools/             build-live-iso.sh (runs in WSL)
+  overlay/           Xorg / live tweaks
   out/terminal.iso
 Makefile             Root: win / iso
 ```
@@ -33,17 +33,17 @@ mingw32-make -C winbuild
 
 Or from the repo root: `mingw32-make win`
 
-## ISO
+## ISO (Linux live + Chromium kiosk)
+
+Requires **WSL** (Ubuntu) with sudo. First build downloads a Debian rootfs and Chromium (slow); later builds reuse `.cache/`.
 
 ```powershell
 mingw32-make -C kernelbuild
 ```
 
-This builds the freestanding kernel, stages React into `kernelbuild/iso_root/ui`, then packs `kernelbuild/out/terminal.iso`.
+Boot flow: GRUB → Debian live → autologin → Openbox → Chromium `--kiosk` → React UI at `http://127.0.0.1/` (nginx serves `/opt/terminal/ui`).
 
-ISO packing prefers **WSL `grub-mkrescue`**, then **Windows ADK `oscdimg`**. Without either, a zip-backed staging file is written so the tree is still buildable.
-
-A 32-bit freestanding ELF toolchain (`i686-elf-gcc` / `x86_64-elf-gcc`) produces a cleaner Multiboot2 kernel; otherwise the makefile uses host `gcc -m32 -ffreestanding`.
+Output: `kernelbuild/out/terminal.iso`
 
 ## Bridge (Windows host)
 
@@ -53,3 +53,5 @@ A 32-bit freestanding ELF toolchain (`i686-elf-gcc` / `x86_64-elf-gcc`) produces
 | `nativeCd(path)` | change directory |
 | `nativeRun(cmd)` | run command / builtin |
 | `nativeQuit()` | terminate app |
+
+On the ISO kiosk, those bridges are absent; the React shell still runs (browser fallbacks in `native.ts`).
